@@ -20,17 +20,15 @@ npm install counter-strike-demo-parser
 
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
-import { readFileSync } from 'node:fs';
 
-const buffer = readFileSync('match.dem');
-const parser = DemoParser.fromBuffer(buffer);
+const parser = await DemoParser.fromFile('match.dem');
 
 parser.on('playerDeath', (event) => {
   const hs = event.headshot ? ' (headshot)' : '';
   console.log(`${event.attacker?.name} killed ${event.victim.name} with ${event.weapon}${hs}`);
 });
 
-parser.parseAll();
+await parser.parseAll();
 ```
 
 ## Features
@@ -50,9 +48,8 @@ parser.parseAll();
 
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
-import { readFileSync } from 'node:fs';
 
-const parser = DemoParser.fromBuffer(readFileSync('match.dem'));
+const parser = await DemoParser.fromFile('match.dem');
 
 parser.on('parseEnd', () => {
   for (const player of parser.players) {
@@ -63,12 +60,15 @@ parser.on('parseEnd', () => {
   }
 });
 
-parser.parseAll();
+await parser.parseAll();
 ```
 
 ### Position Heatmap Data
 
 ```typescript
+import { DemoParser } from 'counter-strike-demo-parser';
+
+const parser = await DemoParser.fromFile('match.dem');
 const positions: { x: number; y: number; team: string }[] = [];
 
 parser.on('tickEnd', () => {
@@ -83,13 +83,17 @@ parser.on('tickEnd', () => {
   }
 });
 
-parser.parseAll();
+await parser.parseAll();
 // positions now contains every alive player's location at every tick
 ```
 
 ### Grenade Trajectories
 
 ```typescript
+import { DemoParser } from 'counter-strike-demo-parser';
+
+const parser = await DemoParser.fromFile('match.dem');
+
 parser.on('grenadeThrown', (event) => {
   console.log(`${event.player.name} threw ${event.grenadeType} from (${event.origin.x}, ${event.origin.y})`);
 });
@@ -102,12 +106,16 @@ parser.on('flashbangDetonate', (event) => {
   console.log(`Flashbang detonated at (${event.position.x}, ${event.position.y})`);
 });
 
-parser.parseAll();
+await parser.parseAll();
 ```
 
 ### Round-by-Round Economy
 
 ```typescript
+import { DemoParser } from 'counter-strike-demo-parser';
+
+const parser = await DemoParser.fromFile('match.dem');
+
 parser.on('roundFreezeEnd', () => {
   const round = parser.gameState.roundNumber;
   for (const player of parser.players) {
@@ -117,7 +125,7 @@ parser.on('roundFreezeEnd', () => {
   }
 });
 
-parser.parseAll();
+await parser.parseAll();
 ```
 
 ## API Overview
