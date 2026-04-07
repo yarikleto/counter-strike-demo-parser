@@ -8,7 +8,7 @@
 [![license](https://img.shields.io/npm/l/counter-strike-demo-parser)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-417e38)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org)
-[![CI](https://img.shields.io/github/actions/workflow/status/user/counter-strike-demo-parser/ci.yml?label=CI)](https://github.com/user/counter-strike-demo-parser/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/yarikleto/counter-strike-demo-parser/ci.yml?label=CI)](https://github.com/yarikleto/counter-strike-demo-parser/actions)
 
 ---
 
@@ -184,11 +184,15 @@ If you're in the Node.js/TypeScript ecosystem — this is the parser to use.
 Contributions are welcome. Please open an issue before starting work on anything substantial so we can discuss the approach.
 
 ```bash
-git clone https://github.com/user/counter-strike-demo-parser.git
+git clone https://github.com/yarikleto/counter-strike-demo-parser.git
 cd counter-strike-demo-parser
 npm install
 npm test
 ```
+
+## Author
+
+Created by [Yaroslav Pakhaliuk](https://github.com/yarikleto).
 
 ## License
 
