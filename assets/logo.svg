@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f1419"/>
+      <stop offset="100%" stop-color="#1a2332"/>
+    </linearGradient>
+
+    <!-- Accent gradient for the icon -->
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+
+    <!-- Subtle glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Soft outer glow for the icon -->
+    <filter id="iconGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#3b82f6" flood-opacity="0.3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="shadow"/>
+      <feComposite in="SourceGraphic" in2="shadow" operator="over"/>
+    </filter>
+
+    <!-- Rounded rectangle clip for the banner -->
+    <clipPath id="bannerClip">
+      <rect x="0" y="0" width="800" height="200" rx="12" ry="12"/>
+    </clipPath>
+  </defs>
+
+  <!-- Banner background with rounded corners -->
+  <g clip-path="url(#bannerClip)">
+    <rect width="800" height="200" fill="url(#bg)"/>
+
+    <!-- Subtle grid pattern suggesting data/matrix -->
+    <g opacity="0.04" stroke="#3b82f6" stroke-width="0.5" fill="none">
+      <line x1="0" y1="40" x2="800" y2="40"/>
+      <line x1="0" y1="80" x2="800" y2="80"/>
+      <line x1="0" y1="120" x2="800" y2="120"/>
+      <line x1="0" y1="160" x2="800" y2="160"/>
+      <line x1="100" y1="0" x2="100" y2="200"/>
+      <line x1="200" y1="0" x2="200" y2="200"/>
+      <line x1="300" y1="0" x2="300" y2="200"/>
+      <line x1="400" y1="0" x2="400" y2="200"/>
+      <line x1="500" y1="0" x2="500" y2="200"/>
+      <line x1="600" y1="0" x2="600" y2="200"/>
+      <line x1="700" y1="0" x2="700" y2="200"/>
+    </g>
+
+    <!-- Floating binary data on the left - very subtle -->
+    <g opacity="0.06" fill="#60a5fa" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'Liberation Mono', 'Courier New', monospace" font-size="10">
+      <text x="20" y="30">01001000 11010010</text>
+      <text x="45" y="50">10110100 01100001</text>
+      <text x="15" y="70">01110011 10010110</text>
+      <text x="55" y="90">11001010 01011101</text>
+      <text x="25" y="170">10010011 01101100</text>
+      <text x="50" y="190">01100101 11010001</text>
+    </g>
+
+    <!-- Floating binary data on the right -->
+    <g opacity="0.06" fill="#60a5fa" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'Liberation Mono', 'Courier New', monospace" font-size="10" text-anchor="end">
+      <text x="780" y="25">01101101 00101110</text>
+      <text x="755" y="45">11100100 01010011</text>
+      <text x="775" y="165">10101100 01110010</text>
+      <text x="750" y="185">01011010 11001101</text>
+    </g>
+
+    <!-- === ICON: Crosshair + Code Brackets === -->
+    <!-- Positioned to the left of the text block -->
+    <g transform="translate(115, 78)" filter="url(#iconGlow)">
+      <!-- Left angle bracket < -->
+      <polyline points="-38,-22 -54,0 -38,22" fill="none" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Right angle bracket > -->
+      <polyline points="38,-22 54,0 38,22" fill="none" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Crosshair - vertical line -->
+      <line x1="0" y1="-18" x2="0" y2="-6" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="6" x2="0" y2="18" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- Crosshair - horizontal line -->
+      <line x1="-18" y1="0" x2="-6" y2="0" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+      <line x1="6" y1="0" x2="18" y2="0" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- Crosshair - center dot -->
+      <circle cx="0" cy="0" r="2" fill="#3b82f6"/>
+
+      <!-- Crosshair - outer ring -->
+      <circle cx="0" cy="0" r="26" fill="none" stroke="#475569" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+    </g>
+
+    <!-- === TEXT === -->
+    <!-- Main title -->
+    <text x="185" y="85" fill="#f1f5f9" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'Liberation Mono', 'Courier New', monospace" font-size="26" font-weight="700" letter-spacing="-0.5">
+      counter-strike-demo-parser
+    </text>
+
+    <!-- Tagline -->
+    <text x="185" y="115" fill="#64748b" font-family="'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'Liberation Mono', 'Courier New', monospace" font-size="14" letter-spacing="0.5">
+      Parse .dem files. Extract everything.
+    </text>
+
+    <!-- Accent line under the tagline -->
+    <line x1="185" y1="130" x2="310" y2="130" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Bottom border accent -->
+    <rect x="0" y="196" width="800" height="4" fill="url(#accent)" opacity="0.8"/>
+  </g>
+
+  <!-- Rounded border -->
+  <rect x="0.5" y="0.5" width="799" height="199" rx="12" ry="12" fill="none" stroke="#1e293b" stroke-width="1"/>
+</svg>

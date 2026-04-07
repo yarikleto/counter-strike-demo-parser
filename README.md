@@ -1,4 +1,6 @@
-# counter-strike-demo-parser
+<p align="center">
+  <img src="./assets/logo.svg" alt="counter-strike-demo-parser" width="800" />
+</p>
 
 **A streaming, fully-typed Counter-Strike demo parser for Node.js. CS:GO now, CS2 coming soon.**
 
