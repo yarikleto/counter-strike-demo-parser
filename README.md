@@ -10,7 +10,7 @@
 
 ---
 
-Parse `.dem` files and extract everything: every tick, every entity, every event. Fully typed, streaming, zero native dependencies.
+Parse `.dem` files and extract everything: every tick, every entity, every event. Fully typed, zero native dependencies.
 
 ## Quick Start
 
@@ -21,15 +21,15 @@ npm install counter-strike-demo-parser
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
 
-const parser = await DemoParser.fromFile('match.dem');
+const demo = await DemoParser.parse('match.dem');
 
-parser.on('playerDeath', (event) => {
-  const hs = event.headshot ? ' (headshot)' : '';
-  console.log(`${event.attacker?.name} killed ${event.victim.name} with ${event.weapon}${hs}`);
-});
-
-await parser.parseAll();
+for (const kill of demo.kills) {
+  const hs = kill.headshot ? ' (headshot)' : '';
+  console.log(`${kill.attacker?.name} killed ${kill.victim.name} with ${kill.weapon}${hs}`);
+}
 ```
+
+That's it. One call, all data, fully typed.
 
 ## Features
 
@@ -38,7 +38,7 @@ await parser.parseAll();
 - **Grenade trajectories** — follow every smoke, flash, molotov, and HE from throw to detonation
 - **Economy tracking** — money, purchases, equipment value per player per round
 - **Complete entity system** — every networked object decoded via SendTable/ServerClass with delta compression
-- **Streaming architecture** — constant memory usage regardless of demo length
+- **Two API levels** — high-level async/await for simplicity, low-level streaming for power users
 - **Zero native dependencies** — pure TypeScript, works everywhere Node.js runs
 - **Full TypeScript types** — every event, every entity property, every API surface is typed
 
@@ -49,18 +49,14 @@ await parser.parseAll();
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
 
-const parser = await DemoParser.fromFile('match.dem');
+const demo = await DemoParser.parse('match.dem');
 
-parser.on('parseEnd', () => {
-  for (const player of parser.players) {
-    console.log(
-      `${player.name.padEnd(20)} K: ${player.kills}  D: ${player.deaths}  A: ${player.assists}  ` +
-      `Score: ${player.score}  MVPs: ${player.mvps}`
-    );
-  }
-});
-
-await parser.parseAll();
+for (const player of demo.players) {
+  console.log(
+    `${player.name.padEnd(20)} K: ${player.kills}  D: ${player.deaths}  A: ${player.assists}  ` +
+    `Score: ${player.score}  MVPs: ${player.mvps}`
+  );
+}
 ```
 
 ### Position Heatmap Data
@@ -68,23 +64,12 @@ await parser.parseAll();
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
 
-const parser = await DemoParser.fromFile('match.dem');
-const positions: { x: number; y: number; team: string }[] = [];
+const demo = await DemoParser.parse('match.dem');
 
-parser.on('tickEnd', () => {
-  for (const player of parser.players) {
-    if (player.isAlive) {
-      positions.push({
-        x: player.position.x,
-        y: player.position.y,
-        team: player.side,
-      });
-    }
-  }
-});
-
-await parser.parseAll();
-// positions now contains every alive player's location at every tick
+// All player positions across all ticks
+for (const snapshot of demo.playerPositions) {
+  console.log(`Tick ${snapshot.tick}: ${snapshot.player.name} at (${snapshot.x}, ${snapshot.y})`);
+}
 ```
 
 ### Grenade Trajectories
@@ -92,21 +77,13 @@ await parser.parseAll();
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
 
-const parser = await DemoParser.fromFile('match.dem');
+const demo = await DemoParser.parse('match.dem');
 
-parser.on('grenadeThrown', (event) => {
-  console.log(`${event.player.name} threw ${event.grenadeType} from (${event.origin.x}, ${event.origin.y})`);
-});
-
-parser.on('hegrenadeDetonate', (event) => {
-  console.log(`HE grenade detonated at (${event.position.x}, ${event.position.y})`);
-});
-
-parser.on('flashbangDetonate', (event) => {
-  console.log(`Flashbang detonated at (${event.position.x}, ${event.position.y})`);
-});
-
-await parser.parseAll();
+for (const grenade of demo.grenades) {
+  const start = grenade.trajectory[0];
+  const end = grenade.trajectory.at(-1);
+  console.log(`${grenade.thrower.name} threw ${grenade.type}: (${start.x}, ${start.y}) → (${end.x}, ${end.y})`);
+}
 ```
 
 ### Round-by-Round Economy
@@ -114,14 +91,48 @@ await parser.parseAll();
 ```typescript
 import { DemoParser } from 'counter-strike-demo-parser';
 
+const demo = await DemoParser.parse('match.dem');
+
+for (const round of demo.rounds) {
+  console.log(`\nRound ${round.number} — winner: ${round.winner.name}`);
+  for (const player of round.players) {
+    console.log(`  ${player.name.padEnd(20)} $${player.startMoney} → $${player.endMoney}`);
+  }
+}
+```
+
+## Two API Levels
+
+### High-level: `DemoParser.parse()` — async/await, all data collected
+
+For most use cases. Parses the entire demo and returns a structured result object.
+
+```typescript
+const demo = await DemoParser.parse('match.dem');
+
+demo.header       // map, duration, tick count, server info
+demo.players      // final player states with full stats
+demo.kills        // all kills with attacker, victim, weapon, headshot...
+demo.rounds       // round-by-round results, economy, events
+demo.grenades     // grenade trajectories from throw to detonation
+demo.chatMessages // in-game chat
+demo.events       // every raw game event, if you need it
+```
+
+### Low-level: streaming events — per-tick control, constant memory
+
+For power users processing huge files or building real-time pipelines. Subscribe to events, parse frame-by-frame.
+
+```typescript
 const parser = await DemoParser.fromFile('match.dem');
 
-parser.on('roundFreezeEnd', () => {
-  const round = parser.gameState.roundNumber;
+parser.on('playerDeath', (event) => {
+  console.log(`${event.attacker?.name} killed ${event.victim.name}`);
+});
+
+parser.on('tickEnd', () => {
   for (const player of parser.players) {
-    console.log(
-      `[Round ${round}] ${player.name.padEnd(20)} $${player.money}`
-    );
+    // access current state at this tick
   }
 });
 
@@ -132,11 +143,13 @@ await parser.parseAll();
 
 | Class / Type | Description |
 |---|---|
-| `DemoParser` | Main entry point. Create from a buffer, subscribe to events, call `parseAll()`. |
-| `Player` | Full player state: position, health, armor, weapons, money, stats, and more. |
+| `DemoParser.parse()` | High-level: parse a file and return all collected data. |
+| `DemoParser.fromFile()` | Low-level: create a streaming parser from a file path. |
+| `DemoParser.fromBuffer()` | Low-level: create a streaming parser from a Buffer. |
+| `DemoResult` | The result of `parse()` — header, players, kills, rounds, grenades, and more. |
+| `Player` | Full player state: position, health, armor, weapons, money, stats. |
 | `Team` | Team name, score, player list, side (CT/T). |
 | `GameState` | Current round, phase, bomb state, map, server info. |
-| `GameEvent` | Discriminated union of 100+ typed game events. |
 | `Entity` | Low-level networked entity with typed property access. |
 
 ## Supported Data
@@ -168,7 +181,7 @@ There are demo parsers in other languages. Here's how they compare:
 | | **counter-strike-demo-parser** | demoinfocs-golang | demofile | demoparser2 |
 |---|---|---|---|---|
 | Language | **TypeScript** | Go | JavaScript | Rust/Python |
-| API | **Streaming + typed events** | Streaming | Streaming | Query-based |
+| API | **async/await + streaming** | Streaming | Streaming | Query-based |
 | TypeScript types | **Full** | N/A | Partial | N/A |
 | CS:GO support | **Yes** | Yes | Yes | Yes |
 | CS2 support | **Planned** | Yes | No | Yes |
