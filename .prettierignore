@@ -1,0 +1,6 @@
+dist/
+node_modules/
+src/generated/
+coverage/
+*.dem
+README.md

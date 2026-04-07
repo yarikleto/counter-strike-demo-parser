@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@reader/*": ["src/reader/*"],
+      "@frame/*": ["src/frame/*"],
+      "@packet/*": ["src/packet/*"],
+      "@proto/*": ["src/proto/*"],
+      "@datatables/*": ["src/datatables/*"],
+      "@entities/*": ["src/entities/*"],
+      "@stringtables/*": ["src/stringtables/*"],
+      "@state/*": ["src/state/*"],
+      "@events/*": ["src/events/*"],
+      "@convenience/*": ["src/convenience/*"],
+      "@enums/*": ["src/enums/*"],
+      "@utils/*": ["src/utils/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "examples", "scripts"]
+}

@@ -27,6 +27,7 @@ Desktop.ini
 
 # Project management (internal)
 .claude/
+CLAUDE.md
 
 # Demo files (large binaries)
 *.dem
