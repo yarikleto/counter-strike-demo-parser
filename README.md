@@ -4,11 +4,9 @@
 
 **A streaming, fully-typed Counter-Strike demo parser for Node.js. CS:GO now, CS2 coming soon.**
 
-[![npm version](https://img.shields.io/npm/v/counter-strike-demo-parser?color=cb3837)](https://www.npmjs.com/package/counter-strike-demo-parser)
-[![license](https://img.shields.io/npm/l/counter-strike-demo-parser)](./LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-417e38)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org)
-[![CI](https://img.shields.io/github/actions/workflow/status/yarikleto/counter-strike-demo-parser/ci.yml?label=CI)](https://github.com/yarikleto/counter-strike-demo-parser/actions)
 
 ---
 
