@@ -190,10 +190,6 @@ npm install
 npm test
 ```
 
-## Author
-
-Created by [Yaroslav Pakhaliuk](https://github.com/yarikleto).
-
 ## License
 
 [MIT](./LICENSE)
