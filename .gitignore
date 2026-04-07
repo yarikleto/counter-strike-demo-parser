@@ -29,8 +29,9 @@ Desktop.ini
 .claude/
 CLAUDE.md
 
-# Demo files (large binaries)
+# Demo files (large binaries) — except test fixtures
 *.dem
+!test/fixtures/**/*.dem
 
 # Logs
 *.log
