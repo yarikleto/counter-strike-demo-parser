@@ -1,6 +1,6 @@
 # counter-strike-demo-parser
 
-**A streaming, fully-typed Counter-Strike: Global Offensive demo parser for Node.js.**
+**A streaming, fully-typed Counter-Strike demo parser for Node.js. CS:GO now, CS2 coming soon.**
 
 [![npm version](https://img.shields.io/npm/v/counter-strike-demo-parser?color=cb3837)](https://www.npmjs.com/package/counter-strike-demo-parser)
 [![license](https://img.shields.io/npm/l/counter-strike-demo-parser)](./LICENSE)
@@ -162,11 +162,20 @@ There are demo parsers in other languages. Here's how they compare:
 | Language | **TypeScript** | Go | JavaScript | Rust/Python |
 | API | **Streaming + typed events** | Streaming | Streaming | Query-based |
 | TypeScript types | **Full** | N/A | Partial | N/A |
+| CS:GO support | **Yes** | Yes | Yes | Yes |
+| CS2 support | **Planned** | Yes | No | Yes |
 | Maintained | **Yes** | Yes | No (3+ years) | Yes |
 | Native acceleration | **Optional C++ addon** | N/A | N/A | Rust core |
 | Node.js native | **Yes** | No | Yes | No (Python bindings) |
 
 If you're in the Node.js/TypeScript ecosystem — this is the parser to use.
+
+## Roadmap
+
+- **v1** — CS:GO demo parsing: full entity system, all game events, player/team/round state, streaming API
+- **v2** — CS2 demo parsing: Source 2 format support (separate API surface — CS2 uses a fundamentally different entity system)
+- **Performance** — optional native C++ addon for hot-path acceleration
+- **Convenience** — grenade trajectories, economy tracking, damage matrix, match summaries
 
 ## Contributing
 
