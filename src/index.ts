@@ -14,3 +14,6 @@
  * ```
  */
 export { DemoParser } from "./DemoParser.js";
+export { ByteReader } from "./reader/ByteReader.js";
+export { parseHeader } from "./frame/header.js";
+export type { DemoHeader } from "./frame/header.js";
