@@ -15,6 +15,35 @@
  * Out-of-bounds reads throw a RangeError immediately.
  */
 export class BitReader {
+  // Constants from Valve's `coord_const.h`. See bitbuf.cpp for usage.
+  /** Integer bit width for full-precision coords. */
+  static readonly COORD_INTEGER_BITS = 14;
+  /** Integer bit width for in-bounds multiplayer coords. */
+  static readonly COORD_INTEGER_BITS_MP = 11;
+  /** Fractional bit width for full-precision coords (1/32 resolution). */
+  static readonly COORD_FRACTIONAL_BITS = 5;
+  /** Fractional bit width for low-precision MP coords (1/8 resolution). */
+  static readonly COORD_FRACTIONAL_BITS_MP_LOWPRECISION = 3;
+  /** Resolution for full-precision fractional coords: 1 / 32. */
+  static readonly COORD_RESOLUTION = 1 / (1 << 5);
+  /** Resolution for low-precision fractional coords: 1 / 8. */
+  static readonly COORD_RESOLUTION_LOWPRECISION = 1 / (1 << 3);
+  /** Fractional bit width for unit normals. */
+  static readonly NORMAL_FRACTIONAL_BITS = 11;
+  /** Denominator for unit normals: (1 << 11) - 1 = 2047. */
+  static readonly NORMAL_DENOMINATOR = (1 << 11) - 1;
+  /** Per-step resolution for unit normals: 1 / 2047. */
+  static readonly NORMAL_RESOLUTION = 1 / ((1 << 11) - 1);
+
+  /**
+   * Shared 4-byte scratch DataView for reinterpreting bit patterns as
+   * IEEE 754 floats. Single-threaded JS — safe to share across calls.
+   */
+  private static readonly floatScratchView = new DataView(new ArrayBuffer(4));
+
+  /** Shared UTF-8 decoder (no allocation per call). */
+  private static readonly utf8Decoder = new TextDecoder("utf-8");
+
   private readonly view: Uint8Array;
   private readonly totalBits: number;
   private bitCursor: number;
@@ -179,6 +208,217 @@ export class BitReader {
         // 32-bit signed quirk of `<< 6` when the upper bits set bit 31.
         return (ret + this.readBits(28) * 64) >>> 0;
     }
+  }
+
+  /**
+   * Read a protobuf-style varint from the bit stream.
+   *
+   * NOTE: This is *distinct* from {@link readUBitVar}. `readUBitVar` is
+   * Source's `bitbuf.cpp` `ReadUBitVar` (6 bits + 2-bit lookup + 0/4/8/28
+   * extension). `readVarInt32` is the standard protobuf wire-format
+   * varint (groups of 7 data bits + 1 continuation bit), encoded into a
+   * bit stream rather than a byte stream. It is used by some entity
+   * property sub-encodings where varints appear unaligned.
+   *
+   * Reads up to 5 groups (35 bits) and accumulates the low 32 bits of
+   * the result. The return value is coerced to an unsigned 32-bit number
+   * via `>>> 0`.
+   */
+  readVarInt32(): number {
+    let result = 0;
+    for (let i = 0; i < 5; i++) {
+      const b = this.readBits(8);
+      result |= (b & 0x7f) << (7 * i);
+      if ((b & 0x80) === 0) break;
+    }
+    return result >>> 0;
+  }
+
+  /**
+   * Read a zigzag-encoded signed varint from the bit stream. Combines
+   * {@link readVarInt32} with the protobuf zigzag decode:
+   *   `(n >>> 1) ^ -(n & 1)`
+   * Returns a signed 32-bit JS number.
+   */
+  readSignedVarInt32(): number {
+    const n = this.readVarInt32();
+    return (n >>> 1) ^ -(n & 1);
+  }
+
+  /**
+   * Read a Source-engine fractional coordinate. Mirrors `bf_read::ReadBitCoord`
+   * in Valve's `bitbuf.cpp`.
+   *
+   * Wire format:
+   *   has_int  = readBit()
+   *   has_frac = readBit()
+   *   if has_int || has_frac:
+   *     sign  = readBit()
+   *     int   = has_int  ? readBits(COORD_INTEGER_BITS=14) + 1 : 0
+   *     frac  = has_frac ? readBits(COORD_FRACTIONAL_BITS=5)   : 0
+   *     value = int + frac * COORD_RESOLUTION (1/32)
+   *     if sign: value = -value
+   *   else:
+   *     value = 0
+   *
+   * Note Valve adds 1 to the integer part on encode (so 0 is signaled by
+   * has_int=0), and subtracts 1 on decode — replicate that here.
+   */
+  readBitCoord(): number {
+    const hasInt = this.readBit();
+    const hasFrac = this.readBit();
+    if (hasInt === 0 && hasFrac === 0) return 0;
+    const sign = this.readBit();
+    const intVal = hasInt ? this.readBits(BitReader.COORD_INTEGER_BITS) + 1 : 0;
+    const fracVal = hasFrac
+      ? this.readBits(BitReader.COORD_FRACTIONAL_BITS)
+      : 0;
+    const value = intVal + fracVal * BitReader.COORD_RESOLUTION;
+    return sign ? -value : value;
+  }
+
+  /**
+   * Read a multiplayer-optimized coordinate. Mirrors `bf_read::ReadBitCoordMP`
+   * in Valve's `bitbuf.cpp`.
+   *
+   *   in_bounds  = readBit()      // selects 11- vs 14-bit integer width
+   *   has_int_or_sign = readBit() // semantics differ by mode (see below)
+   *
+   * - integral=true:
+   *     if has_int_or_sign: read sign, read intBits (11 if in_bounds else 14)
+   *     return signed integer
+   *
+   * - integral=false:
+   *     has_int = has_int_or_sign
+   *     sign    = readBit()
+   *     int     = has_int ? readBits(in_bounds ? 11 : 14) + 1 : 0
+   *     frac    = readBits(lowPrecision ? 3 : 5)
+   *     value   = int + frac * (lowPrecision ? 1/8 : 1/32)
+   *     return sign ? -value : value
+   */
+  readBitCoordMP(integral: boolean, lowPrecision: boolean): number {
+    const inBounds = this.readBit();
+    if (integral) {
+      const hasIntVal = this.readBit();
+      if (!hasIntVal) return 0;
+      const sign = this.readBit();
+      const intBits = inBounds
+        ? BitReader.COORD_INTEGER_BITS_MP
+        : BitReader.COORD_INTEGER_BITS;
+      const intVal = this.readBits(intBits) + 1;
+      return sign ? -intVal : intVal;
+    }
+    const hasInt = this.readBit();
+    const sign = this.readBit();
+    const intBits = inBounds
+      ? BitReader.COORD_INTEGER_BITS_MP
+      : BitReader.COORD_INTEGER_BITS;
+    const intVal = hasInt ? this.readBits(intBits) + 1 : 0;
+    const fracBits = lowPrecision
+      ? BitReader.COORD_FRACTIONAL_BITS_MP_LOWPRECISION
+      : BitReader.COORD_FRACTIONAL_BITS;
+    const resolution = lowPrecision
+      ? BitReader.COORD_RESOLUTION_LOWPRECISION
+      : BitReader.COORD_RESOLUTION;
+    const fracVal = this.readBits(fracBits);
+    const value = intVal + fracVal * resolution;
+    return sign ? -value : value;
+  }
+
+  /**
+   * Read a unit normal component in [-1, 1]. Mirrors `bf_read::ReadBitNormal`
+   * in Valve's `bitbuf.cpp`:
+   *   sign     = readBit()
+   *   fraction = readBits(NORMAL_FRACTIONAL_BITS=11)
+   *   value    = fraction / NORMAL_DENOMINATOR  (= 2047)
+   *   return sign ? -value : value
+   */
+  readBitNormal(): number {
+    const sign = this.readBit();
+    const fraction = this.readBits(BitReader.NORMAL_FRACTIONAL_BITS);
+    const value = fraction * BitReader.NORMAL_RESOLUTION;
+    return sign ? -value : value;
+  }
+
+  /**
+   * Read a cell-relative coordinate. Mirrors `bf_read::ReadBitCellCoord` in
+   * Valve's `bitbuf.cpp`.
+   *
+   *   int  = readBits(bits)
+   *   if integral:        return int
+   *   frac = readBits(lowPrecision ? 3 : 5)
+   *   return int + frac * (lowPrecision ? 1/8 : 1/32)
+   *
+   * Cell coords are unsigned (no sign bit) because cells are always
+   * non-negative offsets from a known origin.
+   */
+  readBitCellCoord(bits: number, integral: boolean, lowPrecision: boolean): number {
+    const intVal = this.readBits(bits);
+    if (integral) return intVal;
+    const fracBits = lowPrecision
+      ? BitReader.COORD_FRACTIONAL_BITS_MP_LOWPRECISION
+      : BitReader.COORD_FRACTIONAL_BITS;
+    const resolution = lowPrecision
+      ? BitReader.COORD_RESOLUTION_LOWPRECISION
+      : BitReader.COORD_RESOLUTION;
+    const fracVal = this.readBits(fracBits);
+    return intVal + fracVal * resolution;
+  }
+
+  /**
+   * Read a raw 32-bit IEEE 754 little-endian float. Equivalent to
+   * `bf_read::ReadBitFloat` — read 32 bits, reinterpret as float32.
+   */
+  readBitFloat(): number {
+    const raw = this.readBits(32);
+    BitReader.floatScratchView.setUint32(0, raw, true);
+    return BitReader.floatScratchView.getFloat32(0, true);
+  }
+
+  /**
+   * Read an angle quantized into `bits` bits over the [0, 360) range.
+   * Mirrors `bf_read::ReadBitAngle`:
+   *   raw = readBits(bits)
+   *   return raw * 360 / (1 << bits)
+   */
+  readBitAngle(bits: number): number {
+    if (bits < 1 || bits > 32) {
+      throw new RangeError(
+        `BitReader: readBitAngle(bits) requires 1 <= bits <= 32, got ${bits}`,
+      );
+    }
+    const raw = this.readBits(bits);
+    return (raw * 360) / Math.pow(2, bits);
+  }
+
+  /**
+   * Read a UTF-8 string up to (but not including) a NUL terminator, or
+   * up to `maxLength` bytes if no NUL is found earlier. The bit cursor
+   * always advances past the terminator (or `maxLength` bytes when no
+   * NUL is encountered, in which case an error is also thrown if we hit
+   * the end of the buffer first).
+   */
+  readString(maxLength: number = 512): string {
+    if (maxLength < 0) {
+      throw new RangeError(
+        `BitReader: readString(maxLength) requires maxLength >= 0, got ${maxLength}`,
+      );
+    }
+    const bytes: number[] = [];
+    for (let i = 0; i < maxLength; i++) {
+      if (this.bitCursor + 8 > this.totalBits) {
+        throw new RangeError(
+          `BitReader: readString reached end of buffer at byte ${i} ` +
+            `without finding NUL terminator (maxLength: ${maxLength})`,
+        );
+      }
+      const byte = this.readBits(8);
+      if (byte === 0) {
+        return BitReader.utf8Decoder.decode(new Uint8Array(bytes));
+      }
+      bytes.push(byte);
+    }
+    return BitReader.utf8Decoder.decode(new Uint8Array(bytes));
   }
 
   /**

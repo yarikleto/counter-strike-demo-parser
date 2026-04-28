@@ -407,6 +407,418 @@ describe("BitReader", () => {
     });
   });
 
+  describe("readVarInt32 / readSignedVarInt32", () => {
+    it("decodes 0", () => {
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(reader.readVarInt32()).toBe(0);
+      expect(reader.position).toBe(8);
+    });
+
+    it("decodes 1", () => {
+      const reader = new BitReader(new Uint8Array([0x01]));
+      expect(reader.readVarInt32()).toBe(1);
+      expect(reader.position).toBe(8);
+    });
+
+    it("decodes 127 (single byte max)", () => {
+      const reader = new BitReader(new Uint8Array([0x7f]));
+      expect(reader.readVarInt32()).toBe(127);
+      expect(reader.position).toBe(8);
+    });
+
+    it("decodes 128 (two bytes)", () => {
+      // 128 -> 0x80 0x01
+      const reader = new BitReader(new Uint8Array([0x80, 0x01]));
+      expect(reader.readVarInt32()).toBe(128);
+      expect(reader.position).toBe(16);
+    });
+
+    it("decodes max int32 2147483647", () => {
+      // 0x7FFFFFFF -> 0xFF 0xFF 0xFF 0xFF 0x07
+      const reader = new BitReader(
+        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x07]),
+      );
+      expect(reader.readVarInt32()).toBe(0x7fffffff);
+      expect(reader.position).toBe(40);
+    });
+
+    it("decodes max uint32 4294967295", () => {
+      // 0xFFFFFFFF -> 0xFF 0xFF 0xFF 0xFF 0x0F
+      const reader = new BitReader(
+        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]),
+      );
+      expect(reader.readVarInt32()).toBe(0xffffffff);
+    });
+
+    it("decodes varint at non-byte-aligned offset", () => {
+      // place varint for value 300 (0xAC, 0x02) starting at bit 3
+      // We need to construct bytes such that bits 3..18 = 0xAC | (0x02 << 8) = 0x02AC
+      // bits 0..2 = anything (use 0), bits 3..10 = 0xAC, bits 11..18 = 0x02, rest = 0
+      // byte0 = (0xAC << 3) & 0xFF = 0x60; carry = 0xAC >> 5 = 0x05
+      // byte1 = carry | ((0x02 << 3) & 0xFF) = 0x05 | 0x10 = 0x15
+      // carry from byte1 = 0x02 >> 5 = 0
+      // byte2 = 0
+      const reader = new BitReader(new Uint8Array([0x60, 0x15, 0x00]));
+      reader.seek(3);
+      expect(reader.readVarInt32()).toBe(300);
+    });
+
+    it("zigzag: 0 -> 0", () => {
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(reader.readSignedVarInt32()).toBe(0);
+    });
+
+    it("zigzag: 1 -> -1", () => {
+      const reader = new BitReader(new Uint8Array([0x01]));
+      expect(reader.readSignedVarInt32()).toBe(-1);
+    });
+
+    it("zigzag: 2 -> 1", () => {
+      const reader = new BitReader(new Uint8Array([0x02]));
+      expect(reader.readSignedVarInt32()).toBe(1);
+    });
+
+    it("zigzag: 3 -> -2", () => {
+      const reader = new BitReader(new Uint8Array([0x03]));
+      expect(reader.readSignedVarInt32()).toBe(-2);
+    });
+
+    it("zigzag: max int32 2147483647", () => {
+      // zigzag-encoded value of 2147483647 is (2147483647 << 1) = 0xFFFFFFFE
+      // varint of 0xFFFFFFFE: bytes 0xFE 0xFF 0xFF 0xFF 0x0F
+      const reader = new BitReader(
+        new Uint8Array([0xfe, 0xff, 0xff, 0xff, 0x0f]),
+      );
+      expect(reader.readSignedVarInt32()).toBe(0x7fffffff);
+    });
+
+    it("zigzag: min int32 -2147483648", () => {
+      // zigzag-encoded value of -2147483648 is 0xFFFFFFFF
+      // varint of 0xFFFFFFFF: bytes 0xFF 0xFF 0xFF 0xFF 0x0F
+      const reader = new BitReader(
+        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]),
+      );
+      expect(reader.readSignedVarInt32()).toBe(-0x80000000);
+    });
+  });
+
+  describe("readBitCoord", () => {
+    it("returns 0 when both has_int and has_frac are 0", () => {
+      // bits 00... -> byte 0x00
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(reader.readBitCoord()).toBe(0);
+      expect(reader.position).toBe(2);
+    });
+
+    it("decodes 1.5 (int=1, frac=16, sign=0)", () => {
+      // has_int=1, has_frac=1, sign=0, int(14)=0 (decodes to 1), frac(5)=16
+      // byte0 = bits 0..7 = 1,1,0,0,0,0,0,0 = 0x03
+      // byte1 = bits 8..15 = 0
+      // byte2 = bits 16..23: bit17..21 = 0,0,0,0,1 -> bit 21 set = 0x20
+      const reader = new BitReader(new Uint8Array([0x03, 0x00, 0x20]));
+      expect(reader.readBitCoord()).toBe(1.5);
+      expect(reader.position).toBe(22);
+    });
+
+    it("decodes -1.5 (sign=1)", () => {
+      // same as 1.5 but sign bit set -> byte0 = 0x07
+      const reader = new BitReader(new Uint8Array([0x07, 0x00, 0x20]));
+      expect(reader.readBitCoord()).toBe(-1.5);
+    });
+
+    it("decodes 5.25 (int=5, frac=8, sign=0)", () => {
+      // has_int=1, has_frac=1, sign=0, int(14)=4, frac(5)=8
+      // bit5 set in byte0 -> 0b00100011 = 0x23
+      // bit20 set in byte2 -> 0b00010000 = 0x10
+      const reader = new BitReader(new Uint8Array([0x23, 0x00, 0x10]));
+      expect(reader.readBitCoord()).toBe(5.25);
+    });
+
+    it("decodes pure integer (has_frac=0)", () => {
+      // has_int=1, has_frac=0, sign=0, int(14)=2 (decodes to 3)
+      // bit 0 = has_int = 1
+      // bit 1 = has_frac = 0
+      // bit 2 = sign = 0
+      // bits 3..16 = int = 2 = 0b10 LSB-first -> bit 3=0, bit 4=1, rest 0
+      // byte0 = bits 0,1,...7: 1,0,0,0,1,0,0,0 = 0b00010001 = 0x11
+      const reader = new BitReader(new Uint8Array([0x11, 0x00, 0x00]));
+      expect(reader.readBitCoord()).toBe(3);
+      expect(reader.position).toBe(17);
+    });
+
+    it("decodes pure fraction (has_int=0)", () => {
+      // has_int=0, has_frac=1, sign=0, frac(5)=8 -> 0.25
+      // byte0 = bits 0..7: 0,1,0,0,0,0,0,1 = 0b10000010 = 0x82
+      // bit 0=0 (has_int), bit 1=1 (has_frac), bit 2=0 (sign),
+      // bits 3..7 = frac low 5 bits = 8 = 0b01000 -> bit 3=0, bit4=0, bit5=0, bit6=1, bit7=0
+      // result: bit1 + bit6 set = 0b01000010 = 0x42
+      const reader = new BitReader(new Uint8Array([0x42]));
+      expect(reader.readBitCoord()).toBe(0.25);
+    });
+  });
+
+  describe("readBitCoordMP", () => {
+    it("integral, hasIntVal=0 returns 0", () => {
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(reader.readBitCoordMP(true, false)).toBe(0);
+    });
+
+    it("integral, in_bounds=1, hasIntVal=1, int=4 -> 5", () => {
+      // bit0=1, bit1=1, bit2=0(sign), bits3..13: int(11)=4 -> bit5 set
+      // byte0 = 1,1,0,0,0,1,0,0 = 0b00100011 = 0x23
+      const reader = new BitReader(new Uint8Array([0x23, 0x00]));
+      expect(reader.readBitCoordMP(true, false)).toBe(5);
+    });
+
+    it("integral, in_bounds=0, hasIntVal=1, sign=1, int=0 -> -1", () => {
+      // bit0=0(in_bounds), bit1=1(hasIntVal), bit2=1(sign), bits3..16: int(14)=0
+      // byte0 = 0,1,1,0,0,0,0,0 = 0b00000110 = 0x06
+      const reader = new BitReader(new Uint8Array([0x06, 0x00, 0x00]));
+      expect(reader.readBitCoordMP(true, false)).toBe(-1);
+    });
+
+    it("non-integral, in_bounds=1, full precision -> 1.5", () => {
+      // bit0=1, bit1=1(has_int), bit2=0(sign), bits3..13: int(11)=0,
+      // bits 14..18: frac(5)=16 -> bit18 set
+      // byte0 = bits 0..7: 1,1,0,0,0,0,0,0 = 0x03
+      // byte1 = 0
+      // byte2 = bit 16=0, bit17=0, bit18=1, rest=0 = 0b00000100 = 0x04
+      const reader = new BitReader(new Uint8Array([0x03, 0x00, 0x04]));
+      expect(reader.readBitCoordMP(false, false)).toBe(1.5);
+    });
+
+    it("non-integral, in_bounds=0, low precision -> -1.5", () => {
+      // bit0=0, bit1=1(has_int), bit2=1(sign), bits3..16: int(14)=0,
+      // bits 17..19: frac(3)=4=0b100 -> bit19 set
+      // byte0 = bits 0..7: 0,1,1,0,0,0,0,0 = 0x06
+      // byte1 = 0
+      // byte2 = bit16=0, bit17=0, bit18=0, bit19=1 -> 0b00001000 = 0x08
+      const reader = new BitReader(new Uint8Array([0x06, 0x00, 0x08]));
+      expect(reader.readBitCoordMP(false, true)).toBe(-1.5);
+    });
+
+    it("non-integral, in_bounds=1, has_int=0 -> 0.25", () => {
+      // bit0=1, bit1=0(has_int), bit2=0(sign), int skipped,
+      // bits 3..7: frac(5)=8=0b01000 -> bit6 set
+      // Wait — when has_int=0, intBits are NOT read; frac comes immediately after sign.
+      // bit0=1, bit1=0, bit2=0, then frac(5) starts at bit 3
+      // frac=8 -> bits 3,4,5,6,7 = 0,0,0,1,0 -> bit6 set
+      // byte0 = 1,0,0,0,0,0,1,0 = 0b01000001 = 0x41
+      const reader = new BitReader(new Uint8Array([0x41]));
+      expect(reader.readBitCoordMP(false, false)).toBe(0.25);
+    });
+  });
+
+  describe("readBitNormal", () => {
+    it("sign=0, fraction=0 -> 0", () => {
+      const reader = new BitReader(new Uint8Array([0x00, 0x00]));
+      expect(reader.readBitNormal()).toBe(0);
+      expect(reader.position).toBe(12);
+    });
+
+    it("sign=0, fraction=2047 (max) -> 1", () => {
+      // bit0=0(sign), bits 1..11=2047=0b11111111111
+      // byte0 bits 0..7: 0,1,1,1,1,1,1,1 -> 0b11111110 = 0xFE
+      // byte1 bits 8..11: 1,1,1,1, bits 12..15: 0 -> 0b00001111 = 0x0F
+      const reader = new BitReader(new Uint8Array([0xfe, 0x0f]));
+      expect(reader.readBitNormal()).toBe(1);
+    });
+
+    it("sign=1, fraction=2047 -> -1", () => {
+      // bit0=1(sign), bits 1..11 all 1
+      // byte0 = 0b11111111 = 0xFF
+      // byte1 bits 8..11: all 1 -> 0b00001111 = 0x0F
+      const reader = new BitReader(new Uint8Array([0xff, 0x0f]));
+      expect(reader.readBitNormal()).toBe(-1);
+    });
+
+    it("sign=0, fraction=1023 -> 1023/2047", () => {
+      // bit0=0(sign), bits 1..11: fraction=1023=0b01111111111
+      // byte0 bits 0..7: 0,1,1,1,1,1,1,1 -> 0xFE
+      // byte1 bits 8..10: 1,1,1, bit11=0 -> 0b00000111 = 0x07
+      const reader = new BitReader(new Uint8Array([0xfe, 0x07]));
+      expect(reader.readBitNormal()).toBeCloseTo(1023 / 2047, 10);
+    });
+  });
+
+  describe("readBitCellCoord", () => {
+    it("integral mode returns just the integer", () => {
+      // bits=4, integral=true, raw=10 -> 10
+      // 10 = 0b1010, low 4 bits = 0b1010 -> byte0 bits 0..3 = 0,1,0,1 -> 0b1010 = 0x0A
+      const reader = new BitReader(new Uint8Array([0x0a]));
+      expect(reader.readBitCellCoord(4, true, false)).toBe(10);
+      expect(reader.position).toBe(4);
+    });
+
+    it("low-precision: int=5, frac=4 -> 5.5", () => {
+      // bits=4, int=5=0b0101, frac(3)=4=0b100
+      // byte0 bits 0..3: int 5 -> 1,0,1,0 -> 0b0101
+      // bits 4..6: frac=4 -> 0,0,1
+      // byte0 = 1,0,1,0,0,0,1,0 = 0b01000101 = 0x45
+      const reader = new BitReader(new Uint8Array([0x45]));
+      expect(reader.readBitCellCoord(4, false, true)).toBe(5.5);
+    });
+
+    it("full precision: int=3, frac=8 -> 3.25", () => {
+      // bits=4, int=3=0b0011, frac(5)=8=0b01000
+      // byte0 bits 0..3: int=3 -> 1,1,0,0
+      // bits 4..7: frac low 4 = 8 = 0b1000 -> 0,0,0,1
+      // byte1 bit 8: frac high bit = 0
+      // byte0 = 1,1,0,0,0,0,0,1 = 0b10000011 = 0x83
+      const reader = new BitReader(new Uint8Array([0x83, 0x00]));
+      expect(reader.readBitCellCoord(4, false, false)).toBe(3.25);
+    });
+  });
+
+  describe("readBitFloat", () => {
+    it("decodes 1.0", () => {
+      // 1.0f = 0x3F800000, LE bytes: 0x00, 0x00, 0x80, 0x3F
+      const reader = new BitReader(new Uint8Array([0x00, 0x00, 0x80, 0x3f]));
+      expect(reader.readBitFloat()).toBe(1.0);
+      expect(reader.position).toBe(32);
+    });
+
+    it("decodes 0.0", () => {
+      const reader = new BitReader(new Uint8Array([0x00, 0x00, 0x00, 0x00]));
+      expect(reader.readBitFloat()).toBe(0);
+    });
+
+    it("decodes -2.0", () => {
+      // -2.0f = 0xC0000000, LE: 0x00, 0x00, 0x00, 0xC0
+      const reader = new BitReader(new Uint8Array([0x00, 0x00, 0x00, 0xc0]));
+      expect(reader.readBitFloat()).toBe(-2);
+    });
+
+    it("decodes float at non-byte-aligned offset", () => {
+      // Place 1.0f starting at bit 4. Need 4 + 32 = 36 bits = 5 bytes.
+      // bits 0..3 = 0, bits 4..35 = 0x3F800000 (LE bit order)
+      // byte0 = bits 0..7: bits 0..3=0, bits 4..7 = low nibble of byte0 of float = 0
+      //   -> 0
+      // byte1 = bits 8..15: bits 8..11 = high nibble of float byte 0 = 0,
+      //   bits 12..15 = low nibble of float byte 1 = 0 -> 0
+      // byte2 = bits 16..23: bits 16..19 = high nibble of float byte 1 = 0,
+      //   bits 20..23 = low nibble of float byte 2 = 0 -> 0
+      // byte3 = bits 24..31: bits 24..27 = high nibble of float byte 2 = 8 (high),
+      //   bits 28..31 = low nibble of float byte 3 = F (low of 0x3F)
+      //   high nibble of 0x80 = 8 -> bits 24..27 represent value 8 LSB-first:
+      //   bit 24=0, bit 25=0, bit 26=0, bit 27=1
+      //   low nibble of 0x3F = F -> bits 28..31 represent value 15 LSB-first
+      //   bit 28=1, bit 29=1, bit 30=1, bit 31=1
+      //   byte3 = 0b11111000 = 0xF8
+      // byte4 = bits 32..39: bits 32..35 = high nibble of float byte 3 = 3
+      //   bit 32=1, bit 33=1, bit 34=0, bit 35=0
+      //   bits 36..39 = 0
+      //   byte4 = 0b00000011 = 0x03
+      const reader = new BitReader(
+        new Uint8Array([0x00, 0x00, 0x00, 0xf8, 0x03]),
+      );
+      reader.seek(4);
+      expect(reader.readBitFloat()).toBe(1.0);
+    });
+  });
+
+  describe("readBitAngle", () => {
+    it("0 in any bit width -> 0", () => {
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(reader.readBitAngle(8)).toBe(0);
+    });
+
+    it("8 bits, raw=128 -> 180 degrees", () => {
+      // 128 = 0b10000000 -> LSB-first byte = bit7 set = 0x80
+      const reader = new BitReader(new Uint8Array([0x80]));
+      expect(reader.readBitAngle(8)).toBe(180);
+    });
+
+    it("8 bits, raw=64 -> 90 degrees", () => {
+      // 64 = 0b01000000 -> bit6 set = 0x40
+      const reader = new BitReader(new Uint8Array([0x40]));
+      expect(reader.readBitAngle(8)).toBe(90);
+    });
+
+    it("16 bits, raw=32768 -> 180 degrees", () => {
+      // 32768 = 0x8000 LE -> bytes 0x00, 0x80
+      const reader = new BitReader(new Uint8Array([0x00, 0x80]));
+      expect(reader.readBitAngle(16)).toBe(180);
+    });
+
+    it("rejects bits outside [1, 32]", () => {
+      const reader = new BitReader(new Uint8Array(4));
+      expect(() => reader.readBitAngle(0)).toThrow(RangeError);
+      expect(() => reader.readBitAngle(33)).toThrow(RangeError);
+    });
+  });
+
+  describe("readString", () => {
+    it("reads empty string (NUL at byte 0)", () => {
+      const reader = new BitReader(new Uint8Array([0x00, 0x41]));
+      expect(reader.readString()).toBe("");
+      // Cursor advanced past the NUL (8 bits).
+      expect(reader.position).toBe(8);
+    });
+
+    it("reads ASCII 'hello' followed by NUL", () => {
+      const bytes = new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0xff]);
+      const reader = new BitReader(bytes);
+      expect(reader.readString()).toBe("hello");
+      expect(reader.position).toBe(48); // 6 bytes consumed (5 chars + NUL)
+      // Following byte still readable.
+      expect(reader.readBits(8)).toBe(0xff);
+    });
+
+    it("reads UTF-8 'héllo'", () => {
+      // 'h' 0x68, 'é' 0xC3 0xA9, 'l' 'l' 'o', NUL
+      const reader = new BitReader(
+        new Uint8Array([0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f, 0x00]),
+      );
+      expect(reader.readString()).toBe("héllo");
+    });
+
+    it("respects maxLength when no NUL encountered", () => {
+      // Three 'a's, no NUL within first 3 bytes.
+      const reader = new BitReader(new Uint8Array([0x61, 0x61, 0x61, 0x00]));
+      expect(reader.readString(3)).toBe("aaa");
+      expect(reader.position).toBe(24); // exactly 3 bytes consumed, NUL NOT consumed
+    });
+
+    it("reads string starting at non-byte-aligned offset", () => {
+      // Place "hi\0" starting at bit 3.
+      // Source bytes: 'h' 0x68, 'i' 0x69, NUL 0x00 -> place at bit 3
+      // We need 3 + 24 = 27 bits = 4 bytes minimum.
+      // bits 0..2 = 0; bits 3..26 = 0x00_69_68 (LE byte 0 = 0x68 first)
+      // Construct by shifting: each source byte spans two output bytes.
+      // byte0 = (0x68 << 3) & 0xFF = 0x40, low 3 bits = 0
+      //   -> 0x40
+      // byte1 = (0x68 >> 5) | ((0x69 << 3) & 0xFF) = 3 | 0x48 = 0x4B
+      // byte2 = (0x69 >> 5) | ((0x00 << 3) & 0xFF) = 3 | 0 = 0x03
+      // byte3 = (0x00 >> 5) = 0
+      const reader = new BitReader(
+        new Uint8Array([0x40, 0x4b, 0x03, 0x00]),
+      );
+      reader.seek(3);
+      expect(reader.readString()).toBe("hi");
+      expect(reader.position).toBe(3 + 24); // start + 3 bytes
+    });
+
+    it("throws when buffer ends before NUL or maxLength", () => {
+      // 3 bytes, no NUL, default maxLength=512 should hit end of buffer.
+      const reader = new BitReader(new Uint8Array([0x61, 0x61, 0x61]));
+      expect(() => reader.readString()).toThrow(/end of buffer/);
+    });
+
+    it("rejects negative maxLength", () => {
+      const reader = new BitReader(new Uint8Array([0x00]));
+      expect(() => reader.readString(-1)).toThrow(RangeError);
+    });
+
+    it("respects custom maxLength when NUL is past it", () => {
+      // 'abcdef\0' but maxLength=3 -> returns 'abc' without consuming the NUL
+      const bytes = new Uint8Array([0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x00]);
+      const reader = new BitReader(bytes);
+      expect(reader.readString(3)).toBe("abc");
+      expect(reader.position).toBe(24);
+    });
+  });
+
   describe("error messages", () => {
     it("readBit error message includes position and total", () => {
       const reader = new BitReader(new Uint8Array(1));
