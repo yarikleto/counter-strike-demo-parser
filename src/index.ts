@@ -45,3 +45,9 @@ export { SendPropType } from "./datatables/index.js";
 export { parseDataTables } from "./datatables/index.js";
 export type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
 export type { ServerClassRegistry } from "./datatables/ServerClassRegistry.js";
+export { StringTable, StringTableManager } from "./stringtables/index.js";
+export type {
+  StringTableEntry,
+  StringTableOptions,
+  ParseStringTableResult,
+} from "./stringtables/index.js";

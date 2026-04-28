@@ -42,6 +42,7 @@
  *     both parsers, regardless of internal order — which is the case.
  *     Slice 4 / TASK-021 will reveal whether this matters; if so,
  *     return here with a fix targeted at the m_iMatchStats sub-tree.
+ *     // TODO(TASK-018a): validate priority-140 sub-table walk order against demoinfocs once Slice 4 / TASK-021 lands.
  *
  *   - **Demoinfocs's dotted-name format** (`localdata.m_Local.m_nDuckTimeMsecs`).
  *     We carry only the leaf `varName` and `sourceTableName` separately;

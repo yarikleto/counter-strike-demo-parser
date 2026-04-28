@@ -24,11 +24,15 @@ import { ByteReader } from "../reader/ByteReader.js";
 import { NETMessages, SVCMessages } from "../generated/netmessages.js";
 import {
   CNETMsg_Tick,
+  CSVCMsg_CreateStringTable,
   CSVCMsg_ServerInfo,
+  CSVCMsg_UpdateStringTable,
 } from "../proto/index.js";
 import type {
   CNETMsg_Tick as CNETMsg_TickType,
+  CSVCMsg_CreateStringTable as CSVCMsg_CreateStringTableType,
   CSVCMsg_ServerInfo as CSVCMsg_ServerInfoType,
+  CSVCMsg_UpdateStringTable as CSVCMsg_UpdateStringTableType,
 } from "../proto/index.js";
 
 /** Generic decoder shape exposed by every ts-proto codec object. */
@@ -50,6 +54,8 @@ export interface RawPacketMessage {
 export interface MessageHandlers {
   onServerInfo?: (msg: CSVCMsg_ServerInfoType) => void;
   onNetTick?: (msg: CNETMsg_TickType) => void;
+  onCreateStringTable?: (msg: CSVCMsg_CreateStringTableType) => void;
+  onUpdateStringTable?: (msg: CSVCMsg_UpdateStringTableType) => void;
 }
 
 /** One row in the dispatch registry: command ID -> codec + handler key. */
@@ -99,6 +105,20 @@ export class MessageDispatcher {
       [
         NETMessages.net_Tick,
         { decoder: CNETMsg_Tick, handlerKey: "onNetTick" },
+      ],
+      [
+        SVCMessages.svc_CreateStringTable,
+        {
+          decoder: CSVCMsg_CreateStringTable,
+          handlerKey: "onCreateStringTable",
+        },
+      ],
+      [
+        SVCMessages.svc_UpdateStringTable,
+        {
+          decoder: CSVCMsg_UpdateStringTable,
+          handlerKey: "onUpdateStringTable",
+        },
       ],
     ]);
 

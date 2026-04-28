@@ -62,6 +62,7 @@
     "url": "https://github.com/yarikleto/counter-strike-demo-parser.git"
   },
   "dependencies": {
-    "protobufjs": "^8.0.3"
+    "protobufjs": "^8.0.3",
+    "snappyjs": "^0.7.0"
   }
 }
