@@ -33,3 +33,15 @@ export type {
   RawPacketMessage,
 } from "./packet/MessageDispatch.js";
 export type { CSVCMsg_ServerInfo, CNETMsg_Tick } from "./proto/index.js";
+export type {
+  SendTable,
+  SendProp,
+  SendPropTypeValue,
+  ServerClass,
+  FlattenedSendProp,
+  DataTablesParseResult,
+} from "./datatables/index.js";
+export { SendPropType } from "./datatables/index.js";
+export { parseDataTables } from "./datatables/index.js";
+export type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
+export type { ServerClassRegistry } from "./datatables/ServerClassRegistry.js";

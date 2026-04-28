@@ -32,12 +32,16 @@ export interface FrameHeader {
  * Result of reading a single frame.
  *
  * For dem_signon/dem_packet, `packetData` contains the raw protobuf message
- * stream. For all other types, `packetData` is undefined and the payload
- * has been skipped.
+ * stream. For dem_datatables, `dataTablesData` contains the raw blob carrying
+ * the stream of svc_SendTable messages followed by a single CSVCMsg_ClassInfo.
+ * For all other types, both fields are undefined and the payload has been
+ * skipped.
  */
 export interface Frame extends FrameHeader {
   /** Raw protobuf message stream for packet frames, undefined otherwise. */
   packetData: Buffer | undefined;
+  /** Raw payload of a dem_datatables frame, undefined otherwise. */
+  dataTablesData: Buffer | undefined;
 }
 
 /**
@@ -71,19 +75,48 @@ function readFrame(reader: ByteReader): Frame | null {
       return readPacketFrame(reader, command, tick, playerSlot);
 
     case DemoCommands.DEM_SYNCTICK:
-      return { command, tick, playerSlot, packetData: undefined };
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData: undefined,
+      };
+
+    case DemoCommands.DEM_DATATABLES: {
+      const length = reader.readInt32();
+      const dataTablesData = reader.readBytes(length);
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData,
+      };
+    }
 
     case DemoCommands.DEM_CONSOLECMD:
-    case DemoCommands.DEM_DATATABLES:
     case DemoCommands.DEM_STRINGTABLES:
       skipLengthPrefixedData(reader);
-      return { command, tick, playerSlot, packetData: undefined };
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData: undefined,
+      };
 
     case DemoCommands.DEM_USERCMD:
       // outgoing sequence (int32) + length-prefixed data
       reader.readInt32();
       skipLengthPrefixedData(reader);
-      return { command, tick, playerSlot, packetData: undefined };
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData: undefined,
+      };
 
     case DemoCommands.DEM_STOP:
       return null;
@@ -92,7 +125,13 @@ function readFrame(reader: ByteReader): Frame | null {
       // unknown int32 + length-prefixed data
       reader.readInt32();
       skipLengthPrefixedData(reader);
-      return { command, tick, playerSlot, packetData: undefined };
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData: undefined,
+      };
 
     default:
       throw new Error(`FrameParser: unknown command byte ${command}`);
@@ -114,7 +153,13 @@ function readPacketFrame(
   // Read the protobuf message stream
   const dataLength = reader.readInt32();
   const packetData = reader.readBytes(dataLength);
-  return { command, tick, playerSlot, packetData };
+  return {
+    command,
+    tick,
+    playerSlot,
+    packetData,
+    dataTablesData: undefined,
+  };
 }
 
 /** Skip a length-prefixed data block (int32 length + data bytes). */

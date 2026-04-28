@@ -29,11 +29,16 @@ import type { DemoHeader } from "./frame/header.js";
 import { iterateFrames } from "./frame/FrameParser.js";
 import { MessageDispatcher } from "./packet/MessageDispatch.js";
 import type { CSVCMsg_ServerInfo } from "./proto/index.js";
+import { parseDataTables } from "./datatables/DataTablesParser.js";
+import type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
+import { ServerClassRegistry } from "./datatables/ServerClassRegistry.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
   private _header: DemoHeader | undefined;
   private _serverInfo: CSVCMsg_ServerInfo | undefined;
+  private _sendTables: SendTableRegistry | undefined;
+  private _serverClasses: ServerClassRegistry | undefined;
 
   constructor(buffer: Buffer) {
     super();
@@ -58,6 +63,27 @@ export class DemoParser extends EventEmitter {
    */
   get serverInfo(): CSVCMsg_ServerInfo | undefined {
     return this._serverInfo;
+  }
+
+  /**
+   * The SendTable registry parsed from the demo's `dem_datatables` frame.
+   *
+   * `undefined` until parsing reaches the signon datatables frame. After
+   * `parseAll()` completes on a well-formed demo this is always populated;
+   * the entity decoder (M2 Slice 4) reads it synchronously.
+   */
+  get sendTables(): SendTableRegistry | undefined {
+    return this._sendTables;
+  }
+
+  /**
+   * The ServerClass registry parsed from the demo's `dem_datatables` frame.
+   *
+   * `undefined` until parsing reaches the signon datatables frame. Indexed
+   * by both `classId` and C++ `className`.
+   */
+  get serverClasses(): ServerClassRegistry | undefined {
+    return this._serverClasses;
   }
 
   /**
@@ -107,6 +133,17 @@ export class DemoParser extends EventEmitter {
     for (const frame of iterateFrames(reader)) {
       if (frame.packetData) {
         dispatcher.dispatch(frame.packetData);
+      }
+      if (frame.dataTablesData !== undefined && this._sendTables === undefined) {
+        const { sendTables, serverClasses } = parseDataTables(
+          frame.dataTablesData,
+        );
+        this._sendTables = sendTables;
+        const registry = new ServerClassRegistry();
+        for (const sc of serverClasses) {
+          registry.register(sc);
+        }
+        this._serverClasses = registry;
       }
     }
   }
