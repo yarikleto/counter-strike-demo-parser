@@ -42,3 +42,21 @@ describe("serverInfo event — integration with real demo file", () => {
     expect(serverInfo!.tickInterval).toBe(1 / 128);
   });
 });
+
+describe("DemoParser.serverInfo accessor — cached state from de_nuke.dem", () => {
+  it("should expose serverInfo as undefined before parseAll() is called", () => {
+    const parser = DemoParser.fromFile(FIXTURE_PATH);
+    // Snapshot before any parsing happens.
+    expect(parser.serverInfo).toBeUndefined();
+  });
+
+  it("should populate serverInfo with map name and tick interval after parseAll()", () => {
+    const parser = DemoParser.fromFile(FIXTURE_PATH);
+
+    parser.parseAll();
+
+    expect(parser.serverInfo).toBeDefined();
+    expect(parser.serverInfo!.mapName).toBe("de_nuke");
+    expect(parser.serverInfo!.tickInterval).toBe(1 / 128);
+  });
+});

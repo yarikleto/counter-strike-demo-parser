@@ -24,8 +24,6 @@ export { DemoCommands } from "./frame/DemoCommands.js";
 export type { DemoCommand } from "./frame/DemoCommands.js";
 export { iterateFrames } from "./frame/FrameParser.js";
 export type { Frame, FrameHeader } from "./frame/FrameParser.js";
-export { iteratePacketMessages } from "./packet/PacketReader.js";
-export type { PacketMessage } from "./packet/PacketReader.js";
 export {
   MessageDispatcher,
   iterateRawMessages,
