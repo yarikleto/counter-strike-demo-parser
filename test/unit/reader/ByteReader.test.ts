@@ -149,4 +149,68 @@ describe("ByteReader", () => {
       expect(() => reader.readInt32()).toThrow(RangeError);
     });
   });
+
+  describe("readUInt8", () => {
+    it("should read a single unsigned byte and advance cursor by 1", () => {
+      const buf = Buffer.from([0xab, 0xcd]);
+      const reader = new ByteReader(buf);
+      expect(reader.readUInt8()).toBe(0xab);
+      expect(reader.position).toBe(1);
+    });
+
+    it("should read 0x00 and 0xff correctly", () => {
+      const buf = Buffer.from([0x00, 0xff]);
+      const reader = new ByteReader(buf);
+      expect(reader.readUInt8()).toBe(0);
+      expect(reader.readUInt8()).toBe(255);
+    });
+
+    it("should throw when no bytes remain", () => {
+      const reader = new ByteReader(Buffer.alloc(0));
+      expect(() => reader.readUInt8()).toThrow(RangeError);
+    });
+  });
+
+  describe("readVarInt32", () => {
+    it("should decode a single-byte varint", () => {
+      // Value 1 encodes as [0x01]
+      const reader = new ByteReader(Buffer.from([0x01]));
+      expect(reader.readVarInt32()).toBe(1);
+      expect(reader.position).toBe(1);
+    });
+
+    it("should decode a multi-byte varint (300)", () => {
+      // 300 = 0b100101100 => bytes: 0xAC 0x02
+      const reader = new ByteReader(Buffer.from([0xac, 0x02]));
+      expect(reader.readVarInt32()).toBe(300);
+      expect(reader.position).toBe(2);
+    });
+
+    it("should decode maximum 5-byte varint (0xFFFFFFFF)", () => {
+      // 2^32 - 1 = 4294967295 encoded as 5-byte varint
+      // Each byte: 7 data bits + continuation bit
+      // [0xFF, 0xFF, 0xFF, 0xFF, 0x0F]
+      const reader = new ByteReader(Buffer.from([0xff, 0xff, 0xff, 0xff, 0x0f]));
+      expect(reader.readVarInt32()).toBe(4294967295);
+      expect(reader.position).toBe(5);
+    });
+
+    it("should decode zero", () => {
+      const reader = new ByteReader(Buffer.from([0x00]));
+      expect(reader.readVarInt32()).toBe(0);
+      expect(reader.position).toBe(1);
+    });
+
+    it("should throw on a varint longer than 5 bytes", () => {
+      // Six continuation bytes — all have MSB set
+      const reader = new ByteReader(Buffer.from([0x80, 0x80, 0x80, 0x80, 0x80, 0x01]));
+      expect(() => reader.readVarInt32()).toThrow("varint32 is too long");
+    });
+
+    it("should throw when buffer is exhausted mid-varint", () => {
+      // Continuation bit set but no next byte
+      const reader = new ByteReader(Buffer.from([0x80]));
+      expect(() => reader.readVarInt32()).toThrow(RangeError);
+    });
+  });
 });

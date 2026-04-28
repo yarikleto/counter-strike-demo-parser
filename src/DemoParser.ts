@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 /**
  * DemoParser — main public API for parsing CS:GO .dem files.
  *
@@ -17,12 +15,32 @@ import { readFileSync } from "node:fs";
  *
  * One-shot convenience:
  *   - DemoParser.parse(buffer)      — create + parseAll in one call
+ *
+ * Event emission: extends Node.js EventEmitter. Currently emits:
+ *   - 'serverInfo' — when CSVCMsg_ServerInfo is decoded (contains ServerInfo payload)
  */
-export class DemoParser {
+import { readFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { ByteReader } from "./reader/ByteReader.js";
+import { parseHeader } from "./frame/header.js";
+import type { DemoHeader } from "./frame/header.js";
+import { iterateFrames } from "./frame/FrameParser.js";
+import { iteratePacketMessages } from "./packet/PacketReader.js";
+import { SVC_MSG_SERVER_INFO, decodeServerInfo } from "./packet/ServerInfo.js";
+import type { ServerInfo } from "./packet/ServerInfo.js";
+
+export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
+  private _header: DemoHeader | undefined;
 
   constructor(buffer: Buffer) {
+    super();
     this.buffer = buffer;
+  }
+
+  /** The parsed demo header. Available after parseAll() completes. */
+  get header(): DemoHeader | undefined {
+    return this._header;
   }
 
   /**
@@ -53,10 +71,27 @@ export class DemoParser {
    * Parse the entire demo file synchronously, emitting events as they occur.
    */
   parseAll(): void {
-    // Will be implemented in subsequent tasks.
-    // For now, validates that the buffer exists.
     if (this.buffer.length === 0) {
       throw new Error("Empty demo file");
+    }
+
+    const reader = new ByteReader(this.buffer);
+    this._header = parseHeader(reader);
+
+    for (const frame of iterateFrames(reader)) {
+      if (frame.packetData) {
+        this.processPacketData(frame.packetData);
+      }
+    }
+  }
+
+  /** Iterate protobuf messages in a packet data blob and dispatch known types. */
+  private processPacketData(data: Buffer): void {
+    for (const message of iteratePacketMessages(data)) {
+      if (message.commandType === SVC_MSG_SERVER_INFO) {
+        const serverInfo: ServerInfo = decodeServerInfo(message.payload);
+        this.emit("serverInfo", serverInfo);
+      }
     }
   }
 }

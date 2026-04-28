@@ -36,6 +36,14 @@ export class ByteReader {
     return this.buffer.length;
   }
 
+  /** Read an unsigned 8-bit integer. Advances cursor by 1. */
+  readUInt8(): number {
+    this.ensureAvailable(1);
+    const value = this.buffer[this.cursor];
+    this.cursor += 1;
+    return value;
+  }
+
   /** Read a signed 32-bit little-endian integer. Advances cursor by 4. */
   readInt32(): number {
     this.ensureAvailable(4);
@@ -66,6 +74,32 @@ export class ByteReader {
     const slice = this.buffer.subarray(this.cursor, this.cursor + n);
     this.cursor += n;
     return slice;
+  }
+
+  /**
+   * Read a protobuf-style variable-length integer (varint32).
+   *
+   * Encoding: 7 data bits per byte, MSB is the continuation flag.
+   * If the MSB is 1, read another byte. Up to 5 bytes for a 32-bit value.
+   * Returns the decoded unsigned 32-bit integer.
+   */
+  readVarInt32(): number {
+    let result = 0;
+    let shift = 0;
+
+    for (let i = 0; i < 5; i++) {
+      this.ensureAvailable(1);
+      const byte = this.buffer[this.cursor];
+      this.cursor += 1;
+
+      result |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) {
+        return result >>> 0;
+      }
+      shift += 7;
+    }
+
+    throw new Error("ByteReader: varint32 is too long (more than 5 bytes)");
   }
 
   /**

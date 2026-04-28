@@ -10,6 +10,9 @@
  *
  * const buffer = fs.readFileSync('match.dem');
  * const parser = new DemoParser(buffer);
+ * parser.on('serverInfo', (info) => {
+ *   console.log(`Map: ${info.mapName}, Tick interval: ${info.tickInterval}`);
+ * });
  * parser.parseAll();
  * ```
  */
@@ -17,3 +20,11 @@ export { DemoParser } from "./DemoParser.js";
 export { ByteReader } from "./reader/ByteReader.js";
 export { parseHeader } from "./frame/header.js";
 export type { DemoHeader } from "./frame/header.js";
+export { DemoCommands } from "./frame/DemoCommands.js";
+export type { DemoCommand } from "./frame/DemoCommands.js";
+export { iterateFrames } from "./frame/FrameParser.js";
+export type { Frame, FrameHeader } from "./frame/FrameParser.js";
+export { iteratePacketMessages } from "./packet/PacketReader.js";
+export type { PacketMessage } from "./packet/PacketReader.js";
+export { decodeServerInfo, SVC_MSG_SERVER_INFO } from "./packet/ServerInfo.js";
+export type { ServerInfo } from "./packet/ServerInfo.js";
