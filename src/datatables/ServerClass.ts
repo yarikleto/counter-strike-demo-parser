@@ -33,6 +33,20 @@ export interface FlattenedSendProp {
   readonly prop: SendProp;
   /** Name of the SendTable this prop was defined in — used for excludes and debugging. */
   readonly sourceTableName: string;
+  /**
+   * Element template for ARRAY-typed props. Set only when `prop.type ===
+   * SendPropType.ARRAY` — otherwise undefined.
+   *
+   * Source's wire layout for arrays carries the per-element shape as a
+   * separate SendProp marked with `SPROP_INSIDEARRAY` immediately
+   * preceding the array prop in the parent table's prop list. The
+   * flattener pulls that template into the array's `arrayElement` so
+   * later property decoders can route element decoding without a separate
+   * lookup. We carry it as a full `FlattenedSendProp` (rather than a bare
+   * `SendProp`) so the array's element decoder can recursively call
+   * `decodeProp` with the same shape it accepts at the top level.
+   */
+  readonly arrayElement?: FlattenedSendProp;
 }
 
 /**

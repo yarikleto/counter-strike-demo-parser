@@ -99,17 +99,35 @@ function walk(
   }
 
   // Pass 2: append every leaf prop in wire order.
+  //
+  // INSIDEARRAY props describe the element shape of the IMMEDIATELY-
+  // following ARRAY prop. Source's `SendTable_Flatten` attaches the
+  // template to the ARRAY's `arrayElement`; we mirror that. We track the
+  // most recent INSIDEARRAY prop seen in this table and consume it when
+  // the ARRAY prop appears. After consumption it is cleared so a stray
+  // INSIDEARRAY without a following ARRAY would not leak into the next
+  // ARRAY (defensive: this should not happen in valid wire data).
+  let pendingArrayElement: FlattenedSendProp | undefined;
   for (const prop of table.props) {
     if ((prop.flags & SPropFlags.EXCLUDE) !== 0) continue;
-    // INSIDEARRAY props are array-element TEMPLATES — they describe the
-    // shape of one element of the immediately-following ARRAY prop and
-    // are NOT independent flat-prop entries. Source's SendTable_Flatten
-    // attaches them to their owning ARRAY prop's `arrayElement`; we drop
-    // them here (the ARRAY prop carries `numElements` and bit-width
-    // inline, sufficient for Slice 4 / TASK-021's per-element expansion).
-    if ((prop.flags & SPropFlags.INSIDEARRAY) !== 0) continue;
+    if ((prop.flags & SPropFlags.INSIDEARRAY) !== 0) {
+      // Capture as the next array's element template. INSIDEARRAY props
+      // are NOT independent flat-prop entries — they live attached to
+      // their owning ARRAY.
+      pendingArrayElement = { prop, sourceTableName: table.netTableName };
+      continue;
+    }
     if (exclusions.has(exclusionKey(table.netTableName, prop.varName))) continue;
     if (prop.type === SendPropType.DATATABLE) continue;
+    if (prop.type === SendPropType.ARRAY) {
+      out.push({
+        prop,
+        sourceTableName: table.netTableName,
+        arrayElement: pendingArrayElement,
+      });
+      pendingArrayElement = undefined;
+      continue;
+    }
     out.push({ prop, sourceTableName: table.netTableName });
   }
 }

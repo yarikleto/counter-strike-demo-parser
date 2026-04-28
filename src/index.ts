@@ -51,3 +51,5 @@ export type {
   StringTableOptions,
   ParseStringTableResult,
 } from "./stringtables/index.js";
+export { decodeProp } from "./properties/index.js";
+export type { PropertyValue, Vector2, Vector3 } from "./properties/index.js";
