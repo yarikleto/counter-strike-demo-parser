@@ -133,6 +133,9 @@ function readClassInfo(
       dtName,
       sendTable: sendTables.get(dtName),
       flattenedProps: [],
+      entityStore: null,
+      propColumnLayout: null,
+      cachedBaseline: undefined,
     });
   }
   return out;

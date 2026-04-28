@@ -25,12 +25,14 @@ import { NETMessages, SVCMessages } from "../generated/netmessages.js";
 import {
   CNETMsg_Tick,
   CSVCMsg_CreateStringTable,
+  CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
 } from "../proto/index.js";
 import type {
   CNETMsg_Tick as CNETMsg_TickType,
   CSVCMsg_CreateStringTable as CSVCMsg_CreateStringTableType,
+  CSVCMsg_PacketEntities as CSVCMsg_PacketEntitiesType,
   CSVCMsg_ServerInfo as CSVCMsg_ServerInfoType,
   CSVCMsg_UpdateStringTable as CSVCMsg_UpdateStringTableType,
 } from "../proto/index.js";
@@ -56,6 +58,7 @@ export interface MessageHandlers {
   onNetTick?: (msg: CNETMsg_TickType) => void;
   onCreateStringTable?: (msg: CSVCMsg_CreateStringTableType) => void;
   onUpdateStringTable?: (msg: CSVCMsg_UpdateStringTableType) => void;
+  onPacketEntities?: (msg: CSVCMsg_PacketEntitiesType) => void;
 }
 
 /** One row in the dispatch registry: command ID -> codec + handler key. */
@@ -118,6 +121,13 @@ export class MessageDispatcher {
         {
           decoder: CSVCMsg_UpdateStringTable,
           handlerKey: "onUpdateStringTable",
+        },
+      ],
+      [
+        SVCMessages.svc_PacketEntities,
+        {
+          decoder: CSVCMsg_PacketEntities,
+          handlerKey: "onPacketEntities",
         },
       ],
     ]);

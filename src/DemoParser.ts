@@ -31,6 +31,7 @@ import { iterateFrames } from "./frame/FrameParser.js";
 import { MessageDispatcher } from "./packet/MessageDispatch.js";
 import type {
   CSVCMsg_CreateStringTable,
+  CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
 } from "./proto/index.js";
@@ -42,6 +43,7 @@ import type { StringTableEntry } from "./stringtables/StringTable.js";
 import { StringTableManager } from "./stringtables/StringTableManager.js";
 import { parseStringTableEntries } from "./stringtables/StringTableParser.js";
 import { decompressSnappy } from "./stringtables/Compression.js";
+import { EntityList, decodePacketEntities } from "./entities/index.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -53,6 +55,15 @@ export class DemoParser extends EventEmitter {
   /** Per-table-id history rings, keyed by table id. UpdateStringTable
    * continues the same ring its corresponding CreateStringTable used. */
   private readonly stringTableHistories = new Map<number, string[]>();
+  /** Live entity list, populated as PacketEntities messages are decoded. */
+  private readonly _entities: EntityList = new EntityList();
+  /**
+   * Once a PacketEntities decode throws (TASK-021a wire divergence, etc.),
+   * skip subsequent messages — re-attempting them would only burn CPU on
+   * already-desynced cursors. The error is surfaced via the
+   * `entityDecodeError` event the first time it happens.
+   */
+  private _entityDecodeDisabled = false;
 
   constructor(buffer: Buffer) {
     super();
@@ -111,6 +122,16 @@ export class DemoParser extends EventEmitter {
   }
 
   /**
+   * The live entity list, populated as `svc_PacketEntities` messages are
+   * decoded. Empty until parsing reaches the first PacketEntities message
+   * (post-datatables / post-stringtables). After `parseAll()` returns on a
+   * well-formed demo this contains every entity that survived to dem_stop.
+   */
+  get entities(): EntityList {
+    return this._entities;
+  }
+
+  /**
    * One-shot convenience: create a parser from a buffer and parse it immediately.
    */
   static parse(buffer: Buffer): DemoParser {
@@ -157,6 +178,9 @@ export class DemoParser extends EventEmitter {
       },
       onUpdateStringTable: (msg: CSVCMsg_UpdateStringTable) => {
         this.handleUpdateStringTable(msg);
+      },
+      onPacketEntities: (msg: CSVCMsg_PacketEntities) => {
+        this.handlePacketEntities(msg);
       },
     });
 
@@ -253,6 +277,44 @@ export class DemoParser extends EventEmitter {
       history,
     );
     this.emit("stringTableUpdated", { name: table.name, changedEntries });
+  }
+
+  /**
+   * Decode a CSVCMsg_PacketEntities message and apply its create / update /
+   * delete operations to the entity list. Requires datatables (for the
+   * ServerClass registry) and string tables (for instance baselines) — if
+   * either is missing the message is dropped silently, since by-design they
+   * arrive earlier in the wire stream.
+   */
+  private handlePacketEntities(msg: CSVCMsg_PacketEntities): void {
+    if (
+      this._serverClasses === undefined ||
+      this._stringTables === undefined ||
+      this._entityDecodeDisabled
+    ) {
+      return;
+    }
+    try {
+      decodePacketEntities(
+        msg,
+        this._entities,
+        this._serverClasses,
+        this._stringTables,
+        {
+          onCreate: (entity) => this.emit("entityCreated", entity),
+          onUpdate: (entity) => this.emit("entityUpdated", entity),
+          onDelete: (entity) => this.emit("entityDeleted", entity),
+        },
+      );
+    } catch (err) {
+      // Per-prop decoder divergence (TASK-021a) or flatten miscount
+      // (TASK-018a) can desync the bit stream mid-message. Surface the
+      // first failure via `entityDecodeError`, then disable the decoder
+      // for the rest of the parse — re-attempting subsequent messages
+      // would only burn CPU on already-desynced cursors.
+      this._entityDecodeDisabled = true;
+      this.emit("entityDecodeError", err);
+    }
   }
 
   /**

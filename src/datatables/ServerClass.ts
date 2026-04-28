@@ -13,6 +13,18 @@
  * and break consumers built on Slice 1.
  */
 import type { SendProp, SendTable } from "./SendTable.js";
+import type { PropertyValue } from "../properties/Property.js";
+
+/**
+ * Forward declaration for the per-class EntityStore (M2 Slice 4 phase 2).
+ *
+ * Defined as `unknown` here to avoid a circular import between
+ * `src/datatables/` and `src/entities/`. The entity layer downcasts to its
+ * concrete `EntityStore` type. The forward type also keeps Slice 1 / 2
+ * consumers oblivious to the storage layer.
+ */
+export type EntityStoreRef = unknown;
+export type PropColumnLayoutRef = unknown;
 
 /**
  * A flattened SendProp — one entry of a ServerClass's decode template.
@@ -70,4 +82,35 @@ export interface ServerClass {
    * See {@link FlattenedSendProp} for the placeholder shape.
    */
   flattenedProps: FlattenedSendProp[];
+
+  /**
+   * Per-class struct-of-arrays storage bundle for live entity property
+   * values. Lazy: `null` until the first entity of this class is created,
+   * at which point the entity layer instantiates an `EntityStore` keyed to
+   * this class's flattened-prop layout.
+   *
+   * Forward-declared here as `EntityStoreRef` (= `unknown`) to keep the
+   * datatables layer free of an upward dependency on `src/entities/`. The
+   * entity layer is the only writer.
+   */
+  entityStore: EntityStoreRef | null;
+
+  /**
+   * Cached prop-column layout: which typed-array column each flatPropIndex
+   * routes to, plus per-kind counts. Computed once on first instantiation
+   * and reused by every subsequent `EntityStore` created from this class.
+   *
+   * Lazily populated by the entity layer for the same circular-dep reason
+   * as `entityStore` above.
+   */
+  propColumnLayout: PropColumnLayoutRef | null;
+
+  /**
+   * Cached decoded instance baseline — the `(propIndex, value)` pairs to
+   * apply at every fresh `enter-PVS` of this class. Lazily decoded on
+   * first need (TASK-025), reused on every subsequent create. `undefined`
+   * before the first decode attempt, `null` if the baseline string-table
+   * entry was missing at decode time (we retry on next entity-create).
+   */
+  cachedBaseline: { propIndices: number[]; values: PropertyValue[] } | null | undefined;
 }

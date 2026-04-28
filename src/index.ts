@@ -53,3 +53,9 @@ export type {
 } from "./stringtables/index.js";
 export { decodeProp } from "./properties/index.js";
 export type { PropertyValue, Vector2, Vector3 } from "./properties/index.js";
+export { Entity, EntityList, MAX_EDICTS } from "./entities/index.js";
+export {
+  EntityClassMismatchError,
+  StaleEntityError,
+  BitStreamMisalignmentError,
+} from "./entities/index.js";
