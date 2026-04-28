@@ -26,5 +26,12 @@ export { iterateFrames } from "./frame/FrameParser.js";
 export type { Frame, FrameHeader } from "./frame/FrameParser.js";
 export { iteratePacketMessages } from "./packet/PacketReader.js";
 export type { PacketMessage } from "./packet/PacketReader.js";
-export { decodeServerInfo, SVC_MSG_SERVER_INFO } from "./packet/ServerInfo.js";
-export type { ServerInfo } from "./packet/ServerInfo.js";
+export {
+  MessageDispatcher,
+  iterateRawMessages,
+} from "./packet/MessageDispatch.js";
+export type {
+  MessageHandlers,
+  RawPacketMessage,
+} from "./packet/MessageDispatch.js";
+export type { CSVCMsg_ServerInfo, CNETMsg_Tick } from "./proto/index.js";

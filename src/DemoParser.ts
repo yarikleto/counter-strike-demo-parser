@@ -17,7 +17,9 @@
  *   - DemoParser.parse(buffer)      — create + parseAll in one call
  *
  * Event emission: extends Node.js EventEmitter. Currently emits:
- *   - 'serverInfo' — when CSVCMsg_ServerInfo is decoded (contains ServerInfo payload)
+ *   - 'serverInfo' — when CSVCMsg_ServerInfo is decoded (decoded by ts-proto
+ *                    via the MessageDispatcher; payload is the generated
+ *                    CSVCMsg_ServerInfo type).
  */
 import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
@@ -25,9 +27,8 @@ import { ByteReader } from "./reader/ByteReader.js";
 import { parseHeader } from "./frame/header.js";
 import type { DemoHeader } from "./frame/header.js";
 import { iterateFrames } from "./frame/FrameParser.js";
-import { iteratePacketMessages } from "./packet/PacketReader.js";
-import { SVC_MSG_SERVER_INFO, decodeServerInfo } from "./packet/ServerInfo.js";
-import type { ServerInfo } from "./packet/ServerInfo.js";
+import { MessageDispatcher } from "./packet/MessageDispatch.js";
+import type { CSVCMsg_ServerInfo } from "./proto/index.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -78,19 +79,15 @@ export class DemoParser extends EventEmitter {
     const reader = new ByteReader(this.buffer);
     this._header = parseHeader(reader);
 
+    const dispatcher = new MessageDispatcher({
+      onServerInfo: (info: CSVCMsg_ServerInfo) => {
+        this.emit("serverInfo", info);
+      },
+    });
+
     for (const frame of iterateFrames(reader)) {
       if (frame.packetData) {
-        this.processPacketData(frame.packetData);
-      }
-    }
-  }
-
-  /** Iterate protobuf messages in a packet data blob and dispatch known types. */
-  private processPacketData(data: Buffer): void {
-    for (const message of iteratePacketMessages(data)) {
-      if (message.commandType === SVC_MSG_SERVER_INFO) {
-        const serverInfo: ServerInfo = decodeServerInfo(message.payload);
-        this.emit("serverInfo", serverInfo);
+        dispatcher.dispatch(frame.packetData);
       }
     }
   }
