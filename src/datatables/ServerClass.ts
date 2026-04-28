@@ -12,19 +12,27 @@
  * an empty array) so adding flattening doesn't change the type signature
  * and break consumers built on Slice 1.
  */
-import type { SendTable } from "./SendTable.js";
+import type { SendProp, SendTable } from "./SendTable.js";
 
 /**
- * A flattened SendProp — populated by M2 Slice 2's flattening pass.
+ * A flattened SendProp — one entry of a ServerClass's decode template.
  *
- * Slice 1 leaves this as a placeholder marker so the `flattenedProps`
- * field on ServerClass has a stable type signature now and Slice 2 only
- * has to populate it. The full shape (with decode metadata) lands with
- * TASK-015.
+ * The flattening pass (M2 Slice 2) walks each ServerClass's root SendTable
+ * tree and emits one `FlattenedSendProp` per non-excluded leaf prop. The
+ * resulting array, indexed by wire prop index, drives the PacketEntities
+ * decoder.
+ *
+ * We carry the original `SendProp` by reference rather than copy its
+ * fields — this keeps the structure small (one pointer + one string per
+ * entry) and means downstream code uses the same `SendProp` interface
+ * already validated by the Slice 1 decoder. `sourceTableName` is retained
+ * for diagnostics, golden-file tests, and future name->index resolution.
  */
 export interface FlattenedSendProp {
-  /** TODO: populated in TASK-015 / TASK-018 — Slice 2 of M2. */
-  readonly _placeholder?: never;
+  /** The original SendProp definition (type, name, flags, bit count, range, etc). */
+  readonly prop: SendProp;
+  /** Name of the SendTable this prop was defined in — used for excludes and debugging. */
+  readonly sourceTableName: string;
 }
 
 /**

@@ -32,6 +32,8 @@ import { CSVCMsg_SendTable } from "../proto/index.js";
 import type { SendProp, SendPropTypeValue, SendTable } from "./SendTable.js";
 import { SendTableRegistry } from "./SendTableRegistry.js";
 import type { ServerClass } from "./ServerClass.js";
+import { gatherExclusions } from "./Exclusions.js";
+import { flattenSendTable, prioritySort } from "./Flattener.js";
 
 /** Output of parseDataTables: every SendTable plus every ServerClass. */
 export interface DataTablesParseResult {
@@ -94,6 +96,19 @@ export function parseDataTables(data: Buffer): DataTablesParseResult {
 
   // 2. Read the trailing class-info section as raw bytes.
   const serverClasses = readClassInfo(reader, sendTables);
+
+  // 3. Flatten each ServerClass's SendTable tree (M2 Slice 2). Eager —
+  // every ServerClass we just registered gets its `flattenedProps` array
+  // populated now, before any entity decoding can request it. The cost
+  // is tens of milliseconds for ~280 classes; lazy-on-first-access is
+  // also acceptable per ADR-001 but eager is simpler and the cost is
+  // not on any hot path.
+  for (const sc of serverClasses) {
+    if (sc.sendTable === undefined) continue;
+    const exclusions = gatherExclusions(sc.sendTable, sendTables);
+    const collected = flattenSendTable(sc.sendTable, sendTables, exclusions);
+    sc.flattenedProps = prioritySort(collected);
+  }
 
   return { sendTables, serverClasses };
 }

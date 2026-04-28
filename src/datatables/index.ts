@@ -17,3 +17,7 @@ export type { ServerClass, FlattenedSendProp } from "./ServerClass.js";
 export { ServerClassRegistry } from "./ServerClassRegistry.js";
 export { parseDataTables } from "./DataTablesParser.js";
 export type { DataTablesParseResult } from "./DataTablesParser.js";
+export { SPropFlags } from "./SPropFlags.js";
+export type { SPropFlagsKey } from "./SPropFlags.js";
+export { gatherExclusions, exclusionKey } from "./Exclusions.js";
+export { flattenSendTable, prioritySort } from "./Flattener.js";

@@ -118,7 +118,12 @@ describe("parseDataTables", () => {
     expect(sc.className).toBe("CTrivialEntity");
     expect(sc.dtName).toBe("DT_Trivial");
     expect(sc.sendTable).toBe(table);
-    expect(sc.flattenedProps).toEqual([]);
+    // M2 Slice 2: parseDataTables now flattens each ServerClass's
+    // SendTable tree eagerly. The trivial single-prop table becomes one
+    // FlattenedSendProp wrapping the original `m_iCount` prop.
+    expect(sc.flattenedProps).toHaveLength(1);
+    expect(sc.flattenedProps[0]!.prop.varName).toBe("m_iCount");
+    expect(sc.flattenedProps[0]!.sourceTableName).toBe("DT_Trivial");
   });
 
   it("normalizes proto defaults on SendProp fields", () => {
