@@ -67,3 +67,15 @@ export {
   resolveHandle,
 } from "./state/index.js";
 export type { TypedServerInfo } from "./state/index.js";
+export {
+  Player,
+  Weapon,
+  PlayerResource,
+  MAX_PLAYER_SLOTS,
+} from "./state/index.js";
+export type {
+  ViewAngle,
+  PlayerSnapshot,
+  WeaponSnapshot,
+  PlayerResourceSnapshot,
+} from "./state/index.js";

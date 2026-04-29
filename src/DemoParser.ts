@@ -46,6 +46,14 @@ import { decompressSnappy } from "./stringtables/Compression.js";
 import { EntityList, decodePacketEntities } from "./entities/index.js";
 import { buildServerInfo } from "./state/ServerInfo.js";
 import type { TypedServerInfo } from "./state/ServerInfo.js";
+import { Player } from "./state/Player.js";
+import { Weapon } from "./state/Weapon.js";
+// PlayerResource overlay deferred to TASK-029a — needs Flattener
+// to synthesize array-element parent names. The PlayerResource class
+// works on synthetic data (see test/unit/state/PlayerResource.test.ts)
+// but cannot construct against real entities until that lands. The
+// type re-export stays in `src/state/index.ts` so downstream consumers
+// can still reference the snapshot types.
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -75,6 +83,15 @@ export class DemoParser extends EventEmitter {
    * decoded" return value the getter exposes.
    */
   private _typedServerInfo: TypedServerInfo | undefined | null = null;
+  /**
+   * Memoized typed overlays (M3). Each is built lazily on first access by
+   * walking `this._entities` and filtering by ServerClass shape. `null`
+   * means "not yet computed". Cache invalidation is intentionally skipped
+   * for v0.1 — held overlays whose entity has been recycled will throw
+   * `StaleEntityError` on read (per ADR-004), which is the right loudness.
+   */
+  private _playersCache: Player[] | null = null;
+  private _weaponsCache: Weapon[] | null = null;
 
   constructor(buffer: Buffer) {
     super();
@@ -123,6 +140,55 @@ export class DemoParser extends EventEmitter {
     }
     this._typedServerInfo = built;
     return built;
+  }
+
+  /**
+   * Live `Player` overlays for every CCSPlayer entity currently in the
+   * entity list. Built lazily on first access by walking
+   * `this._entities.entries()` and filtering by `serverClass.className ===
+   * "CCSPlayer"`. Each overlay is a *live view* (ADR-004): subsequent reads
+   * through `player.position`, `player.health`, etc. observe the latest
+   * tick's value automatically. The slot passed to the `Player` constructor
+   * is the entity id, which on CCSPlayer is the player's 1-based connection
+   * slot in the standard Source convention.
+   *
+   * The returned array is memoized — repeat calls return the same reference
+   * for v0.1. Cache invalidation on disconnect is deferred; held references
+   * to disconnected players surface the `StaleEntityError` from the
+   * underlying `Entity.assertFresh`, which is the right loudness.
+   */
+  get players(): Player[] {
+    if (this._playersCache !== null) return this._playersCache;
+    const out: Player[] = [];
+    for (const [id, entity] of this._entities.entries()) {
+      if (entity.serverClass.className === "CCSPlayer") {
+        out.push(new Player(id, entity));
+      }
+    }
+    this._playersCache = out;
+    return out;
+  }
+
+  /**
+   * Live `Weapon` overlays for every weapon entity currently in the entity
+   * list. Filter heuristic: any entity whose ServerClass exposes
+   * `m_iClip1` in its flattened-prop schema is a weapon. This is a
+   * structural check — it sidesteps the long enumeration of CWeapon*
+   * subclasses and stays correct as new guns are added in CSGO updates.
+   */
+  get weapons(): Weapon[] {
+    if (this._weaponsCache !== null) return this._weaponsCache;
+    const out: Weapon[] = [];
+    for (const [, entity] of this._entities.entries()) {
+      const hasClip1 = entity.serverClass.flattenedProps.some(
+        (p) => p.prop.varName === "m_iClip1",
+      );
+      if (hasClip1) {
+        out.push(new Weapon(entity));
+      }
+    }
+    this._weaponsCache = out;
+    return out;
   }
 
   /**

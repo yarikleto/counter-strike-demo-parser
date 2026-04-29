@@ -22,3 +22,10 @@ export {
 
 export type { TypedServerInfo } from "./ServerInfo.js";
 export { buildServerInfo } from "./ServerInfo.js";
+
+export { Player } from "./Player.js";
+export type { Vector3, ViewAngle, PlayerSnapshot } from "./Player.js";
+export { Weapon } from "./Weapon.js";
+export type { WeaponSnapshot } from "./Weapon.js";
+export { PlayerResource, MAX_PLAYER_SLOTS } from "./PlayerResource.js";
+export type { PlayerResourceSnapshot } from "./PlayerResource.js";
