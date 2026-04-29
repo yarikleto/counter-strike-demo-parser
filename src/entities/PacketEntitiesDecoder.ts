@@ -53,6 +53,8 @@ function readUBitInt(reader: BitReader): number {
 import type { CSVCMsg_PacketEntities } from "../proto/index.js";
 import type { ServerClassRegistry } from "../datatables/ServerClassRegistry.js";
 import type { StringTableManager } from "../stringtables/StringTableManager.js";
+import type { FlattenedSendProp } from "../datatables/ServerClass.js";
+import type { PropertyValue } from "../properties/Property.js";
 import { decodeProp } from "../properties/decodeProp.js";
 import { EntityList } from "./EntityList.js";
 import type { Entity } from "./Entity.js";
@@ -109,35 +111,73 @@ function readFieldIndex(
 }
 
 /**
- * Read one entity's changed-prop list AND interleave-decode each prop value
- * directly into `entity`'s storage. Returns nothing; mutates the store.
+ * Shared core: read a `newWay` flag + changed-prop index list (terminated by
+ * `0xFFF`), then decode each prop value in wire order, dispatching each
+ * `(propIdx, value)` to `writeProp`. Pure on its inputs other than `reader`
+ * (which advances) and `writeProp` (which sinks the values).
  *
- * Per `markus-wa/demoinfocs-golang/pkg/demoinfocs/sendtables/entity.go::ApplyUpdate`:
- *   newWay = readBit()
- *   idx    = -1
- *   loop:
- *     idx = readFieldIndex(reader, idx, newWay)
- *     if idx == -1: break
- *     decodeProp(reader, props[idx]) -> write to slot
+ * Used by BOTH live `PacketEntities` updates (sink writes to `EntityStore`)
+ * AND `instancebaseline` baseline decode (sink appends to a baseline cache).
+ *
+ * Per `markus-wa/demoinfocs-golang/pkg/demoinfocs/sendtables/entity.go::ApplyUpdate`,
+ * which `initializeBaseline` calls verbatim against the baseline-bytes
+ * BitReader. The two formats are identical — the baseline blob is just
+ * "an ApplyUpdate against an entity with all-zero props".
+ *
+ * The two phases (collect indices, then decode values) are sequential on the
+ * bit stream — NOT interleaved. The server writes the entire field-index
+ * list (with its `0xFFF` terminator) and then writes the prop values
+ * back-to-back. Interleaving desynchronises the bit cursor on the very first
+ * prop and corrupts everything downstream.
  */
-function readAndApplyChangedProps(reader: BitReader, entity: Entity): void {
-  const props = entity.serverClass.flattenedProps;
-  const total = props.length;
+export function readChangedFieldIndicesAndDecode(
+  reader: BitReader,
+  flattenedProps: readonly FlattenedSendProp[],
+  className: string,
+  writeProp: (propIdx: number, value: PropertyValue) => void,
+): void {
+  const total = flattenedProps.length;
   const newWay = reader.readBit() === 1;
+
+  // Phase 1: collect all changed-prop indices.
+  const indices: number[] = [];
   let lastIndex = -1;
   while (true) {
     lastIndex = readFieldIndex(reader, lastIndex, newWay);
-    if (lastIndex === -1) return;
+    if (lastIndex === -1) break;
     if (lastIndex < 0 || lastIndex >= total) {
       throw new RangeError(
-        `decodePacketEntities: decoded prop index ${lastIndex} is out of ` +
-          `range [0, ${total}) for ${entity.serverClass.className} — likely ` +
-          `wire-format divergence (TASK-021a) or flatten miscount.`,
+        `readChangedFieldIndicesAndDecode: decoded prop index ${lastIndex} is out of ` +
+          `range [0, ${total}) for ${className} — likely wire-format divergence ` +
+          `(TASK-021a) or flatten miscount.`,
       );
     }
-    const value = decodeProp(reader, props[lastIndex]!);
-    entity.store.write(entity.storageSlot, lastIndex, value);
+    indices.push(lastIndex);
   }
+
+  // Phase 2: decode prop values in the same order.
+  for (let i = 0; i < indices.length; i++) {
+    const idx = indices[i]!;
+    const value = decodeProp(reader, flattenedProps[idx]!);
+    writeProp(idx, value);
+  }
+}
+
+/**
+ * Read one entity's changed-prop list AND decode each prop value into
+ * `entity`'s storage. Returns nothing; mutates the store.
+ *
+ * Thin adapter over `readChangedFieldIndicesAndDecode`.
+ */
+function readAndApplyChangedProps(reader: BitReader, entity: Entity): void {
+  readChangedFieldIndicesAndDecode(
+    reader,
+    entity.serverClass.flattenedProps,
+    entity.serverClass.className,
+    (idx, value) => {
+      entity.store.write(entity.storageSlot, idx, value);
+    },
+  );
 }
 
 /**
@@ -219,17 +259,13 @@ export function decodePacketEntities(
       // same-class re-create (frees old slot, allocates new) per ADR-002.
       const entity = entityList.create(entityId, serverClass, serialNumber);
 
-      // Baseline lookup is best-effort — the instancebaseline string-table
-      // entry can race with ClassInfo, and on real CSGO demos the cached
-      // baseline blob can fail to decode (TASK-025 known divergence). On
-      // failure we fall through to the create-delta which carries enough
-      // state for a usable entity in practice.
-      let baseline;
-      try {
-        baseline = getOrDecodeBaseline(serverClass, stringTables);
-      } catch {
-        baseline = undefined;
-      }
+      // Baseline lookup is best-effort for the missing-table case (the
+      // instancebaseline string-table entry can race with ClassInfo, in
+      // which case `getOrDecodeBaseline` returns undefined and the
+      // create-delta below will populate the entity). Decode FAILURES are
+      // now genuine bugs — they propagate so they're caught by the
+      // entityDecodeError surface, not silently swallowed.
+      const baseline = getOrDecodeBaseline(serverClass, stringTables);
       if (baseline !== undefined) {
         applyBaseline(baseline, (propIdx, value) => {
           entity.store.write(entity.storageSlot, propIdx, value);

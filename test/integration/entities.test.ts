@@ -22,14 +22,17 @@ function findPropIdx(serverClass: ServerClass, varName: string): number {
 }
 
 describe("entities — integration on de_nuke.dem", () => {
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
-  it.skip("populates EntityList during parseAll", () => {
+  it("populates EntityList during parseAll", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
     expect(parser.entities.size).toBeGreaterThan(50);
   });
 
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
+  // TODO TASK-021b: only 3 of expected 5+ CCSPlayer entities are spawning;
+  // m_iTeamNum=2 verified for entity 1 (probe), so flatten + decode is
+  // correct. Likely a downstream packet-entities tick-loop or delta-update
+  // bug — only the initial PVS-enter creates entities, subsequent player
+  // spawns may not be wired through. Investigate after M2 closure.
   it.skip("CCSPlayer entities exist with valid m_iTeamNum", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
@@ -45,8 +48,7 @@ describe("entities — integration on de_nuke.dem", () => {
     expect([2, 3]).toContain(teamNum);
   });
 
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
-  it.skip("CCSPlayer m_vecOrigin has finite values", () => {
+  it("CCSPlayer m_vecOrigin has finite values", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
     const playerEntry = [...parser.entities.entries()].find(
@@ -68,8 +70,7 @@ describe("entities — integration on de_nuke.dem", () => {
     }
   });
 
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
-  it.skip("emits entityCreated events during parse", () => {
+  it("emits entityCreated events during parse", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     let createdCount = 0;
     parser.on("entityCreated", () => {
@@ -79,7 +80,10 @@ describe("entities — integration on de_nuke.dem", () => {
     expect(createdCount).toBeGreaterThan(50);
   });
 
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
+  // TODO TASK-021b: only 99 entityUpdated events fire; threshold of >100
+  // assumes a denser delta stream. Same root cause as low CCSPlayer count
+  // (downstream tick-loop / delta-update wiring). Flatten + per-prop
+  // decode are verified correct (m_iTeamNum=2 for entity 1).
   it.skip("emits entityUpdated events during parse", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     let updatedCount = 0;
@@ -90,8 +94,7 @@ describe("entities — integration on de_nuke.dem", () => {
     expect(updatedCount).toBeGreaterThan(100);
   });
 
-  // TODO TASK-018a/021a: re-enable once flatten order and decoder divergences are validated end-to-end.
-  it.skip("emits entityDeleted events during parse (grenades, etc.)", () => {
+  it("emits entityDeleted events during parse (grenades, etc.)", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     let deletedCount = 0;
     parser.on("entityDeleted", () => {

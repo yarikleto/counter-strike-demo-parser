@@ -65,62 +65,94 @@ function walk(
   out: FlattenedSendProp[],
   visited: Set<string>,
 ): void {
+  // Top-level entry: drive the demoinfocs-golang `gatherProps` algorithm
+  // (pkg/demoinfocs/sendtables/st_parser.go). The key insight is that the
+  // GLOBAL output list is built incrementally as we encounter
+  // non-COLLAPSIBLE sub-tables — each non-COLLAPSIBLE recursion FLUSHES
+  // its descendants to `out` before the parent finishes its iteration.
+  // Then the parent's own leaves + COLLAPSIBLE descendants are flushed
+  // LAST as a single tmp block.
+  //
+  // Distinction from Source:
+  //   - **COLLAPSIBLE DT** (SPROP_COLLAPSIBLE) → recurse into the SAME
+  //     `tmp` list as the parent.
+  //   - **Non-COLLAPSIBLE DT** → eagerly flush its content to the global
+  //     `out` BEFORE returning to the parent.
+  //
+  // Net ordering rule: at every level, all non-COLLAPSIBLE sub-table
+  // descendants come BEFORE the parent's own leaves and COLLAPSIBLE
+  // descendants in the final output. This matches Source's wire ordering
+  // (verified against golden flat-prop dump at
+  // `.claude/research/golden-flat-props.md`).
+  gatherProps(table, registry, exclusions, out, visited);
+}
+
+/**
+ * Equivalent of demoinfocs's `gatherProps`: gather the table's own leaves
+ * + COLLAPSIBLE descendants into a tmp list. Non-COLLAPSIBLE descendants
+ * are flushed to `out` (the GLOBAL accumulator) eagerly during iteration.
+ * After iteration, append the tmp list to `out`.
+ */
+function gatherProps(
+  table: SendTable,
+  registry: SendTableRegistry,
+  exclusions: Set<string>,
+  out: FlattenedSendProp[],
+  visited: Set<string>,
+): void {
+  const tmp: FlattenedSendProp[] = [];
+  iterateProps(table, registry, exclusions, out, tmp, visited);
+  for (const fp of tmp) out.push(fp);
+}
+
+/**
+ * Equivalent of demoinfocs's `gatherPropsIterate`: walks props in
+ * declaration order. COLLAPSIBLE DTs recurse with the SAME `tmp`;
+ * non-COLLAPSIBLE DTs recurse via `gatherProps` which flushes its
+ * content to `out` immediately.
+ */
+function iterateProps(
+  table: SendTable,
+  registry: SendTableRegistry,
+  exclusions: Set<string>,
+  out: FlattenedSendProp[],
+  tmp: FlattenedSendProp[],
+  visited: Set<string>,
+): void {
   if (visited.has(table.netTableName)) return;
   visited.add(table.netTableName);
 
-  // Source's `SendTable_BuildHierarchy_IterateProps` does TWO passes per
-  // table level: first all DataTable-typed props (recursing into them in
-  // wire order), then all leaf props. This produces the prop ordering the
-  // reference parser (demoinfocs-golang) and the Source server agree on:
-  // descendants of a DT prop are inlined where the DT was declared, but
-  // ALL DT recursions complete before any leaf prop is appended at the
-  // current level. The architect's golden dump verifies this — CCSPlayer
-  // idx 9 is `m_nDuckTimeMsecs` (deep inside DT_LocalPlayerExclusive →
-  // DT_Local) and shows BEFORE DT_BasePlayer's own leaf `m_fFlags` at idx
-  // 15, even though `localdata` (the DT prop) is the LAST prop in
-  // DT_BasePlayer's wire-order list. Single-pass DFS produces the
-  // opposite (leaves first, then sub-tree), which deviates from Source.
-
-  // Pass 1: recurse into every DataTable-typed prop in wire order.
-  for (const prop of table.props) {
-    if ((prop.flags & SPropFlags.EXCLUDE) !== 0) continue;
-    if ((prop.flags & SPropFlags.INSIDEARRAY) !== 0) continue;
-    if (exclusions.has(exclusionKey(table.netTableName, prop.varName))) continue;
-    if (prop.type !== SendPropType.DATATABLE) continue;
-    if (prop.dtName === undefined) continue;
-    const sub = registry.get(prop.dtName);
-    if (sub === undefined) continue;
-    // Recurse with a fresh visited-on-this-path lineage. The Source
-    // engine allows the same SendTable to be referenced from multiple
-    // parents — gather it each time. Cloning the visited set per-
-    // recursion keeps cycle protection (A -> B -> A) intact while
-    // permitting diamond paths (A -> B and A -> C -> B).
-    walk(sub, registry, exclusions, out, new Set(visited));
-  }
-
-  // Pass 2: append every leaf prop in wire order.
-  //
   // INSIDEARRAY props describe the element shape of the IMMEDIATELY-
-  // following ARRAY prop. Source's `SendTable_Flatten` attaches the
-  // template to the ARRAY's `arrayElement`; we mirror that. We track the
-  // most recent INSIDEARRAY prop seen in this table and consume it when
-  // the ARRAY prop appears. After consumption it is cleared so a stray
-  // INSIDEARRAY without a following ARRAY would not leak into the next
-  // ARRAY (defensive: this should not happen in valid wire data).
+  // following ARRAY prop. We track the most recent one and attach it to
+  // the next ARRAY we emit.
   let pendingArrayElement: FlattenedSendProp | undefined;
+
   for (const prop of table.props) {
     if ((prop.flags & SPropFlags.EXCLUDE) !== 0) continue;
     if ((prop.flags & SPropFlags.INSIDEARRAY) !== 0) {
-      // Capture as the next array's element template. INSIDEARRAY props
-      // are NOT independent flat-prop entries — they live attached to
-      // their owning ARRAY.
       pendingArrayElement = { prop, sourceTableName: table.netTableName };
       continue;
     }
     if (exclusions.has(exclusionKey(table.netTableName, prop.varName))) continue;
-    if (prop.type === SendPropType.DATATABLE) continue;
+
+    if (prop.type === SendPropType.DATATABLE) {
+      if (prop.dtName === undefined) continue;
+      const sub = registry.get(prop.dtName);
+      if (sub === undefined) continue;
+      // Cloning the visited set per-recursion keeps cycle protection
+      // intact while permitting diamond paths (A -> B and A -> C -> B).
+      if ((prop.flags & SPropFlags.COLLAPSIBLE) !== 0) {
+        // Inline into parent's tmp.
+        iterateProps(sub, registry, exclusions, out, tmp, new Set(visited));
+      } else {
+        // Eagerly flush this sub-tree to the global `out`.
+        gatherProps(sub, registry, exclusions, out, new Set(visited));
+      }
+      continue;
+    }
+
     if (prop.type === SendPropType.ARRAY) {
-      out.push({
+      tmp.push({
         prop,
         sourceTableName: table.netTableName,
         arrayElement: pendingArrayElement,
@@ -128,7 +160,8 @@ function walk(
       pendingArrayElement = undefined;
       continue;
     }
-    out.push({ prop, sourceTableName: table.netTableName });
+
+    tmp.push({ prop, sourceTableName: table.netTableName });
   }
 }
 

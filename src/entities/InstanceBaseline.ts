@@ -28,8 +28,7 @@ import { BitReader } from "../reader/BitReader.js";
 import type { ServerClass } from "../datatables/ServerClass.js";
 import type { StringTableManager } from "../stringtables/StringTableManager.js";
 import type { PropertyValue } from "../properties/Property.js";
-import { decodeProp } from "../properties/decodeProp.js";
-import { readChangedPropIndices } from "./ChangedPropIndices.js";
+import { readChangedFieldIndicesAndDecode } from "./PacketEntitiesDecoder.js";
 
 export interface InstanceBaseline {
   /** Sorted ascending list of flatPropIndices the baseline specifies. */
@@ -94,14 +93,22 @@ function decodeBaseline(
   const userData = entry.userData;
   if (userData.length === 0) return undefined;
 
+  // The baseline blob is encoded as an `ApplyUpdate` against an entity with
+  // all-zero props — same wire format as a live PacketEntities update.
+  // Reference: `markus-wa/demoinfocs-golang/pkg/demoinfocs/sendtables/entity.go::initializeBaseline`,
+  // which calls `e.ApplyUpdate(r)` directly against the baseline-bytes
+  // BitReader. We delegate to the same shared helper for parity.
   const reader = new BitReader(userData);
-  const propIndices = readChangedPropIndices(
-    reader,
-    serverClass.flattenedProps.length,
-  );
+  const propIndices: number[] = [];
   const values: PropertyValue[] = [];
-  for (const idx of propIndices) {
-    values.push(decodeProp(reader, serverClass.flattenedProps[idx]!));
-  }
+  readChangedFieldIndicesAndDecode(
+    reader,
+    serverClass.flattenedProps,
+    serverClass.className,
+    (propIdx, value) => {
+      propIndices.push(propIdx);
+      values.push(value);
+    },
+  );
   return { propIndices, values };
 }

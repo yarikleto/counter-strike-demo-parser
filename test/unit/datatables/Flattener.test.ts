@@ -72,15 +72,17 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     expect(flat.every((f) => f.sourceTableName === "DT_Root")).toBe(true);
   });
 
-  it("recurses into a DATATABLE prop, inlining children before parent leaves (Source two-pass walk)", () => {
-    // Source's `SendTable_BuildHierarchy_IterateProps` does TWO passes
-    // per table level: all DataTable-typed props first (recursing), then
-    // all leaf props. This test pins that behavior — children of the DT
-    // prop appear BEFORE the parent's own leaf props, regardless of
-    // wire-order position. Verified against demoinfocs's CCSPlayer
-    // golden dump (idx 9 = m_nDuckTimeMsecs from a deep DT subtree
-    // appears before idx 15 = m_fFlags, even though m_fFlags's parent
-    // table declares it before the DT prop that leads to m_nDuckTimeMsecs).
+  it("recurses into a non-COLLAPSIBLE DATATABLE prop, flushing children before parent leaves at the global level", () => {
+    // Authoritative reference: markus-wa/demoinfocs-golang
+    // pkg/demoinfocs/sendtables/st_parser.go::gatherProps. A non-
+    // COLLAPSIBLE DT recursion eagerly flushes its descendants to the
+    // GLOBAL output list (NOT the parent's accumulator) before the
+    // parent finishes iteration. The parent's own leaves + COLLAPSIBLE
+    // descendants are flushed last as a single tmp block. Net effect:
+    // every non-COLLAPSIBLE sub-tree's content precedes the parent's
+    // own leaves in the final flat list. See
+    // `.claude/research/per-prop-bit-trace.md` for the divergence
+    // diagnosis that prompted this design.
     const child = table("DT_Child", [intProp("c1"), intProp("c2")]);
     const root = table("DT_Root", [
       intProp("r1"),
@@ -98,7 +100,24 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     expect(flat[3]!.sourceTableName).toBe("DT_Root");
   });
 
-  it("recurses depth-first across multiple levels (DT-first per level)", () => {
+  it("inlines a COLLAPSIBLE DATATABLE prop's children at the DT-prop's position within the parent's tmp", () => {
+    // SPROP_COLLAPSIBLE: per demoinfocs's gatherPropsIterate, a
+    // collapsible DT flattens into the SAME tmp list as the parent.
+    // Children appear inline at the DT-prop's declared position.
+    const child = table("DT_Child", [intProp("c1"), intProp("c2")]);
+    const root = table("DT_Root", [
+      intProp("r1"),
+      dtProp("childRef", "DT_Child", { flags: SPropFlags.COLLAPSIBLE }),
+      intProp("r2"),
+    ]);
+    const reg = new SendTableRegistry();
+    reg.register(root);
+    reg.register(child);
+    const flat = flattenSendTable(root, reg, new Set());
+    expect(flat.map((f) => f.prop.varName)).toEqual(["r1", "c1", "c2", "r2"]);
+  });
+
+  it("recurses depth-first across multiple non-COLLAPSIBLE levels (eager-flush per gatherProps)", () => {
     const grand = table("DT_Grand", [intProp("g1")]);
     const child = table("DT_Child", [
       intProp("c1"),
@@ -114,13 +133,17 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     reg.register(child);
     reg.register(grand);
     const flat = flattenSendTable(root, reg, new Set());
-    // Two-pass per level:
-    //  - DT_Root pass 1: recurse into DT_Child
-    //    - DT_Child pass 1: recurse into DT_Grand
-    //      - DT_Grand pass 1: nothing
-    //      - DT_Grand pass 2: append g1
-    //    - DT_Child pass 2: append c1, c2
-    //  - DT_Root pass 2: append r1
+    // Per demoinfocs gatherProps: non-COLLAPSIBLE recursion flushes
+    // descendants to the GLOBAL out list eagerly; parent's own tmp is
+    // appended LAST.
+    //  - gatherProps(DT_Root, out=[]):
+    //    - iterate DT_Root: DT_Child non-COLLAPSIBLE -> gatherProps(DT_Child, out):
+    //      - iterate DT_Child: c1 -> tmp_child=[c1]; DT_Grand non-COLLAPSIBLE
+    //        -> gatherProps(DT_Grand, out): iterate g1 -> tmp_grand=[g1];
+    //         flush -> out=[g1]; c2 -> tmp_child=[c1, c2]
+    //      - flush -> out=[g1, c1, c2]
+    //    - r1 -> tmp_root=[r1]
+    //    - flush -> out=[g1, c1, c2, r1]
     expect(flat.map((f) => f.prop.varName)).toEqual(["g1", "c1", "c2", "r1"]);
   });
 
@@ -152,12 +175,12 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     reg.register(a);
     reg.register(b);
     const flat = flattenSendTable(a, reg, new Set());
-    // Two-pass walk:
-    //  - DT_A pass 1: recurse into DT_B
-    //    - DT_B pass 1: would recurse into DT_A but visited cycles short-circuit
-    //    - DT_B pass 2: append b1
-    //  - DT_A pass 2: append a1
-    // Final order: b1, a1.
+    // Per demoinfocs gatherProps:
+    //  - gatherProps(A, out=[]):
+    //    - iterate A: a1 -> tmp_a=[a1]; DT_B non-COLLAPSIBLE -> gatherProps(B, out):
+    //      - iterate B: b1 -> tmp_b=[b1]; DT_A non-COLLAPSIBLE -> gatherProps(A, out): visited cycle, no-op
+    //      - flush -> out=[b1]
+    //    - flush -> out=[b1, a1]
     expect(flat.map((f) => f.prop.varName)).toEqual(["b1", "a1"]);
   });
 

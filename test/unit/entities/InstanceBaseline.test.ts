@@ -72,13 +72,20 @@ describe("InstanceBaseline", () => {
       entityStore: null, propColumnLayout: null, cachedBaseline: undefined,
     };
     // Encode: changed-prop-list = [0, 2], with values 0xAB and 0xCD.
+    // Wire format matches `markus-wa/demoinfocs-golang`'s `ApplyUpdate`:
+    //   newWay flag (1 bit) + readFieldIndex loop terminated by 0xFFF.
     const w = new TestBitWriter();
-    // index 0: hasNext=1, delta=0
-    w.writeBit(1); w.writeUBitVar(0);
-    // index 2: hasNext=1, delta=1 (jumps from 0 -> 0+1+1 = 2)
-    w.writeBit(1); w.writeUBitVar(1);
-    // terminator
-    w.writeBit(0);
+    // newWay = 1
+    w.writeBit(1);
+    // index 0 (lastIndex=-1 -> 0): newWay-A fast path, readBit()=1.
+    w.writeBit(1);
+    // index 2 (lastIndex=0 -> 2, delta=1): newWay-A=0, newWay-B=1, readBits(3)=1.
+    w.writeBit(0); w.writeBit(1); w.writeBits(1, 3);
+    // terminator (return -1): newWay-A=0, newWay-B=0, readBits(7) tag=0x60 path.
+    // Final res = 0xFFF = (31) | (127 << 5). 7-bit ret = 0x7F (tag=0x60, low5=31).
+    w.writeBit(0); w.writeBit(0);
+    w.writeBits(0x7f, 7);
+    w.writeBits(0x7f, 7);
     // value at idx 0: readBits(8) of 0xAB
     w.writeBits(0xab, 8);
     // value at idx 2: readBits(8) of 0xcd
