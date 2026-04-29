@@ -59,3 +59,11 @@ export {
   StaleEntityError,
   BitStreamMisalignmentError,
 } from "./entities/index.js";
+export {
+  INVALID_HANDLE,
+  handleToIndex,
+  handleToSerial,
+  isValidHandle,
+  resolveHandle,
+} from "./state/index.js";
+export type { TypedServerInfo } from "./state/index.js";

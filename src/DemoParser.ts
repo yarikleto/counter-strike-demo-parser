@@ -44,6 +44,8 @@ import { StringTableManager } from "./stringtables/StringTableManager.js";
 import { parseStringTableEntries } from "./stringtables/StringTableParser.js";
 import { decompressSnappy } from "./stringtables/Compression.js";
 import { EntityList, decodePacketEntities } from "./entities/index.js";
+import { buildServerInfo } from "./state/ServerInfo.js";
+import type { TypedServerInfo } from "./state/ServerInfo.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -64,6 +66,15 @@ export class DemoParser extends EventEmitter {
    * `entityDecodeError` event the first time it happens.
    */
   private _entityDecodeDisabled = false;
+  /**
+   * Memoized typed ServerInfo overlay (TASK-035). Lazily built on first
+   * access of `serverInfoState`. Both source values (`_serverInfo` and
+   * `_header`) are frozen post-`parseAll`, so a single build is correct
+   * for the lifetime of the parser. `null` means "not yet built";
+   * `undefined` is reserved for the legitimate "raw ServerInfo not yet
+   * decoded" return value the getter exposes.
+   */
+  private _typedServerInfo: TypedServerInfo | undefined | null = null;
 
   constructor(buffer: Buffer) {
     super();
@@ -88,6 +99,30 @@ export class DemoParser extends EventEmitter {
    */
   get serverInfo(): CSVCMsg_ServerInfo | undefined {
     return this._serverInfo;
+  }
+
+  /**
+   * Typed roll-up of the demo header and `CSVCMsg_ServerInfo` packet —
+   * see {@link TypedServerInfo}. Joins map name, tick interval, max
+   * classes, computed `tickRate`, header playback duration / ticks, and
+   * the `isGOTV` flag into a single read-only object.
+   *
+   * Returns `undefined` until both the header and the `CSVCMsg_ServerInfo`
+   * packet have been observed (i.e., before the first `serverInfo` event
+   * fires). Lazily built on first access and memoized — both source
+   * values are immutable for the rest of the parser's lifetime.
+   */
+  get serverInfoState(): TypedServerInfo | undefined {
+    if (this._typedServerInfo !== null) return this._typedServerInfo;
+    if (this._header === undefined) return undefined;
+    const built = buildServerInfo(this._serverInfo, this._header);
+    if (built === undefined) {
+      // Don't memoize "not yet decoded" — keep retrying on each access
+      // until the underlying ServerInfo arrives. Once built it sticks.
+      return undefined;
+    }
+    this._typedServerInfo = built;
+    return built;
   }
 
   /**
