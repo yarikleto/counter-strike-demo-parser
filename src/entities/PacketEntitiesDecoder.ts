@@ -255,8 +255,27 @@ export function decodePacketEntities(
         );
       }
 
-      // EntityList.create handles same-id-different-class (throws) and
-      // same-class re-create (frees old slot, allocates new) per ADR-002.
+      // ADR-002 amendment line 254 forbade enter-PVS-with-different-class
+      // and threw `EntityClassMismatchError`, with an explicit escape hatch:
+      // "Throw now, revisit if a real demo trips it." de_nuke trips it (TASK-021b
+      // diagnostic: entity 417 re-created with class 11 over class 143, then a
+      // ~94k-error cascade because the throw aborted the rest of the message,
+      // leaving subsequent entities un-created and "update for unknown entity"
+      // erroring on every later message). Per the ADR's documented re-visit
+      // path, treat it as a missed delete: emit synthetic onDelete for the
+      // stale slot, free it via EntityList.delete, then re-create cleanly.
+      const existingForClassCheck = entityList.get(entityId);
+      if (
+        existingForClassCheck !== undefined &&
+        existingForClassCheck.serverClass.classId !== serverClass.classId
+      ) {
+        emit.onDelete(existingForClassCheck);
+        entityList.delete(entityId);
+      }
+
+      // EntityList.create handles same-class re-create (frees old slot,
+      // allocates new) per ADR-002. The class-mismatch case above made the
+      // slot empty, so this is now a fresh allocation.
       const entity = entityList.create(entityId, serverClass, serialNumber);
 
       // Baseline lookup is best-effort for the missing-table case (the

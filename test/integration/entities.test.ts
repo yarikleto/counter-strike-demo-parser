@@ -28,12 +28,7 @@ describe("entities — integration on de_nuke.dem", () => {
     expect(parser.entities.size).toBeGreaterThan(50);
   });
 
-  // TODO TASK-021b: only 3 of expected 5+ CCSPlayer entities are spawning;
-  // m_iTeamNum=2 verified for entity 1 (probe), so flatten + decode is
-  // correct. Likely a downstream packet-entities tick-loop or delta-update
-  // bug — only the initial PVS-enter creates entities, subsequent player
-  // spawns may not be wired through. Investigate after M2 closure.
-  it.skip("CCSPlayer entities exist with valid m_iTeamNum", () => {
+  it("CCSPlayer entities exist with valid m_iTeamNum", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
     const players = [...parser.entities.entries()].filter(
@@ -80,11 +75,7 @@ describe("entities — integration on de_nuke.dem", () => {
     expect(createdCount).toBeGreaterThan(50);
   });
 
-  // TODO TASK-021b: only 99 entityUpdated events fire; threshold of >100
-  // assumes a denser delta stream. Same root cause as low CCSPlayer count
-  // (downstream tick-loop / delta-update wiring). Flatten + per-prop
-  // decode are verified correct (m_iTeamNum=2 for entity 1).
-  it.skip("emits entityUpdated events during parse", () => {
+  it("emits entityUpdated events during parse", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     let updatedCount = 0;
     parser.on("entityUpdated", () => {

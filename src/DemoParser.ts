@@ -68,13 +68,6 @@ export class DemoParser extends EventEmitter {
   /** Live entity list, populated as PacketEntities messages are decoded. */
   private readonly _entities: EntityList = new EntityList();
   /**
-   * Once a PacketEntities decode throws (TASK-021a wire divergence, etc.),
-   * skip subsequent messages — re-attempting them would only burn CPU on
-   * already-desynced cursors. The error is surfaced via the
-   * `entityDecodeError` event the first time it happens.
-   */
-  private _entityDecodeDisabled = false;
-  /**
    * Memoized typed ServerInfo overlay (TASK-035). Lazily built on first
    * access of `serverInfoState`. Both source values (`_serverInfo` and
    * `_header`) are frozen post-`parseAll`, so a single build is correct
@@ -390,8 +383,7 @@ export class DemoParser extends EventEmitter {
   private handlePacketEntities(msg: CSVCMsg_PacketEntities): void {
     if (
       this._serverClasses === undefined ||
-      this._stringTables === undefined ||
-      this._entityDecodeDisabled
+      this._stringTables === undefined
     ) {
       return;
     }
@@ -409,11 +401,13 @@ export class DemoParser extends EventEmitter {
       );
     } catch (err) {
       // Per-prop decoder divergence (TASK-021a) or flatten miscount
-      // (TASK-018a) can desync the bit stream mid-message. Surface the
-      // first failure via `entityDecodeError`, then disable the decoder
-      // for the rest of the parse — re-attempting subsequent messages
-      // would only burn CPU on already-desynced cursors.
-      this._entityDecodeDisabled = true;
+      // (TASK-018a) can desync the bit stream mid-message. Each
+      // PacketEntities message owns its own BitReader (instantiated from
+      // `msg.entityData`), so a desync is isolated to that single message
+      // — the next message starts with a fresh cursor. Surface the failure
+      // via `entityDecodeError` and continue parsing; pre-021b we would
+      // self-disable here, which silently dropped the rest of the demo
+      // (thousands of legitimate entityCreated/Updated events).
       this.emit("entityDecodeError", err);
     }
   }
