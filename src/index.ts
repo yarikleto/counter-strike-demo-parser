@@ -72,10 +72,15 @@ export {
   Weapon,
   PlayerResource,
   MAX_PLAYER_SLOTS,
+  RoundTracker,
+  computeRoundPhase,
 } from "./state/index.js";
 export type {
   ViewAngle,
   PlayerSnapshot,
   WeaponSnapshot,
   PlayerResourceSnapshot,
+  RoundStateChange,
+  RoundPhase,
+  RoundPhaseInputs,
 } from "./state/index.js";

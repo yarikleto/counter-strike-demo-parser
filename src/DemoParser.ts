@@ -51,6 +51,8 @@ import { Weapon } from "./state/Weapon.js";
 import { Team } from "./state/Team.js";
 import { GameRules } from "./state/GameRules.js";
 import { PlayerResource } from "./state/PlayerResource.js";
+import { RoundTracker } from "./state/RoundTracker.js";
+import type { RoundStateChange } from "./state/RoundTracker.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -100,6 +102,19 @@ export class DemoParser extends EventEmitter {
    * the overlay is built it sticks for the parser's lifetime.
    */
   private _playerResourceCache: PlayerResource | undefined | null = null;
+  /**
+   * Round-phase tracker (TASK-034). Owned by the parser; subscribed to the
+   * `CCSGameRulesProxy` entity's create/update events from inside the
+   * PacketEntities decode hook. The tracker is constructed eagerly so the
+   * `roundTracker` accessor never returns `undefined` and listeners attached
+   * before `parseAll()` start receiving emissions on the very first proxy
+   * tick. The emit callback bridges to the parser-level `roundStateChanged`
+   * typed event — the tracker stays pure and embedder-agnostic, the parser
+   * owns the EventEmitter.
+   */
+  private readonly _roundTracker: RoundTracker = new RoundTracker(
+    (change: RoundStateChange) => this.emit("roundStateChanged", change),
+  );
 
   constructor(buffer: Buffer) {
     super();
@@ -278,6 +293,19 @@ export class DemoParser extends EventEmitter {
     // Don't memoize "not yet observed" — retry each access until the
     // entity arrives. Once built (above) the cache sticks.
     return undefined;
+  }
+
+  /**
+   * Round-phase tracker (TASK-034) — derives the `warmup`/`freeze`/`live`/
+   * `over` round phase from `GameRules` updates and emits the
+   * `roundStateChanged` parser event on every transition. The tracker is
+   * always non-null; before the first `CCSGameRulesProxy` tick its `phase`
+   * getter returns `undefined`. Use this getter to inspect the latest phase
+   * synchronously, or subscribe to the `roundStateChanged` event to stream
+   * transitions as they fire.
+   */
+  get roundTracker(): RoundTracker {
+    return this._roundTracker;
   }
 
   /**
@@ -470,6 +498,27 @@ export class DemoParser extends EventEmitter {
   }
 
   /**
+   * Bridge from the PacketEntities create/update hook to the RoundTracker.
+   * Filters to the singleton `CCSGameRulesProxy` entity — every other entity
+   * is a no-op. Reads the four `RoundPhaseInputs` fields off the live
+   * `gameRules` overlay (which auto-memoizes on first proxy observation, so
+   * this is O(entities) once and O(1) per tick thereafter) and feeds them
+   * into the tracker, which emits `roundStateChanged` on phase transitions.
+   */
+  private feedRoundTracker(entity: { serverClass: { className: string } }): void {
+    if (entity.serverClass.className !== "CCSGameRulesProxy") return;
+    const gr = this.gameRules;
+    if (gr === undefined) return;
+    this._roundTracker.onUpdate({
+      gamePhase: gr.gamePhase,
+      isWarmup: gr.isWarmup,
+      isFreezePeriod: gr.isFreezePeriod,
+      roundWinStatus: gr.roundWinStatus,
+      totalRoundsPlayed: gr.totalRoundsPlayed,
+    });
+  }
+
+  /**
    * Decode a CSVCMsg_PacketEntities message and apply its create / update /
    * delete operations to the entity list. Requires datatables (for the
    * ServerClass registry) and string tables (for instance baselines) — if
@@ -490,8 +539,14 @@ export class DemoParser extends EventEmitter {
         this._serverClasses,
         this._stringTables,
         {
-          onCreate: (entity) => this.emit("entityCreated", entity),
-          onUpdate: (entity) => this.emit("entityUpdated", entity),
+          onCreate: (entity) => {
+            this.emit("entityCreated", entity);
+            this.feedRoundTracker(entity);
+          },
+          onUpdate: (entity) => {
+            this.emit("entityUpdated", entity);
+            this.feedRoundTracker(entity);
+          },
           onDelete: (entity) => this.emit("entityDeleted", entity),
         },
       );
