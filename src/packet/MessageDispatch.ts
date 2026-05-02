@@ -25,6 +25,7 @@ import { NETMessages, SVCMessages } from "../generated/netmessages.js";
 import {
   CNETMsg_Tick,
   CSVCMsg_CreateStringTable,
+  CSVCMsg_GameEventList,
   CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
@@ -32,6 +33,7 @@ import {
 import type {
   CNETMsg_Tick as CNETMsg_TickType,
   CSVCMsg_CreateStringTable as CSVCMsg_CreateStringTableType,
+  CSVCMsg_GameEventList as CSVCMsg_GameEventListType,
   CSVCMsg_PacketEntities as CSVCMsg_PacketEntitiesType,
   CSVCMsg_ServerInfo as CSVCMsg_ServerInfoType,
   CSVCMsg_UpdateStringTable as CSVCMsg_UpdateStringTableType,
@@ -59,6 +61,7 @@ export interface MessageHandlers {
   onCreateStringTable?: (msg: CSVCMsg_CreateStringTableType) => void;
   onUpdateStringTable?: (msg: CSVCMsg_UpdateStringTableType) => void;
   onPacketEntities?: (msg: CSVCMsg_PacketEntitiesType) => void;
+  onGameEventList?: (msg: CSVCMsg_GameEventListType) => void;
 }
 
 /** One row in the dispatch registry: command ID -> codec + handler key. */
@@ -128,6 +131,13 @@ export class MessageDispatcher {
         {
           decoder: CSVCMsg_PacketEntities,
           handlerKey: "onPacketEntities",
+        },
+      ],
+      [
+        SVCMessages.svc_GameEventList,
+        {
+          decoder: CSVCMsg_GameEventList,
+          handlerKey: "onGameEventList",
         },
       ],
     ]);

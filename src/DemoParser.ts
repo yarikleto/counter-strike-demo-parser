@@ -31,6 +31,7 @@ import { iterateFrames } from "./frame/FrameParser.js";
 import { MessageDispatcher } from "./packet/MessageDispatch.js";
 import type {
   CSVCMsg_CreateStringTable,
+  CSVCMsg_GameEventList,
   CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
@@ -53,6 +54,8 @@ import { GameRules } from "./state/GameRules.js";
 import { PlayerResource } from "./state/PlayerResource.js";
 import { RoundTracker } from "./state/RoundTracker.js";
 import type { RoundStateChange } from "./state/RoundTracker.js";
+import { buildDescriptorTable } from "./events/EventDescriptorTable.js";
+import type { EventDescriptorTable } from "./events/EventDescriptorTable.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -115,6 +118,13 @@ export class DemoParser extends EventEmitter {
   private readonly _roundTracker: RoundTracker = new RoundTracker(
     (change: RoundStateChange) => this.emit("roundStateChanged", change),
   );
+  /**
+   * Game-event descriptor table (TASK-036). Built once when
+   * `CSVCMsg_GameEventList` arrives during signon. `undefined` until that
+   * message has been observed; the GameEvent decoder (TASK-037) reads this
+   * synchronously to interpret each `CSVCMsg_GameEvent` payload.
+   */
+  private _eventDescriptors: EventDescriptorTable | undefined;
 
   constructor(buffer: Buffer) {
     super();
@@ -350,6 +360,22 @@ export class DemoParser extends EventEmitter {
   }
 
   /**
+   * Game-event descriptor table parsed from the demo's `CSVCMsg_GameEventList`
+   * signon message (TASK-036). `undefined` until that message has been
+   * observed during `parseAll()`; on a well-formed CS:GO demo it is populated
+   * with 100+ descriptors (CS:GO networks 169+ events) early in signon and
+   * remains stable for the rest of the parse.
+   *
+   * Each entry maps an event id to its name plus the schema (key name + wire
+   * type) of every value carried by an instance of that event. The GameEvent
+   * decoder (TASK-037) reads this synchronously; the public Tier-2 catch-all
+   * `gameEvent` (TASK-048) surfaces it to user code.
+   */
+  get gameEventDescriptors(): EventDescriptorTable | undefined {
+    return this._eventDescriptors;
+  }
+
+  /**
    * One-shot convenience: create a parser from a buffer and parse it immediately.
    */
   static parse(buffer: Buffer): DemoParser {
@@ -399,6 +425,9 @@ export class DemoParser extends EventEmitter {
       },
       onPacketEntities: (msg: CSVCMsg_PacketEntities) => {
         this.handlePacketEntities(msg);
+      },
+      onGameEventList: (msg: CSVCMsg_GameEventList) => {
+        this.handleGameEventList(msg);
       },
     });
 
@@ -561,6 +590,23 @@ export class DemoParser extends EventEmitter {
       // (thousands of legitimate entityCreated/Updated events).
       this.emit("entityDecodeError", err);
     }
+  }
+
+  /**
+   * Decode a CSVCMsg_GameEventList message (TASK-036) and store the resulting
+   * descriptor table on the parser. CS:GO networks this exactly once during
+   * signon, before any CSVCMsg_GameEvent fires, so storing the freshest table
+   * unconditionally is correct — there is nothing to merge or reconcile.
+   * Downstream code (TASK-037 GameEvent decoder) reads `_eventDescriptors`
+   * synchronously when interpreting each event payload.
+   */
+  private handleGameEventList(msg: CSVCMsg_GameEventList): void {
+    // Capture before emit so synchronous listeners that observe both the
+    // event payload and `parser.gameEventDescriptors` see a consistent state
+    // — same pattern as `onServerInfo` above.
+    const table = buildDescriptorTable(msg);
+    this._eventDescriptors = table;
+    this.emit("gameEventListReady", table);
   }
 
   /**

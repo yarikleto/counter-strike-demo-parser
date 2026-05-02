@@ -7,3 +7,13 @@
  */
 export { TypedEventEmitter } from "./TypedEventEmitter.js";
 export type { EventMap, Listener } from "./TypedEventEmitter.js";
+export {
+  EventDescriptorTable,
+  buildDescriptorTable,
+} from "./EventDescriptorTable.js";
+export type {
+  EventDescriptor,
+  EventKeyDescriptor,
+  EventKeyType,
+} from "./EventDescriptor.js";
+export { eventKeyTypeFromWire } from "./EventDescriptor.js";
