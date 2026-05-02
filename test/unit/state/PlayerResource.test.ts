@@ -18,9 +18,19 @@ import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 const STAT_NAMES = ["m_iKills", "m_iDeaths", "m_iAssists", "m_iScore", "m_iPing"] as const;
 
 /**
- * Build the canonical 320-prop CCSPlayerResource flat-prop list. Order:
- * for each stat name, slots 000..063 in sequence. Returned indices are
- * stable across calls.
+ * Build the canonical 320-prop CCSPlayerResource flat-prop list mirroring
+ * the real wire shape: each per-slot stat is its own SendTable named after
+ * the stat (`m_iKills`), and each slot's flat prop has `varName === "000"`
+ * .. `"063"` with `sourceTableName === "<stat>"` as the disambiguator.
+ *
+ * This is what the Flattener actually produces on a real CS:GO demo (see
+ * `scripts/probe-pr.ts` against de_nuke.dem). Earlier drafts of these
+ * tests synthesized a dotted-path varName (`m_iKills.000`) under a single
+ * `DT_CSPlayerResource` parent — that did not match the wire and was the
+ * gap TASK-029a closed.
+ *
+ * Order: for each stat name, slots 000..063 in sequence. Returned indices
+ * are stable across calls.
  */
 function buildPlayerResourceProps(): FlattenedSendProp[] {
   const props: FlattenedSendProp[] = [];
@@ -29,7 +39,7 @@ function buildPlayerResourceProps(): FlattenedSendProp[] {
       props.push({
         prop: {
           type: 0,
-          varName: `${stat}.${slot.toString().padStart(3, "0")}`,
+          varName: slot.toString().padStart(3, "0"),
           flags: 0,
           priority: 0,
           numElements: 0,
@@ -37,7 +47,7 @@ function buildPlayerResourceProps(): FlattenedSendProp[] {
           highValue: 0,
           numBits: 32,
         },
-        sourceTableName: "DT_CSPlayerResource",
+        sourceTableName: stat,
       });
     }
   }
@@ -170,19 +180,21 @@ describe("PlayerResource", () => {
 
   it("throws on construction when a per-slot prop is missing from the schema", () => {
     const props = buildPlayerResourceProps();
-    // Drop one prop the overlay needs (m_iScore.042) — a real schema
-    // mismatch should be loud.
+    // Drop one prop the overlay needs — slot 042 of `m_iScore`. A real
+    // schema mismatch should be loud and name both the table and the slot.
     const filtered = props.filter(
-      (p) => p.prop.varName !== "m_iScore.042",
+      (p) => !(p.sourceTableName === "m_iScore" && p.prop.varName === "042"),
     );
     const entity = fakeEntity(filtered, () => 0);
-    expect(() => new PlayerResource(entity)).toThrow(/m_iScore\.042/);
+    expect(() => new PlayerResource(entity)).toThrow(/m_iScore/);
+    expect(() => new PlayerResource(entity)).toThrow(/042/);
     expect(() => new PlayerResource(entity)).toThrow(/CCSPlayerResource/);
   });
 
   it("throws when the entity's ServerClass has no PlayerResource props at all", () => {
     const entity = fakeEntity([], () => 0, "CCSPlayer");
-    expect(() => new PlayerResource(entity)).toThrow(/m_iKills\.000/);
+    // First missing prop is m_iKills slot 000.
+    expect(() => new PlayerResource(entity)).toThrow(/m_iKills/);
     expect(() => new PlayerResource(entity)).toThrow(/CCSPlayer/);
   });
 });

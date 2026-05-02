@@ -2,12 +2,19 @@
  * PlayerResource — typed overlay on the singleton CCSPlayerResource entity.
  *
  * CCSPlayerResource carries per-player-slot stat arrays (kills, deaths,
- * assists, score, ping). Each per-slot stat is sent on the wire as 64
- * separate flat props with the demoinfocs array-element naming convention
- * `m_iKills.000` ... `m_iKills.063`. This overlay caches all 64x5 = 320
- * flat-prop indices on construction so per-slot reads are direct
- * EntityStore typed-array dereferences (one Map.get on construction, zero
- * on the hot path).
+ * assists, score, ping). On the wire, each per-slot stat is its own
+ * SendTable named after the stat (`m_iKills`, `m_iDeaths`, ...) and its
+ * elements flatten to entries with `varName === "000".."063"` and
+ * `sourceTableName === "<stat>"`. The disambiguator is the source-table
+ * name, NOT a dotted-path varName. This is what the SendTable Flattener
+ * already preserves (see TASK-029a / ADR-005 §4 and the probe output in
+ * `scripts/probe-pr.ts` against de_nuke.dem). An earlier draft assumed
+ * the demoinfocs `m_iKills.000` convention and could not resolve any
+ * slot on a real entity; the fix is in the lookup, not in the Flattener.
+ *
+ * The overlay caches all 64x5 = 320 flat-prop indices on construction so
+ * per-slot reads are direct EntityStore typed-array dereferences (one
+ * scan on construction, zero on the hot path).
  *
  * Per ADR-004:
  *   - Live view, not snapshot — every getter re-reads the latest value.
@@ -51,18 +58,49 @@ export class PlayerResource {
   constructor(entity: Entity) {
     this.entity = entity;
 
-    const resolveSlots = (statName: string): readonly number[] => {
+    // Resolve all 64 per-slot indices for one stat-table by scanning the
+    // flat-prop list once. The disambiguator is the (sourceTableName,
+    // varName) pair: each per-slot stat is its own SendTable in CSGO, so
+    // every slot's varName is the bare zero-padded index `"000".."063"`
+    // and the table name carries the stat identity. A bare-varName scan
+    // would collide across stats (every stat-table emits the same
+    // `"000".."063"` strings).
+    const resolveSlots = (statTable: string): readonly number[] => {
       const arr: number[] = new Array<number>(MAX_PLAYER_SLOTS);
       const flatProps = entity.serverClass.flattenedProps;
+      // Single linear pass: for each prop in the right table, slot the
+      // padded varName into arr. Cheaper than 64 separate `findIndex`
+      // calls and avoids the O(N*64) blow-up on the 3.5k-prop CSGO
+      // CCSPlayerResource schema.
+      const found = new Array<boolean>(MAX_PLAYER_SLOTS).fill(false);
+      for (let i = 0; i < flatProps.length; i++) {
+        const fp = flatProps[i]!;
+        if (fp.sourceTableName !== statTable) continue;
+        const varName = fp.prop.varName;
+        // varName is zero-padded 3-digit ASCII ("000".."064"); parse and
+        // gate to the slot range we care about. The CSGO schema also
+        // emits a 65th `"064"` entry which we ignore — it's an unused
+        // tail slot, not a real player.
+        const slot = Number.parseInt(varName, 10);
+        if (
+          !Number.isFinite(slot) ||
+          slot < 0 ||
+          slot >= MAX_PLAYER_SLOTS
+        ) {
+          continue;
+        }
+        arr[slot] = i;
+        found[slot] = true;
+      }
       for (let slot = 0; slot < MAX_PLAYER_SLOTS; slot++) {
-        const propName = `${statName}.${slot.toString().padStart(3, "0")}`;
-        const idx = flatProps.findIndex((p) => p.prop.varName === propName);
-        if (idx < 0) {
+        if (!found[slot]) {
+          const padded = slot.toString().padStart(3, "0");
           throw new Error(
-            `PlayerResource overlay: prop "${propName}" not in ${entity.serverClass.className} schema`,
+            `PlayerResource overlay: prop "${statTable}.${padded}" ` +
+              `(sourceTable: ${statTable}, varName: ${padded}) not in ` +
+              `${entity.serverClass.className} schema`,
           );
         }
-        arr[slot] = idx;
       }
       return Object.freeze(arr);
     };

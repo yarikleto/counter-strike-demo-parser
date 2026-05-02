@@ -48,12 +48,9 @@ import { buildServerInfo } from "./state/ServerInfo.js";
 import type { TypedServerInfo } from "./state/ServerInfo.js";
 import { Player } from "./state/Player.js";
 import { Weapon } from "./state/Weapon.js";
-// PlayerResource overlay deferred to TASK-029a — needs Flattener
-// to synthesize array-element parent names. The PlayerResource class
-// works on synthetic data (see test/unit/state/PlayerResource.test.ts)
-// but cannot construct against real entities until that lands. The
-// type re-export stays in `src/state/index.ts` so downstream consumers
-// can still reference the snapshot types.
+import { Team } from "./state/Team.js";
+import { GameRules } from "./state/GameRules.js";
+import { PlayerResource } from "./state/PlayerResource.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -85,6 +82,24 @@ export class DemoParser extends EventEmitter {
    */
   private _playersCache: Player[] | null = null;
   private _weaponsCache: Weapon[] | null = null;
+  private _teamsCache: Team[] | null = null;
+  /**
+   * Memoized `GameRules` overlay. `null` means "not yet computed";
+   * `undefined` (after a build attempt) means "no CCSGameRulesProxy entity
+   * exists yet" — distinct from the not-yet-tried sentinel so we keep
+   * retrying on each access until the proxy entity is created. Once built
+   * it sticks for the parser's lifetime.
+   */
+  private _gameRulesCache: GameRules | undefined | null = null;
+  /**
+   * Memoized `PlayerResource` overlay (TASK-029a). Same lifecycle as
+   * `_gameRulesCache`: `null` is "not yet computed", `undefined` (after a
+   * build attempt) is "no CCSPlayerResource entity yet — keep retrying".
+   * The CCSPlayerResource entity is a singleton created once during the
+   * server's spawn sequence and persists for the demo's lifetime, so once
+   * the overlay is built it sticks for the parser's lifetime.
+   */
+  private _playerResourceCache: PlayerResource | undefined | null = null;
 
   constructor(buffer: Buffer) {
     super();
@@ -182,6 +197,87 @@ export class DemoParser extends EventEmitter {
     }
     this._weaponsCache = out;
     return out;
+  }
+
+  /**
+   * Live `Team` overlays for every CCSTeam entity currently in the entity
+   * list. CS:GO networks one CCSTeam per side — Unassigned, Spectator, T,
+   * CT — so on a well-formed demo this returns four entries. Each overlay
+   * is a *live view* (ADR-004): subsequent reads through `team.score`,
+   * `team.name`, etc. observe the latest tick's value automatically.
+   *
+   * The returned array is memoized — repeat calls return the same reference
+   * for v0.1. Cache invalidation on team-entity churn is deferred; CCSTeam
+   * entities are stable for the duration of a match so this is a non-issue
+   * in practice.
+   */
+  get teams(): Team[] {
+    if (this._teamsCache !== null) return this._teamsCache;
+    const out: Team[] = [];
+    for (const [, entity] of this._entities.entries()) {
+      if (entity.serverClass.className === "CCSTeam") {
+        out.push(new Team(entity));
+      }
+    }
+    this._teamsCache = out;
+    return out;
+  }
+
+  /**
+   * Live `GameRules` overlay (TASK-033) over the singleton
+   * `CCSGameRulesProxy` entity. The proxy is created early in the demo's
+   * signon sequence and persists for the full parse — there's exactly one
+   * per demo, so this returns a single overlay (or `undefined` if the
+   * proxy hasn't been observed yet, e.g. mid-parse before signon
+   * completes).
+   *
+   * Each overlay is a *live view* (ADR-004): subsequent reads through
+   * `gameRules.roundTime`, `gameRules.isWarmup`, etc. observe the latest
+   * tick's value automatically. The result is memoized once the proxy
+   * entity is found; until then the getter keeps retrying so a caller
+   * holding a parser reference picks up the overlay as soon as the proxy
+   * appears in the entity list.
+   */
+  get gameRules(): GameRules | undefined {
+    if (this._gameRulesCache !== null) return this._gameRulesCache;
+    for (const [, entity] of this._entities.entries()) {
+      if (entity.serverClass.className === "CCSGameRulesProxy") {
+        const built = new GameRules(entity);
+        this._gameRulesCache = built;
+        return built;
+      }
+    }
+    // Don't memoize "not yet observed" — retry each access until the
+    // proxy entity arrives. Once built (above) the cache sticks.
+    return undefined;
+  }
+
+  /**
+   * Live `PlayerResource` overlay (TASK-029a) over the singleton
+   * `CCSPlayerResource` entity. CCSPlayerResource carries per-player-slot
+   * stat arrays (kills/deaths/assists/score/ping for slots 0..63) — read
+   * them via `playerResource.killsForSlot(slot)` and friends, or
+   * `playerResource.snapshot()` for a frozen point-in-time copy.
+   *
+   * Returns `undefined` until the singleton entity has been observed (early
+   * signon on a well-formed demo). Each overlay is a *live view* (ADR-004):
+   * subsequent reads observe the latest tick's value. The result is
+   * memoized once the entity is found; until then the getter keeps
+   * retrying so a caller holding a parser reference picks up the overlay
+   * as soon as the entity appears in the entity list.
+   */
+  get playerResource(): PlayerResource | undefined {
+    if (this._playerResourceCache !== null) return this._playerResourceCache;
+    for (const [, entity] of this._entities.entries()) {
+      if (entity.serverClass.className === "CCSPlayerResource") {
+        const built = new PlayerResource(entity);
+        this._playerResourceCache = built;
+        return built;
+      }
+    }
+    // Don't memoize "not yet observed" — retry each access until the
+    // entity arrives. Once built (above) the cache sticks.
+    return undefined;
   }
 
   /**

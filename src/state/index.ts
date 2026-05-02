@@ -29,3 +29,7 @@ export { Weapon } from "./Weapon.js";
 export type { WeaponSnapshot } from "./Weapon.js";
 export { PlayerResource, MAX_PLAYER_SLOTS } from "./PlayerResource.js";
 export type { PlayerResourceSnapshot } from "./PlayerResource.js";
+export { Team } from "./Team.js";
+export type { TeamSnapshot } from "./Team.js";
+export { GameRules } from "./GameRules.js";
+export type { GameRulesSnapshot } from "./GameRules.js";
