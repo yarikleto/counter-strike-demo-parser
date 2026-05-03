@@ -9,6 +9,13 @@ export default defineConfig({
     // CPU-bound for seconds at a time and can't service the RPC heartbeat.
     // Capping the pool to 4 workers + a forgiving test timeout removes the
     // cascade without sacrificing throughput on smaller machines.
+    //
+    // Known limitation (TASK-037 follow-up): with 12+ heavy integration
+    // files, even maxThreads=4 occasionally hits the cascade — 2-4 false-
+    // positive failures per full-suite run. Each file passes cleanly when
+    // run in isolation. The fix is to split unit + integration into two
+    // vitest projects with separate concurrency profiles (deferred so M4
+    // event work can ship without churn on test infra).
     pool: "threads",
     poolOptions: {
       threads: {

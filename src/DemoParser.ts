@@ -31,6 +31,7 @@ import { iterateFrames } from "./frame/FrameParser.js";
 import { MessageDispatcher } from "./packet/MessageDispatch.js";
 import type {
   CSVCMsg_CreateStringTable,
+  CSVCMsg_GameEvent,
   CSVCMsg_GameEventList,
   CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
@@ -56,6 +57,7 @@ import { RoundTracker } from "./state/RoundTracker.js";
 import type { RoundStateChange } from "./state/RoundTracker.js";
 import { buildDescriptorTable } from "./events/EventDescriptorTable.js";
 import type { EventDescriptorTable } from "./events/EventDescriptorTable.js";
+import { decodeGameEvent } from "./events/GameEventDecoder.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -429,6 +431,9 @@ export class DemoParser extends EventEmitter {
       onGameEventList: (msg: CSVCMsg_GameEventList) => {
         this.handleGameEventList(msg);
       },
+      onGameEvent: (msg: CSVCMsg_GameEvent) => {
+        this.handleGameEvent(msg);
+      },
     });
 
     for (const frame of iterateFrames(reader)) {
@@ -607,6 +612,31 @@ export class DemoParser extends EventEmitter {
     const table = buildDescriptorTable(msg);
     this._eventDescriptors = table;
     this.emit("gameEventListReady", table);
+  }
+
+  /**
+   * Decode a `CSVCMsg_GameEvent` message (TASK-037) and emit the Tier-2
+   * catch-all `gameEvent` typed event with the decoded payload.
+   *
+   * Wire-order discipline: CS:GO networks `CSVCMsg_GameEventList` once
+   * during signon BEFORE any `CSVCMsg_GameEvent` fires. If we somehow
+   * observe a GameEvent before the descriptor table arrives, the message
+   * is dropped silently — there's no schema with which to interpret it.
+   * This shouldn't happen on a well-formed demo.
+   *
+   * Decode-error policy: when the descriptor table doesn't contain the
+   * incoming event id, we surface a `gameEventDecodeError` event with the
+   * id and continue. We never throw — a single unknown event id should
+   * not abort the parse for the remaining (valid) events on the wire.
+   */
+  private handleGameEvent(msg: CSVCMsg_GameEvent): void {
+    if (this._eventDescriptors === undefined) return;
+    const decoded = decodeGameEvent(msg, this._eventDescriptors);
+    if (decoded === undefined) {
+      this.emit("gameEventDecodeError", { eventId: msg.eventid ?? 0 });
+      return;
+    }
+    this.emit("gameEvent", decoded);
   }
 
   /**

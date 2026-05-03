@@ -17,3 +17,5 @@ export type {
   EventKeyType,
 } from "./EventDescriptor.js";
 export { eventKeyTypeFromWire } from "./EventDescriptor.js";
+export { decodeGameEvent } from "./GameEventDecoder.js";
+export type { DecodedGameEvent } from "./GameEventDecoder.js";
