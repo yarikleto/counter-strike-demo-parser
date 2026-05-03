@@ -74,6 +74,7 @@ export {
   MAX_PLAYER_SLOTS,
   RoundTracker,
   computeRoundPhase,
+  UserInfoIndex,
 } from "./state/index.js";
 export type {
   ViewAngle,
@@ -83,4 +84,5 @@ export type {
   RoundStateChange,
   RoundPhase,
   RoundPhaseInputs,
+  UserInfo,
 } from "./state/index.js";

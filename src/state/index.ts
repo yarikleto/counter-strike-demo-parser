@@ -34,8 +34,6 @@ export type { TeamSnapshot } from "./Team.js";
 export { GameRules } from "./GameRules.js";
 export type { GameRulesSnapshot } from "./GameRules.js";
 export { RoundTracker, computeRoundPhase } from "./RoundTracker.js";
-export type {
-  RoundStateChange,
-  RoundPhase,
-  RoundPhaseInputs,
-} from "./RoundTracker.js";
+export type { RoundStateChange, RoundPhase, RoundPhaseInputs } from "./RoundTracker.js";
+export { UserInfoIndex } from "./userInfoIndex.js";
+export type { UserInfo } from "./userInfoIndex.js";

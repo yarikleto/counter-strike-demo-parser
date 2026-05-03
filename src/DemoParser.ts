@@ -55,6 +55,7 @@ import { GameRules } from "./state/GameRules.js";
 import { PlayerResource } from "./state/PlayerResource.js";
 import { RoundTracker } from "./state/RoundTracker.js";
 import type { RoundStateChange } from "./state/RoundTracker.js";
+import { UserInfoIndex } from "./state/userInfoIndex.js";
 import { buildDescriptorTable } from "./events/EventDescriptorTable.js";
 import type { EventDescriptorTable } from "./events/EventDescriptorTable.js";
 import { decodeGameEvent } from "./events/GameEventDecoder.js";
@@ -117,8 +118,8 @@ export class DemoParser extends EventEmitter {
    * typed event — the tracker stays pure and embedder-agnostic, the parser
    * owns the EventEmitter.
    */
-  private readonly _roundTracker: RoundTracker = new RoundTracker(
-    (change: RoundStateChange) => this.emit("roundStateChanged", change),
+  private readonly _roundTracker: RoundTracker = new RoundTracker((change: RoundStateChange) =>
+    this.emit("roundStateChanged", change),
   );
   /**
    * Game-event descriptor table (TASK-036). Built once when
@@ -127,6 +128,16 @@ export class DemoParser extends EventEmitter {
    * synchronously to interpret each `CSVCMsg_GameEvent` payload.
    */
   private _eventDescriptors: EventDescriptorTable | undefined;
+  /**
+   * `userid -> entitySlot` resolver (TASK-037b). Built lazily on first
+   * access of `userInfoIndex`. Stays live across the parse: every time
+   * the `userinfo` string-table changes (CreateStringTable or
+   * UpdateStringTable), the index is `refresh()`-ed so Tier-1 enrichers
+   * always see the current player roster. `null` is the not-yet-built
+   * sentinel — once instantiated the same instance sticks for the
+   * parser's lifetime.
+   */
+  private _userInfoIndex: UserInfoIndex | null = null;
 
   constructor(buffer: Buffer) {
     super();
@@ -215,9 +226,7 @@ export class DemoParser extends EventEmitter {
     if (this._weaponsCache !== null) return this._weaponsCache;
     const out: Weapon[] = [];
     for (const [, entity] of this._entities.entries()) {
-      const hasClip1 = entity.serverClass.flattenedProps.some(
-        (p) => p.prop.varName === "m_iClip1",
-      );
+      const hasClip1 = entity.serverClass.flattenedProps.some((p) => p.prop.varName === "m_iClip1");
       if (hasClip1) {
         out.push(new Weapon(entity));
       }
@@ -378,6 +387,38 @@ export class DemoParser extends EventEmitter {
   }
 
   /**
+   * `userid -> entitySlot` / `userid -> UserInfo` resolver (TASK-037b),
+   * the canonical decoder of the `userinfo` string-table's `player_info_t`
+   * userdata blob. Per ADR-006 every Tier-1 event enricher routes its
+   * `userid` field through this index — no enricher decodes
+   * `player_info_t` directly.
+   *
+   * Built lazily on first access and refreshed whenever the underlying
+   * `userinfo` string-table changes (during signon and on every
+   * mid-demo player join/leave). The instance returned is stable for the
+   * parser's lifetime; the maps inside it move as players reconnect.
+   *
+   * Always returns a non-null `UserInfoIndex`. Until the `userinfo` table
+   * is created (very early in signon), every lookup returns `undefined`.
+   */
+  get userInfoIndex(): UserInfoIndex {
+    if (this._userInfoIndex !== null) return this._userInfoIndex;
+    // The `_stringTables` manager is created the moment the first
+    // CreateStringTable arrives (very early in signon). On a well-formed
+    // demo this is true before any consumer touches `userInfoIndex`. If
+    // somehow accessed before that, we lazily create the manager so the
+    // getter never returns null and so a single canonical manager exists
+    // for the rest of the parse.
+    if (this._stringTables === undefined) {
+      this._stringTables = new StringTableManager();
+    }
+    const built = new UserInfoIndex(this._stringTables);
+    built.refresh();
+    this._userInfoIndex = built;
+    return built;
+  }
+
+  /**
    * One-shot convenience: create a parser from a buffer and parse it immediately.
    */
   static parse(buffer: Buffer): DemoParser {
@@ -441,9 +482,7 @@ export class DemoParser extends EventEmitter {
         dispatcher.dispatch(frame.packetData);
       }
       if (frame.dataTablesData !== undefined && this._sendTables === undefined) {
-        const { sendTables, serverClasses } = parseDataTables(
-          frame.dataTablesData,
-        );
+        const { sendTables, serverClasses } = parseDataTables(frame.dataTablesData);
         this._sendTables = sendTables;
         const registry = new ServerClassRegistry();
         for (const sc of serverClasses) {
@@ -494,6 +533,9 @@ export class DemoParser extends EventEmitter {
         }
       }
     }
+    if (table.name === "userinfo" && this._userInfoIndex !== null) {
+      this._userInfoIndex.refresh();
+    }
     this.emit("stringTableCreated", { name: table.name, table });
   }
 
@@ -511,11 +553,7 @@ export class DemoParser extends EventEmitter {
     const history = this.stringTableHistories.get(tableId) ?? [];
     const stringData = msg.stringData;
     const numChangedEntries = msg.numChangedEntries ?? 0;
-    if (
-      stringData === undefined ||
-      stringData.length === 0 ||
-      numChangedEntries <= 0
-    ) {
+    if (stringData === undefined || stringData.length === 0 || numChangedEntries <= 0) {
       return;
     }
     const bitReader = new BitReader(stringData);
@@ -528,6 +566,9 @@ export class DemoParser extends EventEmitter {
       numChangedEntries,
       history,
     );
+    if (table.name === "userinfo" && this._userInfoIndex !== null) {
+      this._userInfoIndex.refresh();
+    }
     this.emit("stringTableUpdated", { name: table.name, changedEntries });
   }
 
@@ -560,30 +601,21 @@ export class DemoParser extends EventEmitter {
    * arrive earlier in the wire stream.
    */
   private handlePacketEntities(msg: CSVCMsg_PacketEntities): void {
-    if (
-      this._serverClasses === undefined ||
-      this._stringTables === undefined
-    ) {
+    if (this._serverClasses === undefined || this._stringTables === undefined) {
       return;
     }
     try {
-      decodePacketEntities(
-        msg,
-        this._entities,
-        this._serverClasses,
-        this._stringTables,
-        {
-          onCreate: (entity) => {
-            this.emit("entityCreated", entity);
-            this.feedRoundTracker(entity);
-          },
-          onUpdate: (entity) => {
-            this.emit("entityUpdated", entity);
-            this.feedRoundTracker(entity);
-          },
-          onDelete: (entity) => this.emit("entityDeleted", entity),
+      decodePacketEntities(msg, this._entities, this._serverClasses, this._stringTables, {
+        onCreate: (entity) => {
+          this.emit("entityCreated", entity);
+          this.feedRoundTracker(entity);
         },
-      );
+        onUpdate: (entity) => {
+          this.emit("entityUpdated", entity);
+          this.feedRoundTracker(entity);
+        },
+        onDelete: (entity) => this.emit("entityDeleted", entity),
+      });
     } catch (err) {
       // Per-prop decoder divergence (TASK-021a) or flatten miscount
       // (TASK-018a) can desync the bit stream mid-message. Each
@@ -658,10 +690,7 @@ export class DemoParser extends EventEmitter {
    * Returns the decompressed (or pass-through) bytes, or `undefined`
    * when compression is detected but snappyjs is unavailable.
    */
-  private decompressIfNeeded(
-    data: Uint8Array,
-    _flags: number,
-  ): Uint8Array | undefined {
+  private decompressIfNeeded(data: Uint8Array, _flags: number): Uint8Array | undefined {
     if (data.length < 4) return data;
     const looksCompressed =
       data[0] === 0x53 && data[1] === 0x4e && data[2] === 0x41 && data[3] === 0x50;
