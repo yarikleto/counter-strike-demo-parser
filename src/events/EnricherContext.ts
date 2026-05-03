@@ -57,14 +57,17 @@ export function buildEnricherContext(parser: DemoParser): EnricherContext {
     teams: parser.teams,
     userInfoIndex,
     resolvePlayer(userId: number): Player | undefined {
-      const slot = userInfoIndex.entitySlotForUserId(userId);
-      if (slot === undefined) return undefined;
-      // `Player.slot` is the underlying entity id (see `parser.players`
-      // getter, which constructs `new Player(id, entity)` from each
-      // CCSPlayer entity's id). The userinfo string-table slot equals the
-      // CCSPlayer entity slot in CS:GO — see `userInfoIndex.ts`.
+      const tableSlot = userInfoIndex.entitySlotForUserId(userId);
+      if (tableSlot === undefined) return undefined;
+      // `userInfoIndex.entitySlotForUserId` returns the userinfo
+      // string-table slot (0..63). `Player.slot` is the underlying CCSPlayer
+      // entity id, which CS:GO assigns as `tableSlot + 1` — entity 0 is the
+      // engine's reserved world entity, players occupy entity ids 1..64.
+      // Verified empirically on de_nuke.dem (e.g. userid 131 → tableSlot 0
+      // → entity.id 1 for "Brian"). The `+1` is the canonical bridge.
+      const entityId = tableSlot + 1;
       for (const p of players) {
-        if (p.slot === slot) return p;
+        if (p.slot === entityId) return p;
       }
       return undefined;
     },

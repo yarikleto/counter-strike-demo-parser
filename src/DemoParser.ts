@@ -575,6 +575,31 @@ export class DemoParser extends EventEmitter {
   }
 
   /**
+   * Drop memoized overlay arrays whose membership depends on the given
+   * ServerClass. Called from the entity create / delete hooks so the next
+   * `parser.players` / `parser.teams` / `parser.weapons` access rebuilds
+   * fresh — required because the dispatcher (TASK-037 + Tier-1 enrichers)
+   * accesses these getters mid-parse, and a stale empty cache from an early
+   * read would suppress every subsequent `resolvePlayer` lookup. Cheap: the
+   * subsequent rebuild is one filtered scan over the entity list.
+   */
+  private invalidateOverlayCache(entity: { serverClass: { className: string; flattenedProps: ReadonlyArray<{ prop: { varName: string } }> } }): void {
+    const className = entity.serverClass.className;
+    if (className === "CCSPlayer") {
+      this._playersCache = null;
+      // A new/deleted CCSPlayer also affects the per-team playerSlots array.
+      this._teamsCache = null;
+    } else if (className === "CCSTeam") {
+      this._teamsCache = null;
+    } else if (entity.serverClass.flattenedProps.some((p) => p.prop.varName === "m_iClip1")) {
+      // Same duck-type predicate as `get weapons()` — every weapon
+      // ServerClass (CWeapon*, CC4, CKnife, plus future variants) carries
+      // `m_iClip1`. Authoritative match without enumerating class names.
+      this._weaponsCache = null;
+    }
+  }
+
+  /**
    * Bridge from the PacketEntities create/update hook to the RoundTracker.
    * Filters to the singleton `CCSGameRulesProxy` entity — every other entity
    * is a no-op. Reads the four `RoundPhaseInputs` fields off the live
@@ -609,6 +634,7 @@ export class DemoParser extends EventEmitter {
     try {
       decodePacketEntities(msg, this._entities, this._serverClasses, this._stringTables, {
         onCreate: (entity) => {
+          this.invalidateOverlayCache(entity);
           this.emit("entityCreated", entity);
           this.feedRoundTracker(entity);
         },
@@ -616,7 +642,10 @@ export class DemoParser extends EventEmitter {
           this.emit("entityUpdated", entity);
           this.feedRoundTracker(entity);
         },
-        onDelete: (entity) => this.emit("entityDeleted", entity),
+        onDelete: (entity) => {
+          this.invalidateOverlayCache(entity);
+          this.emit("entityDeleted", entity);
+        },
       });
     } catch (err) {
       // Per-prop decoder divergence (TASK-021a) or flatten miscount

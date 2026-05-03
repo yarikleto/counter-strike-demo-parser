@@ -24,9 +24,13 @@ function makeFakeParser(opts: {
   } as unknown as DemoParser;
 }
 
+// resolvePlayer bridges the (table-slot 0..63) → (entity-id 1..64) gap by
+// adding 1 to the userInfoIndex slot before scanning Players. The tests
+// below encode this contract: a userid that maps to tableSlot N must
+// resolve to the Player whose entity slot is N+1.
 describe("EnricherContext.resolvePlayer", () => {
-  it("returns the matching Player when userid → slot → Player exists", () => {
-    const player = { slot: 5 } as Player;
+  it("returns the Player whose entity slot is tableSlot + 1", () => {
+    const player = { slot: 6 } as Player; // entity id 6 = tableSlot 5
     const ctx = buildEnricherContext(
       makeFakeParser({
         players: [{ slot: 1 } as Player, player, { slot: 9 } as Player],
@@ -40,7 +44,7 @@ describe("EnricherContext.resolvePlayer", () => {
   it("returns undefined when the userid is unknown to userInfoIndex", () => {
     const ctx = buildEnricherContext(
       makeFakeParser({
-        players: [{ slot: 1 } as Player],
+        players: [{ slot: 2 } as Player], // tableSlot 1 -> entity 2
         userIdToSlot: new Map([[42, 1]]),
       }),
     );
@@ -48,10 +52,11 @@ describe("EnricherContext.resolvePlayer", () => {
     expect(ctx.resolvePlayer(999)).toBeUndefined();
   });
 
-  it("returns undefined when the resolved slot has no live Player overlay", () => {
+  it("returns undefined when no Player exists at tableSlot + 1", () => {
     const ctx = buildEnricherContext(
       makeFakeParser({
-        players: [{ slot: 1 } as Player, { slot: 2 } as Player],
+        players: [{ slot: 2 } as Player, { slot: 3 } as Player],
+        // userid 42 → tableSlot 7 → entity 8, but no Player at entity 8.
         userIdToSlot: new Map([[42, 7]]),
       }),
     );

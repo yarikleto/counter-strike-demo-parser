@@ -86,3 +86,41 @@ export type {
   RoundPhaseInputs,
   UserInfo,
 } from "./state/index.js";
+
+// Game events: typed event-map (Tier-2 catch-all + Tier-1 enrichers).
+export {
+  buildDescriptorTable,
+  EventDescriptorTable,
+  decodeGameEvent,
+  buildEnricherContext,
+  enricherTable,
+  freezeEvent,
+} from "./events/index.js";
+export type {
+  EventDescriptor,
+  EventKeyDescriptor,
+  EventKeyType,
+  DecodedGameEvent,
+  EnricherContext,
+  Enricher,
+  EnrichedEvent,
+  // Combat (TASK-038)
+  PlayerDeathEvent,
+  PlayerHurtEvent,
+  PlayerBlindEvent,
+  PlayerSpawnedEvent,
+  PlayerGivenC4Event,
+  BulletImpactEvent,
+  OtherDeathEvent,
+  // Round (TASK-040)
+  RoundStartEvent,
+  RoundEndEvent,
+  RoundFreezeEndEvent,
+  RoundPrestartEvent,
+  RoundPoststartEvent,
+  // Weapon (TASK-044)
+  WeaponFireEvent,
+  WeaponReloadEvent,
+  WeaponZoomEvent,
+} from "./events/index.js";
+export { HitGroup, RoundEndReason } from "./enums/index.js";

@@ -11,3 +11,4 @@
 export { TeamSide } from "./TeamSide.js";
 export { WeaponType } from "./WeaponType.js";
 export { HitGroup } from "./HitGroup.js";
+export { RoundEndReason } from "./RoundEndReason.js";
