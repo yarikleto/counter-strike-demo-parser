@@ -59,6 +59,8 @@ import { UserInfoIndex } from "./state/userInfoIndex.js";
 import { buildDescriptorTable } from "./events/EventDescriptorTable.js";
 import type { EventDescriptorTable } from "./events/EventDescriptorTable.js";
 import { decodeGameEvent } from "./events/GameEventDecoder.js";
+import { enricherTable } from "./events/enrichers/index.js";
+import { buildEnricherContext } from "./events/EnricherContext.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -669,6 +671,23 @@ export class DemoParser extends EventEmitter {
       return;
     }
     this.emit("gameEvent", decoded);
+    // Tier-1 dispatch (ADR-006). Tier-1 fires AFTER Tier-2 so a consumer
+    // subscribed to both observes the raw payload first — no surprise
+    // reordering. Empty-table fast path: when no enrichers are registered
+    // (pre-TASK-038) the `.get` returns `undefined` and we exit cheaply.
+    const enricher = enricherTable.get(decoded.name);
+    if (enricher !== undefined) {
+      const ctx = buildEnricherContext(this);
+      const enriched = enricher(decoded, ctx);
+      if (enriched !== null) {
+        this.emit(decoded.name, enriched);
+      } else {
+        this.emit("gameEventEnrichmentSkipped", {
+          name: decoded.name,
+          eventId: decoded.eventId,
+        });
+      }
+    }
   }
 
   /**

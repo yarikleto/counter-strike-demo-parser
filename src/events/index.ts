@@ -19,3 +19,7 @@ export type {
 export { eventKeyTypeFromWire } from "./EventDescriptor.js";
 export { decodeGameEvent } from "./GameEventDecoder.js";
 export type { DecodedGameEvent } from "./GameEventDecoder.js";
+export { buildEnricherContext } from "./EnricherContext.js";
+export type { EnricherContext } from "./EnricherContext.js";
+export { freezeEvent, enricherTable } from "./enrichers/index.js";
+export type { Enricher, EnrichedEvent } from "./enrichers/Enricher.js";
