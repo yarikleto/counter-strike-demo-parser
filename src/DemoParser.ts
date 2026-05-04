@@ -22,6 +22,7 @@
  *                    CSVCMsg_ServerInfo type).
  */
 import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { TypedEventEmitter } from "./events/TypedEventEmitter.js";
 import type { ParserEventMap, Tier1EventMap } from "./events/ParserEventMap.js";
 import { ByteReader } from "./reader/ByteReader.js";
@@ -64,7 +65,12 @@ import { decodeGameEvent } from "./events/GameEventDecoder.js";
 import { enricherTable } from "./events/enrichers/index.js";
 import { buildEnricherContext } from "./events/EnricherContext.js";
 import { decodeChatMessage } from "./events/UserMessageDecoder.js";
-import type { ChatMessageContext } from "./events/UserMessageDecoder.js";
+import type { ChatMessage, ChatMessageContext } from "./events/UserMessageDecoder.js";
+import type { DecodedGameEvent } from "./events/GameEventDecoder.js";
+import type { PlayerDeathEvent } from "./events/enrichers/playerDeath.js";
+import type { RoundEndEvent } from "./events/enrichers/roundEnd.js";
+import type { GrenadeThrownEvent } from "./events/enrichers/grenadeThrown.js";
+import type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -426,11 +432,64 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
 
   /**
    * One-shot convenience: create a parser from a buffer and parse it immediately.
+   *
+   * @deprecated Use `DemoParser.parse(buffer)` (the async overload) instead.
+   *   `parseSync` remains for synchronous contexts but the async `parse` is
+   *   the preferred primary entry point as of v0.1.
    */
-  static parse(buffer: Buffer): DemoParser {
+  static parseSync(buffer: Buffer): DemoParser {
     const parser = new DemoParser(buffer);
     parser.parseAll();
     return parser;
+  }
+
+  /**
+   * High-level async convenience API (ADR-009). Accepts a file path (string)
+   * or an in-memory Buffer, parses the entire demo, and returns a frozen
+   * {@link DemoResult} with all events collected into typed arrays.
+   *
+   * When given a `string`, the file is read with `fs/promises.readFile`.
+   * A single `setImmediate` yield after I/O (but before parse) keeps the
+   * event loop responsive for callers that chain multiple `parse` calls.
+   *
+   * `options.includeRawEvents` (default `false`) opts into collecting every
+   * raw `DecodedGameEvent`. Leave it off on competitive demos — the raw event
+   * stream is large and callers rarely need it alongside the Tier-1 arrays.
+   */
+  static async parse(input: string | Buffer, options: ParseOptions = {}): Promise<DemoResult> {
+    const buffer: Buffer = typeof input === "string" ? await readFile(input) : input;
+
+    // Yield once so I/O-heavy callers don't starve the event loop between
+    // sequential parse() calls. Negligible overhead (~0 ms) for single calls.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const parser = new DemoParser(buffer);
+
+    const kills: PlayerDeathEvent[] = [];
+    const rounds: RoundEndEvent[] = [];
+    const grenades: GrenadeThrownEvent[] = [];
+    const chatMessages: ChatMessage[] = [];
+    const events: DecodedGameEvent[] | undefined = options.includeRawEvents ? [] : undefined;
+
+    parser.on("player_death", (e) => kills.push(e));
+    parser.on("round_end", (e) => rounds.push(e));
+    parser.on("grenade_thrown", (e) => grenades.push(e));
+    parser.on("chatMessage", (e) => chatMessages.push(e));
+    if (events !== undefined) {
+      parser.on("gameEvent", (e) => events.push(e));
+    }
+
+    parser.parseAll();
+
+    return Object.freeze({
+      header: parser.header as DemoHeader,
+      players: parser.players.map((p) => p.snapshot()),
+      kills,
+      rounds,
+      grenades,
+      chatMessages,
+      events,
+    });
   }
 
   /**

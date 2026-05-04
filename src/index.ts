@@ -171,3 +171,6 @@ export type {
   BotTakeoverEvent,
 } from "./events/index.js";
 export { HitGroup, RoundEndReason } from "./enums/index.js";
+
+// Convenience async API (ADR-009).
+export type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";

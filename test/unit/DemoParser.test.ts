@@ -63,16 +63,16 @@ describe("DemoParser", () => {
     });
   });
 
-  describe("static parse", () => {
+  describe("static parseSync", () => {
     it("should create and parse in one call", () => {
       const buffer = buildMinimalDemoBuffer();
-      const parser = DemoParser.parse(buffer);
+      const parser = DemoParser.parseSync(buffer);
       expect(parser).toBeInstanceOf(DemoParser);
     });
 
     it("should throw on empty buffer", () => {
       const buffer = Buffer.alloc(0);
-      expect(() => DemoParser.parse(buffer)).toThrow("Empty demo file");
+      expect(() => DemoParser.parseSync(buffer)).toThrow("Empty demo file");
     });
   });
 });
