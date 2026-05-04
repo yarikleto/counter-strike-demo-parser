@@ -1,0 +1,58 @@
+// Minimal CSGO user-message subset — chat & text-message decoders only.
+//
+// Source: Valve's `cstrike15_usermessages_public.proto`, mirrored in
+// `markus-wa/demoinfocs-golang` at commit
+// a68aa2fbae56999ab4c985a78b6b536c5ae3fb4b. The full upstream file
+// declares ~70 user-message types; we vendor only the three the parser
+// currently consumes for TASK-047 (chat decoder). Additional messages can
+// be appended later as new tasks demand them.
+//
+// `ECstrike15UserMessages` enum values are stable across the CSGO lifetime
+// and were verified against de_nuke.dem (v0.1 fixture) — observed
+// `CSVCMsg_UserMessage.msg_type` values 6 and 7 match SayText2 and
+// TextMsg respectively (ent_idx, chat flag, "Cstrike_Chat_All" template).
+// CS_UM_SayText (raw text) is not observed on the bots-only fixture but
+// retains its canonical value of 5.
+
+import "google/protobuf/descriptor.proto";
+
+option cc_generic_services = false;
+
+// Subset of the upstream enum — only the message ids the parser currently
+// decodes. Numeric values match Valve's canonical CSGO public enum.
+enum ECstrike15UserMessages {
+	CS_UM_SayText = 5;
+	CS_UM_SayText2 = 6;
+	CS_UM_TextMsg = 7;
+}
+
+// Raw chat text — used by the engine for un-formatted messages (e.g. the
+// rare server console emit). Most player chat in CSGO arrives as SayText2
+// instead.
+message CCSUsrMsg_SayText {
+	optional int32 ent_idx = 1;
+	optional string text = 2;
+	optional bool chat = 3;
+	optional bool textallchat = 4;
+}
+
+// Formatted chat — the common case. `msg_name` references a localization
+// template (e.g. "Cstrike_Chat_All", "Cstrike_Chat_AllDead"); each `%s1`,
+// `%s2`, … placeholder in the template is substituted with the matching
+// `params` entry. The first param is the speaker's display name; the
+// second is the message body.
+message CCSUsrMsg_SayText2 {
+	optional int32 ent_idx = 1;
+	optional bool chat = 2;
+	optional string msg_name = 3;
+	repeated string params = 4;
+	optional bool textallchat = 5;
+}
+
+// Server-emitted text — round restart announcements, kick notifications,
+// etc. `params` are positional substitutions matching `%s1`/`%s2`/… in the
+// localization template held by `params[0]`.
+message CCSUsrMsg_TextMsg {
+	optional int32 msg_dst = 1;
+	repeated string params = 3;
+}

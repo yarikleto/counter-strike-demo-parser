@@ -92,6 +92,7 @@ export {
   buildDescriptorTable,
   EventDescriptorTable,
   decodeGameEvent,
+  decodeChatMessage,
   buildEnricherContext,
   enricherTable,
   freezeEvent,
@@ -101,6 +102,9 @@ export type {
   EventKeyDescriptor,
   EventKeyType,
   DecodedGameEvent,
+  // TASK-047: chat / user-message decoder.
+  ChatMessage,
+  ChatMessageContext,
   EnricherContext,
   Enricher,
   EnrichedEvent,
@@ -146,5 +150,21 @@ export type {
   WeaponFireEvent,
   WeaponReloadEvent,
   WeaponZoomEvent,
+  // Hostage (TASK-045)
+  HostageRescuedEvent,
+  HostagePickedUpEvent,
+  HostageHurtEvent,
+  // Item lifecycle (TASK-043)
+  ItemPickupEvent,
+  ItemPurchaseEvent,
+  ItemEquipEvent,
+  // Miscellaneous match state (TASK-046)
+  BeginNewMatchEvent,
+  RoundMvpEvent,
+  AnnouncePhaseEndEvent,
+  CsWinPanelMatchEvent,
+  CsWinPanelRoundEvent,
+  MatchEndConditionsEvent,
+  BotTakeoverEvent,
 } from "./events/index.js";
 export { HitGroup, RoundEndReason } from "./enums/index.js";

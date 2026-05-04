@@ -19,6 +19,8 @@ export type {
 export { eventKeyTypeFromWire } from "./EventDescriptor.js";
 export { decodeGameEvent } from "./GameEventDecoder.js";
 export type { DecodedGameEvent } from "./GameEventDecoder.js";
+export { decodeChatMessage } from "./UserMessageDecoder.js";
+export type { ChatMessage, ChatMessageContext } from "./UserMessageDecoder.js";
 export { buildEnricherContext } from "./EnricherContext.js";
 export type { EnricherContext } from "./EnricherContext.js";
 export { freezeEvent, enricherTable } from "./enrichers/index.js";
@@ -67,3 +69,19 @@ export { RoundEndReason } from "../enums/RoundEndReason.js";
 export type { WeaponFireEvent } from "./enrichers/weaponFire.js";
 export type { WeaponReloadEvent } from "./enrichers/weaponReload.js";
 export type { WeaponZoomEvent } from "./enrichers/weaponZoom.js";
+// TASK-045: hostage event types.
+export type { HostageRescuedEvent } from "./enrichers/hostageRescued.js";
+export type { HostagePickedUpEvent } from "./enrichers/hostagePickedUp.js";
+export type { HostageHurtEvent } from "./enrichers/hostageHurt.js";
+// TASK-043: item lifecycle event types.
+export type { ItemPickupEvent } from "./enrichers/itemPickup.js";
+export type { ItemPurchaseEvent } from "./enrichers/itemPurchase.js";
+export type { ItemEquipEvent } from "./enrichers/itemEquip.js";
+// TASK-046: miscellaneous match-state event types.
+export type { BeginNewMatchEvent } from "./enrichers/beginNewMatch.js";
+export type { RoundMvpEvent } from "./enrichers/roundMvp.js";
+export type { AnnouncePhaseEndEvent } from "./enrichers/announcePhaseEnd.js";
+export type { CsWinPanelMatchEvent } from "./enrichers/csWinPanelMatch.js";
+export type { CsWinPanelRoundEvent } from "./enrichers/csWinPanelRound.js";
+export type { MatchEndConditionsEvent } from "./enrichers/matchEndConditions.js";
+export type { BotTakeoverEvent } from "./enrichers/botTakeover.js";

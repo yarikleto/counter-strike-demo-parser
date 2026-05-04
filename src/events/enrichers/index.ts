@@ -23,6 +23,8 @@
  * freeze. New events ship via a new release, not a runtime call.
  */
 import type { Enricher, EnrichedEvent } from "./Enricher.js";
+import { enrichAnnouncePhaseEnd } from "./announcePhaseEnd.js";
+import { enrichBeginNewMatch } from "./beginNewMatch.js";
 import { enrichBombAbortDefuse } from "./bombAbortDefuse.js";
 import { enrichBombAbortPlant } from "./bombAbortPlant.js";
 import { enrichBombBeginDefuse } from "./bombBeginDefuse.js";
@@ -32,13 +34,23 @@ import { enrichBombDropped } from "./bombDropped.js";
 import { enrichBombExploded } from "./bombExploded.js";
 import { enrichBombPickedUp } from "./bombPickedUp.js";
 import { enrichBombPlanted } from "./bombPlanted.js";
+import { enrichBotTakeover } from "./botTakeover.js";
 import { enrichBulletImpact } from "./bulletImpact.js";
+import { enrichCsWinPanelMatch } from "./csWinPanelMatch.js";
+import { enrichCsWinPanelRound } from "./csWinPanelRound.js";
 import { enrichDecoyDetonate } from "./decoyDetonate.js";
 import { enrichFlashbangDetonate } from "./flashbangDetonate.js";
 import { enrichGrenadeBounce } from "./grenadeBounce.js";
 import { enrichGrenadeThrown } from "./grenadeThrown.js";
 import { enrichHeGrenadeDetonate } from "./heGrenadeDetonate.js";
+import { enrichHostageHurt } from "./hostageHurt.js";
+import { enrichHostagePickedUp } from "./hostagePickedUp.js";
+import { enrichHostageRescued } from "./hostageRescued.js";
 import { enrichInfernoExpired } from "./infernoExpired.js";
+import { enrichItemEquip } from "./itemEquip.js";
+import { enrichItemPickup } from "./itemPickup.js";
+import { enrichItemPurchase } from "./itemPurchase.js";
+import { enrichMatchEndConditions } from "./matchEndConditions.js";
 import { enrichMolotovDetonate } from "./molotovDetonate.js";
 import { enrichOtherDeath } from "./otherDeath.js";
 import { enrichPlayerBlind } from "./playerBlind.js";
@@ -50,6 +62,7 @@ import { enrichPlayerHurt } from "./playerHurt.js";
 import { enrichPlayerSpawned } from "./playerSpawned.js";
 import { enrichPlayerTeamChange } from "./playerTeamChange.js";
 import { enrichRoundEnd } from "./roundEnd.js";
+import { enrichRoundMvp } from "./roundMvp.js";
 import { enrichRoundFreezeEnd } from "./roundFreezeEnd.js";
 import { enrichRoundPoststart } from "./roundPoststart.js";
 import { enrichRoundPrestart } from "./roundPrestart.js";
@@ -89,7 +102,15 @@ export const enricherTable: ReadonlyMap<string, Enricher> = new Map<
   ["grenade_bounce", enrichGrenadeBounce as Enricher],
   ["grenade_thrown", enrichGrenadeThrown as Enricher],
   ["hegrenade_detonate", enrichHeGrenadeDetonate as Enricher],
+  // TASK-045: hostage events.
+  ["hostage_follows", enrichHostagePickedUp as Enricher],
+  ["hostage_hurt", enrichHostageHurt as Enricher],
+  ["hostage_rescued", enrichHostageRescued as Enricher],
   ["inferno_expire", enrichInfernoExpired as Enricher],
+  // TASK-043: item lifecycle events.
+  ["item_equip", enrichItemEquip as Enricher],
+  ["item_pickup", enrichItemPickup as Enricher],
+  ["item_purchase", enrichItemPurchase as Enricher],
   ["molotov_detonate", enrichMolotovDetonate as Enricher],
   ["smokegrenade_detonate", enrichSmokeGrenadeDetonate as Enricher],
   ["smokegrenade_expired", enrichSmokeGrenadeExpired as Enricher],
@@ -107,6 +128,14 @@ export const enricherTable: ReadonlyMap<string, Enricher> = new Map<
   ["weapon_fire", enrichWeaponFire as Enricher],
   ["weapon_reload", enrichWeaponReload as Enricher],
   ["weapon_zoom", enrichWeaponZoom as Enricher],
+  // TASK-046: miscellaneous match-state events. Alphabetical by raw event name.
+  ["announce_phase_end", enrichAnnouncePhaseEnd as Enricher],
+  ["begin_new_match", enrichBeginNewMatch as Enricher],
+  ["bot_takeover", enrichBotTakeover as Enricher],
+  ["cs_win_panel_match", enrichCsWinPanelMatch as Enricher],
+  ["cs_win_panel_round", enrichCsWinPanelRound as Enricher],
+  ["match_end_conditions", enrichMatchEndConditions as Enricher],
+  ["round_mvp", enrichRoundMvp as Enricher],
 ]);
 
 export type { Enricher, EnrichedEvent };

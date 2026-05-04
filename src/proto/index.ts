@@ -28,7 +28,14 @@ import {
   CSVCMsgSendTable,
   CSVCMsgServerInfo,
   CSVCMsgUpdateStringTable,
+  CSVCMsgUserMessage,
 } from '../generated/netmessages.js';
+import {
+  CCSUsrMsgSayText,
+  CCSUsrMsgSayText2,
+  CCSUsrMsgTextMsg,
+  ECstrike15UserMessages,
+} from '../generated/cstrike15_usermessages.js';
 
 // --- net_* messages ---------------------------------------------------------
 
@@ -63,3 +70,19 @@ export const CSVCMsg_GameEvent = CSVCMsgGameEvent;
 
 export type CSVCMsg_GameEventList = CSVCMsgGameEventList;
 export const CSVCMsg_GameEventList = CSVCMsgGameEventList;
+
+export type CSVCMsg_UserMessage = CSVCMsgUserMessage;
+export const CSVCMsg_UserMessage = CSVCMsgUserMessage;
+
+// --- CSGO user-messages (cstrike15_usermessages.proto) -----------------------
+
+export type CCSUsrMsg_SayText = CCSUsrMsgSayText;
+export const CCSUsrMsg_SayText = CCSUsrMsgSayText;
+
+export type CCSUsrMsg_SayText2 = CCSUsrMsgSayText2;
+export const CCSUsrMsg_SayText2 = CCSUsrMsgSayText2;
+
+export type CCSUsrMsg_TextMsg = CCSUsrMsgTextMsg;
+export const CCSUsrMsg_TextMsg = CCSUsrMsgTextMsg;
+
+export { ECstrike15UserMessages };

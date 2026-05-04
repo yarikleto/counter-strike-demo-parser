@@ -36,6 +36,7 @@ import type {
   CSVCMsg_PacketEntities,
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
+  CSVCMsg_UserMessage,
 } from "./proto/index.js";
 import { parseDataTables } from "./datatables/DataTablesParser.js";
 import type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
@@ -61,6 +62,8 @@ import type { EventDescriptorTable } from "./events/EventDescriptorTable.js";
 import { decodeGameEvent } from "./events/GameEventDecoder.js";
 import { enricherTable } from "./events/enrichers/index.js";
 import { buildEnricherContext } from "./events/EnricherContext.js";
+import { decodeChatMessage } from "./events/UserMessageDecoder.js";
+import type { ChatMessageContext } from "./events/UserMessageDecoder.js";
 
 export class DemoParser extends EventEmitter {
   private readonly buffer: Buffer;
@@ -477,6 +480,9 @@ export class DemoParser extends EventEmitter {
       onGameEvent: (msg: CSVCMsg_GameEvent) => {
         this.handleGameEvent(msg);
       },
+      onUserMessage: (msg: CSVCMsg_UserMessage) => {
+        this.handleUserMessage(msg);
+      },
     });
 
     for (const frame of iterateFrames(reader)) {
@@ -717,6 +723,60 @@ export class DemoParser extends EventEmitter {
         });
       }
     }
+  }
+
+  /**
+   * Decode a `CSVCMsg_UserMessage` (TASK-047) and route chat-related
+   * variants (`CS_UM_SayText`, `CS_UM_SayText2`, `CS_UM_TextMsg`) through
+   * `decodeChatMessage`. On a successful decode the typed `chatMessage`
+   * event fires with the resulting `ChatMessage`. Non-chat user messages
+   * (game UI, hints, paint-map data, …) return `undefined` from the
+   * decoder and are dropped silently — we do not surface them as a
+   * generic `userMessage` event in v0.1.
+   *
+   * Sender resolution: SayText2 carries `ent_idx` (the speaker's entity
+   * id, which on CSGO is `slot+1` per the same `+1` convention
+   * `EnricherContext.resolvePlayer` uses). The decoder routes through
+   * the supplied context's `userInfoIndex` and `resolvePlayer`, so a
+   * speaker who's already disconnected mid-tick surfaces as `sender:
+   * undefined` with `senderName` falling back to the wire param.
+   *
+   * Decode errors (proto-level) propagate from `decodeChatMessage` and
+   * abort this handler — but ts-proto's decoders tolerate empty / under-
+   * populated blobs, so a throw here is exceptional. If it ever happens
+   * we let it bubble; the dispatcher's outer loop continues with the
+   * next message in the packet.
+   */
+  private handleUserMessage(msg: CSVCMsg_UserMessage): void {
+    const ctx = this.buildChatMessageContext();
+    const decoded = decodeChatMessage(msg, ctx);
+    if (decoded === undefined) return;
+    this.emit("chatMessage", decoded);
+  }
+
+  /**
+   * Build a `ChatMessageContext` for the user-message decoder. Mirrors
+   * `buildEnricherContext` but stays scoped to what `decodeChatMessage`
+   * needs — `players`, `userInfoIndex`, and a `resolvePlayer` shim that
+   * applies the `slot+1` entity-id convention.
+   */
+  private buildChatMessageContext(): ChatMessageContext {
+    const players = this.players;
+    const userInfoIndex = this.userInfoIndex;
+    const ctx: ChatMessageContext = {
+      players,
+      userInfoIndex,
+      resolvePlayer(userId: number): Player | undefined {
+        const tableSlot = userInfoIndex.entitySlotForUserId(userId);
+        if (tableSlot === undefined) return undefined;
+        const entityId = tableSlot + 1;
+        for (const p of players) {
+          if (p.slot === entityId) return p;
+        }
+        return undefined;
+      },
+    };
+    return Object.freeze(ctx);
   }
 
   /**
