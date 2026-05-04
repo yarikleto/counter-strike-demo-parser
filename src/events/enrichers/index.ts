@@ -23,18 +23,39 @@
  * freeze. New events ship via a new release, not a runtime call.
  */
 import type { Enricher, EnrichedEvent } from "./Enricher.js";
+import { enrichBombAbortDefuse } from "./bombAbortDefuse.js";
+import { enrichBombAbortPlant } from "./bombAbortPlant.js";
+import { enrichBombBeginDefuse } from "./bombBeginDefuse.js";
+import { enrichBombBeginPlant } from "./bombBeginPlant.js";
+import { enrichBombDefused } from "./bombDefused.js";
+import { enrichBombDropped } from "./bombDropped.js";
+import { enrichBombExploded } from "./bombExploded.js";
+import { enrichBombPickedUp } from "./bombPickedUp.js";
+import { enrichBombPlanted } from "./bombPlanted.js";
 import { enrichBulletImpact } from "./bulletImpact.js";
+import { enrichDecoyDetonate } from "./decoyDetonate.js";
+import { enrichFlashbangDetonate } from "./flashbangDetonate.js";
+import { enrichGrenadeBounce } from "./grenadeBounce.js";
+import { enrichGrenadeThrown } from "./grenadeThrown.js";
+import { enrichHeGrenadeDetonate } from "./heGrenadeDetonate.js";
+import { enrichInfernoExpired } from "./infernoExpired.js";
+import { enrichMolotovDetonate } from "./molotovDetonate.js";
 import { enrichOtherDeath } from "./otherDeath.js";
 import { enrichPlayerBlind } from "./playerBlind.js";
+import { enrichPlayerConnect } from "./playerConnect.js";
 import { enrichPlayerDeath } from "./playerDeath.js";
+import { enrichPlayerDisconnect } from "./playerDisconnect.js";
 import { enrichPlayerGivenC4 } from "./playerGivenC4.js";
 import { enrichPlayerHurt } from "./playerHurt.js";
 import { enrichPlayerSpawned } from "./playerSpawned.js";
+import { enrichPlayerTeamChange } from "./playerTeamChange.js";
 import { enrichRoundEnd } from "./roundEnd.js";
 import { enrichRoundFreezeEnd } from "./roundFreezeEnd.js";
 import { enrichRoundPoststart } from "./roundPoststart.js";
 import { enrichRoundPrestart } from "./roundPrestart.js";
 import { enrichRoundStart } from "./roundStart.js";
+import { enrichSmokeGrenadeDetonate } from "./smokeGrenadeDetonate.js";
+import { enrichSmokeGrenadeExpired } from "./smokeGrenadeExpired.js";
 import { enrichWeaponFire } from "./weaponFire.js";
 import { enrichWeaponReload } from "./weaponReload.js";
 import { enrichWeaponZoom } from "./weaponZoom.js";
@@ -44,6 +65,16 @@ export const enricherTable: ReadonlyMap<string, Enricher> = new Map<
   Enricher
 >([
   // Alphabetical by raw CS:GO event name.
+  // TASK-039: bomb lifecycle events.
+  ["bomb_abortdefuse", enrichBombAbortDefuse as Enricher],
+  ["bomb_abortplant", enrichBombAbortPlant as Enricher],
+  ["bomb_begindefuse", enrichBombBeginDefuse as Enricher],
+  ["bomb_beginplant", enrichBombBeginPlant as Enricher],
+  ["bomb_defused", enrichBombDefused as Enricher],
+  ["bomb_dropped", enrichBombDropped as Enricher],
+  ["bomb_exploded", enrichBombExploded as Enricher],
+  ["bomb_pickup", enrichBombPickedUp as Enricher],
+  ["bomb_planted", enrichBombPlanted as Enricher],
   // TASK-038: combat & player-action events.
   ["bullet_impact", enrichBulletImpact as Enricher],
   ["other_death", enrichOtherDeath as Enricher],
@@ -52,6 +83,20 @@ export const enricherTable: ReadonlyMap<string, Enricher> = new Map<
   ["player_given_c4", enrichPlayerGivenC4 as Enricher],
   ["player_hurt", enrichPlayerHurt as Enricher],
   ["player_spawn", enrichPlayerSpawned as Enricher],
+  // TASK-041: grenade lifecycle events.
+  ["decoy_detonate", enrichDecoyDetonate as Enricher],
+  ["flashbang_detonate", enrichFlashbangDetonate as Enricher],
+  ["grenade_bounce", enrichGrenadeBounce as Enricher],
+  ["grenade_thrown", enrichGrenadeThrown as Enricher],
+  ["hegrenade_detonate", enrichHeGrenadeDetonate as Enricher],
+  ["inferno_expire", enrichInfernoExpired as Enricher],
+  ["molotov_detonate", enrichMolotovDetonate as Enricher],
+  ["smokegrenade_detonate", enrichSmokeGrenadeDetonate as Enricher],
+  ["smokegrenade_expired", enrichSmokeGrenadeExpired as Enricher],
+  // TASK-042: player connection lifecycle events.
+  ["player_connect", enrichPlayerConnect as Enricher],
+  ["player_disconnect", enrichPlayerDisconnect as Enricher],
+  ["player_team", enrichPlayerTeamChange as Enricher],
   // TASK-040: round lifecycle events. Alphabetical by raw event name.
   ["round_end", enrichRoundEnd as Enricher],
   ["round_freeze_end", enrichRoundFreezeEnd as Enricher],

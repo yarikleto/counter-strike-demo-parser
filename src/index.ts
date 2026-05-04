@@ -104,6 +104,16 @@ export type {
   EnricherContext,
   Enricher,
   EnrichedEvent,
+  // Bomb lifecycle (TASK-039)
+  BombPlantedEvent,
+  BombDefusedEvent,
+  BombExplodedEvent,
+  BombPickedUpEvent,
+  BombDroppedEvent,
+  BombBeginPlantEvent,
+  BombAbortPlantEvent,
+  BombBeginDefuseEvent,
+  BombAbortDefuseEvent,
   // Combat (TASK-038)
   PlayerDeathEvent,
   PlayerHurtEvent,
@@ -112,6 +122,20 @@ export type {
   PlayerGivenC4Event,
   BulletImpactEvent,
   OtherDeathEvent,
+  // Grenade lifecycle (TASK-041)
+  GrenadeThrownEvent,
+  GrenadeBounceEvent,
+  HeGrenadeDetonateEvent,
+  FlashbangDetonateEvent,
+  SmokeGrenadeDetonateEvent,
+  SmokeGrenadeExpiredEvent,
+  MolotovDetonateEvent,
+  InfernoExpiredEvent,
+  DecoyDetonateEvent,
+  // Player lifecycle (TASK-042)
+  PlayerConnectEvent,
+  PlayerDisconnectEvent,
+  PlayerTeamChangeEvent,
   // Round (TASK-040)
   RoundStartEvent,
   RoundEndEvent,
