@@ -71,6 +71,7 @@ import type { PlayerDeathEvent } from "./events/enrichers/playerDeath.js";
 import type { GrenadeThrownEvent } from "./events/enrichers/grenadeThrown.js";
 import type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
 import { ConvenienceRoundTracker } from "./convenience/RoundTracker.js";
+import { DamageMatrix } from "./convenience/DamageMatrix.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -499,6 +500,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const roundTracker = new ConvenienceRoundTracker();
     roundTracker.attach(parser);
 
+    const damageMatrix = new DamageMatrix();
+    damageMatrix.attach(parser);
+
     parser.parseAll();
 
     return Object.freeze({
@@ -509,6 +513,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       grenades,
       chatMessages,
       events,
+      damageMatrix,
     });
   }
 

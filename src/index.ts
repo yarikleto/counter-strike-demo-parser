@@ -175,3 +175,5 @@ export { HitGroup, RoundEndReason } from "./enums/index.js";
 // Convenience async API (ADR-009).
 export type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
 export type { RoundSummary, RoundPlayerStats, RoundBombEvents } from "./convenience/RoundTracker.js";
+export { DamageMatrix } from "./convenience/DamageMatrix.js";
+export type { DamageEntry } from "./convenience/DamageMatrix.js";

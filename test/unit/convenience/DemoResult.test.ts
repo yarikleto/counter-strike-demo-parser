@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import type { DemoResult, ParseOptions } from "../../../src/convenience/DemoResult.js";
 import type { RoundSummary } from "../../../src/convenience/RoundTracker.js";
+import { DamageMatrix } from "../../../src/convenience/DamageMatrix.js";
 import type { DemoHeader } from "../../../src/frame/header.js";
 import type { PlayerSnapshot } from "../../../src/state/Player.js";
 import type { PlayerDeathEvent } from "../../../src/events/enrichers/playerDeath.js";
@@ -28,6 +29,7 @@ describe("DemoResult types", () => {
     const stubGrenades: GrenadeThrownEvent[] = [];
     const stubChatMessages: ChatMessage[] = [];
     const stubEvents: DecodedGameEvent[] = [];
+    const stubDamageMatrix = new DamageMatrix();
 
     // `satisfies` ensures the object literal matches DemoResult without widening.
     const result = {
@@ -38,6 +40,7 @@ describe("DemoResult types", () => {
       grenades: stubGrenades,
       chatMessages: stubChatMessages,
       events: stubEvents,
+      damageMatrix: stubDamageMatrix,
     } satisfies DemoResult;
 
     // Trivial runtime assertion so vitest counts this as a passing test.
@@ -54,6 +57,7 @@ describe("DemoResult types", () => {
       rounds: [] as RoundSummary[],
       grenades: [] as GrenadeThrownEvent[],
       chatMessages: [] as ChatMessage[],
+      damageMatrix: new DamageMatrix(),
     } satisfies DemoResult;
 
     expect(result).toBeDefined();

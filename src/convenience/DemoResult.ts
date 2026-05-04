@@ -25,6 +25,7 @@ import type { GrenadeThrownEvent } from "../events/enrichers/grenadeThrown.js";
 import type { ChatMessage } from "../events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import type { RoundSummary } from "./RoundTracker.js";
+import type { DamageMatrix } from "./DamageMatrix.js";
 
 /** Options for `DemoParser.parse()`. */
 export interface ParseOptions {
@@ -52,6 +53,14 @@ export interface DemoResult {
   readonly kills: PlayerDeathEvent[];
   /** Per-round aggregated summaries, one per completed competitive round. */
   readonly rounds: RoundSummary[];
+  /**
+   * Full-match and per-round damage aggregation matrix.
+   *
+   * Keyed by (attacker slot, victim slot) pairs derived from `player_hurt`
+   * events. Provides both full-match and per-round views. See
+   * {@link DamageMatrix} for the complete API.
+   */
+  readonly damageMatrix: DamageMatrix;
   /** All `grenade_thrown` events emitted during the demo, in wire order. */
   readonly grenades: GrenadeThrownEvent[];
   /** All chat messages decoded from `CSVCMsg_UserMessage` frames, in wire order. */
