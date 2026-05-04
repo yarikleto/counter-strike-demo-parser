@@ -177,3 +177,5 @@ export type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
 export type { RoundSummary, RoundPlayerStats, RoundBombEvents } from "./convenience/RoundTracker.js";
 export { DamageMatrix } from "./convenience/DamageMatrix.js";
 export type { DamageEntry } from "./convenience/DamageMatrix.js";
+export { EconomyTracker } from "./convenience/EconomyTracker.js";
+export type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";

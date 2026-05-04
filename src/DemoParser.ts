@@ -72,6 +72,8 @@ import type { GrenadeThrownEvent } from "./events/enrichers/grenadeThrown.js";
 import type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
 import { ConvenienceRoundTracker } from "./convenience/RoundTracker.js";
 import { DamageMatrix } from "./convenience/DamageMatrix.js";
+import { EconomyTracker } from "./convenience/EconomyTracker.js";
+import type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -503,13 +505,35 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const damageMatrix = new DamageMatrix();
     damageMatrix.attach(parser);
 
+    const economyTracker = new EconomyTracker();
+    economyTracker.attach(parser);
+
     parser.parseAll();
+
+    const rounds = roundTracker.snapshot();
+
+    // Decorate each RoundPlayerStats with the corresponding economy record.
+    // The cast below is the ONLY place we sidestep the `readonly economy?`
+    // constraint — `RoundPlayerStats.economy` is readonly in the public type
+    // but the field is `undefined` at construction time and must be filled in
+    // here during post-parse assembly. Using a cast avoids making the mutable
+    // field visible in the public interface.
+    for (let i = 0; i < rounds.length; i++) {
+      const round = rounds[i];
+      if (round === undefined) continue;
+      for (const stats of round.players.values()) {
+        const econ = economyTracker.getEconomy(i, stats.player.slot);
+        if (econ !== undefined) {
+          (stats as { economy?: PlayerRoundEconomy }).economy = econ;
+        }
+      }
+    }
 
     return Object.freeze({
       header: parser.header as DemoHeader,
       players: parser.players.map((p) => p.snapshot()),
       kills,
-      rounds: roundTracker.snapshot(),
+      rounds,
       grenades,
       chatMessages,
       events,

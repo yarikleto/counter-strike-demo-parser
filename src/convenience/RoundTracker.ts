@@ -46,6 +46,7 @@ import type { RoundStartEvent } from "../events/enrichers/roundStart.js";
 import type { RoundEndEvent } from "../events/enrichers/roundEnd.js";
 import type { RoundMvpEvent } from "../events/enrichers/roundMvp.js";
 import type { ItemPurchaseEvent } from "../events/enrichers/itemPurchase.js";
+import type { PlayerRoundEconomy } from "./EconomyTracker.js";
 
 /** Per-player statistics for a single round. */
 export interface RoundPlayerStats {
@@ -64,8 +65,17 @@ export interface RoundPlayerStats {
    *
    * TODO(TASK-064): currently always `0` — economy tracker not yet wired up.
    * When TASK-064 lands a `cost` field on `ItemPurchaseEvent`, accumulate it here.
+   * Use `economy.startMoney - economy.endMoney` for a rough estimate; deferred for accuracy.
    */
   moneySpent: number;
+  /**
+   * Per-player per-round economy snapshot (TASK-064).
+   *
+   * Populated by `EconomyTracker` after `parseAll()` completes (assembled in
+   * `DemoParser.parse()`). `undefined` when a player joined mid-round and
+   * missed the `round_start` snapshot — rare in practice on well-formed demos.
+   */
+  readonly economy?: PlayerRoundEconomy;
 }
 
 /** Bomb-event buckets for a single round. */
