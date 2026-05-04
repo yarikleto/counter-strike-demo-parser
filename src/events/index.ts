@@ -85,3 +85,9 @@ export type { CsWinPanelMatchEvent } from "./enrichers/csWinPanelMatch.js";
 export type { CsWinPanelRoundEvent } from "./enrichers/csWinPanelRound.js";
 export type { MatchEndConditionsEvent } from "./enrichers/matchEndConditions.js";
 export type { BotTakeoverEvent } from "./enrichers/botTakeover.js";
+export type {
+  ParserEventMap,
+  Tier1EventMap,
+  Tier2EventMap,
+  Tier3EventMap,
+} from "./ParserEventMap.js";

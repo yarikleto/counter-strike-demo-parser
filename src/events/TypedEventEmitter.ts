@@ -42,11 +42,18 @@ import { EventEmitter } from "node:events";
 /**
  * Base constraint for event maps: a record of event-name -> payload type.
  *
+ * Declared as an open `object` type so that both plain object type aliases
+ * and TypeScript interfaces (which do not implicitly satisfy index-signature
+ * types like `Record<string, unknown>`) can be used as `TEvents`. The
+ * per-method generics (`K extends keyof TEvents & string`) still constrain
+ * event names to actual declared keys, so type safety is fully preserved.
+ *
  * Symbol keys are excluded because Node's EventEmitter accepts them but they
  * make the type-level event-name machinery harder to reason about and they
  * don't appear in any of our use cases.
  */
-export type EventMap = Record<string, unknown>;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type EventMap = object;
 
 /** Listener signature for a given event. */
 export type Listener<T> = (payload: T) => void;

@@ -87,6 +87,9 @@ export type {
   UserInfo,
 } from "./state/index.js";
 
+// Public event-map type.
+export type { ParserEventMap } from "./events/index.js";
+
 // Game events: typed event-map (Tier-2 catch-all + Tier-1 enrichers).
 export {
   buildDescriptorTable,

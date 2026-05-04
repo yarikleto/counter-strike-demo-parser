@@ -22,7 +22,8 @@
  *                    CSVCMsg_ServerInfo type).
  */
 import { readFileSync } from "node:fs";
-import { EventEmitter } from "node:events";
+import { TypedEventEmitter } from "./events/TypedEventEmitter.js";
+import type { ParserEventMap, Tier1EventMap } from "./events/ParserEventMap.js";
 import { ByteReader } from "./reader/ByteReader.js";
 import { BitReader } from "./reader/BitReader.js";
 import { parseHeader } from "./frame/header.js";
@@ -65,7 +66,7 @@ import { buildEnricherContext } from "./events/EnricherContext.js";
 import { decodeChatMessage } from "./events/UserMessageDecoder.js";
 import type { ChatMessageContext } from "./events/UserMessageDecoder.js";
 
-export class DemoParser extends EventEmitter {
+export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
   private _header: DemoHeader | undefined;
   private _serverInfo: CSVCMsg_ServerInfo | undefined;
@@ -715,7 +716,14 @@ export class DemoParser extends EventEmitter {
       const ctx = buildEnricherContext(this);
       const enriched = enricher(decoded, ctx);
       if (enriched !== null) {
-        this.emit(decoded.name, enriched);
+        // `decoded.name` is guaranteed to be a Tier-1 key (we looked it up
+        // from `enricherTable`), but the type system can't narrow `string` to
+        // the exact union of Tier-1 keys here. The cast is safe: the enricher
+        // contract (ADR-006) guarantees the payload type matches the key.
+        this.emit(
+          decoded.name as keyof Tier1EventMap,
+          enriched as Tier1EventMap[keyof Tier1EventMap],
+        );
       } else {
         this.emit("gameEventEnrichmentSkipped", {
           name: decoded.name,
