@@ -10,10 +10,10 @@
 
 import { describe, it, expect } from "vitest";
 import type { DemoResult, ParseOptions } from "../../../src/convenience/DemoResult.js";
+import type { RoundSummary } from "../../../src/convenience/RoundTracker.js";
 import type { DemoHeader } from "../../../src/frame/header.js";
 import type { PlayerSnapshot } from "../../../src/state/Player.js";
 import type { PlayerDeathEvent } from "../../../src/events/enrichers/playerDeath.js";
-import type { RoundEndEvent } from "../../../src/events/enrichers/roundEnd.js";
 import type { GrenadeThrownEvent } from "../../../src/events/enrichers/grenadeThrown.js";
 import type { ChatMessage } from "../../../src/events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../../../src/events/GameEventDecoder.js";
@@ -24,7 +24,7 @@ describe("DemoResult types", () => {
     const stubHeader = {} as DemoHeader;
     const stubPlayers: PlayerSnapshot[] = [];
     const stubKills: PlayerDeathEvent[] = [];
-    const stubRounds: RoundEndEvent[] = [];
+    const stubRounds: RoundSummary[] = [];
     const stubGrenades: GrenadeThrownEvent[] = [];
     const stubChatMessages: ChatMessage[] = [];
     const stubEvents: DecodedGameEvent[] = [];
@@ -51,7 +51,7 @@ describe("DemoResult types", () => {
       header: stubHeader,
       players: [] as PlayerSnapshot[],
       kills: [] as PlayerDeathEvent[],
-      rounds: [] as RoundEndEvent[],
+      rounds: [] as RoundSummary[],
       grenades: [] as GrenadeThrownEvent[],
       chatMessages: [] as ChatMessage[],
     } satisfies DemoResult;

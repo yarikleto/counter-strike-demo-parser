@@ -68,9 +68,9 @@ import { decodeChatMessage } from "./events/UserMessageDecoder.js";
 import type { ChatMessage, ChatMessageContext } from "./events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "./events/GameEventDecoder.js";
 import type { PlayerDeathEvent } from "./events/enrichers/playerDeath.js";
-import type { RoundEndEvent } from "./events/enrichers/roundEnd.js";
 import type { GrenadeThrownEvent } from "./events/enrichers/grenadeThrown.js";
 import type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
+import { ConvenienceRoundTracker } from "./convenience/RoundTracker.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -342,6 +342,17 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   }
 
   /**
+   * Current frame tick. Updated per-frame inside `parseAll()` before game
+   * events for that frame are dispatched. Tier-1 enriched event listeners
+   * always observe the tick of the frame that triggered the event.
+   *
+   * `0` before `parseAll()` begins or when called outside an active parse.
+   */
+  get currentTick(): number {
+    return this._currentTick;
+  }
+
+  /**
    * The SendTable registry parsed from the demo's `dem_datatables` frame.
    *
    * `undefined` until parsing reaches the signon datatables frame. After
@@ -397,6 +408,14 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   get gameEventDescriptors(): EventDescriptorTable | undefined {
     return this._eventDescriptors;
   }
+
+  /**
+   * Current frame tick, updated on each frame processed during `parseAll()`.
+   * Game events (and therefore Tier-1 enriched events) fire synchronously
+   * inside the frame loop, so this always reflects the frame tick at the
+   * moment any event listener runs. `0` before parsing begins.
+   */
+  private _currentTick = 0;
 
   /**
    * `userid -> entitySlot` / `userid -> UserInfo` resolver (TASK-037b),
@@ -466,18 +485,19 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const parser = new DemoParser(buffer);
 
     const kills: PlayerDeathEvent[] = [];
-    const rounds: RoundEndEvent[] = [];
     const grenades: GrenadeThrownEvent[] = [];
     const chatMessages: ChatMessage[] = [];
     const events: DecodedGameEvent[] | undefined = options.includeRawEvents ? [] : undefined;
 
     parser.on("player_death", (e) => kills.push(e));
-    parser.on("round_end", (e) => rounds.push(e));
     parser.on("grenade_thrown", (e) => grenades.push(e));
     parser.on("chatMessage", (e) => chatMessages.push(e));
     if (events !== undefined) {
       parser.on("gameEvent", (e) => events.push(e));
     }
+
+    const roundTracker = new ConvenienceRoundTracker();
+    roundTracker.attach(parser);
 
     parser.parseAll();
 
@@ -485,7 +505,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       header: parser.header as DemoHeader,
       players: parser.players.map((p) => p.snapshot()),
       kills,
-      rounds,
+      rounds: roundTracker.snapshot(),
       grenades,
       chatMessages,
       events,
@@ -546,6 +566,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     });
 
     for (const frame of iterateFrames(reader)) {
+      // Update current tick before dispatching so event listeners always read
+      // the correct frame tick when they access `parser.currentTick`.
+      this._currentTick = frame.tick;
       if (frame.packetData) {
         dispatcher.dispatch(frame.packetData);
       }

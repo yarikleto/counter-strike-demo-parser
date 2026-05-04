@@ -21,10 +21,10 @@
 import type { DemoHeader } from "../frame/header.js";
 import type { PlayerSnapshot } from "../state/Player.js";
 import type { PlayerDeathEvent } from "../events/enrichers/playerDeath.js";
-import type { RoundEndEvent } from "../events/enrichers/roundEnd.js";
 import type { GrenadeThrownEvent } from "../events/enrichers/grenadeThrown.js";
 import type { ChatMessage } from "../events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
+import type { RoundSummary } from "./RoundTracker.js";
 
 /** Options for `DemoParser.parse()`. */
 export interface ParseOptions {
@@ -50,8 +50,8 @@ export interface DemoResult {
   readonly players: PlayerSnapshot[];
   /** All `player_death` events emitted during the demo, in wire order. */
   readonly kills: PlayerDeathEvent[];
-  /** All `round_end` events emitted during the demo, in wire order. */
-  readonly rounds: RoundEndEvent[];
+  /** Per-round aggregated summaries, one per completed competitive round. */
+  readonly rounds: RoundSummary[];
   /** All `grenade_thrown` events emitted during the demo, in wire order. */
   readonly grenades: GrenadeThrownEvent[];
   /** All chat messages decoded from `CSVCMsg_UserMessage` frames, in wire order. */
