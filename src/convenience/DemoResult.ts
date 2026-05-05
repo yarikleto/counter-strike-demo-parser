@@ -26,6 +26,7 @@ import type { ChatMessage } from "../events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import type { RoundSummary } from "./RoundTracker.js";
 import type { DamageMatrix } from "./DamageMatrix.js";
+import type { PositionSnapshot } from "./PositionTracker.js";
 
 /** Options for `DemoParser.parse()`. */
 export interface ParseOptions {
@@ -35,6 +36,20 @@ export interface ParseOptions {
    * competitive demos which carry thousands of game events.
    */
   includeRawEvents?: boolean;
+  /**
+   * When `true`, player positions are sampled at the configured tick interval
+   * and surfaced via `DemoResult.playerPositions`. Defaults to `false` —
+   * mirrors `includeRawEvents` to avoid memory blowup on long demos
+   * (~36 000 snapshots for a 30-min match at the default 32-tick rate).
+   */
+  collectPlayerPositions?: boolean;
+  /**
+   * Sample interval (in parser ticks) for the position tracker, when
+   * `collectPlayerPositions` is `true`. Defaults to `32` (~0.5s on a
+   * 64-tick server). Ignored when `collectPlayerPositions` is omitted or
+   * `false`.
+   */
+  positionSampleRateTicks?: number;
 }
 
 /** The structured result returned by `DemoParser.parse()`. */
@@ -72,4 +87,12 @@ export interface DemoResult {
    * `undefined` otherwise.
    */
   readonly events?: DecodedGameEvent[];
+  /**
+   * Sampled player position snapshots, in tick-ascending order.
+   *
+   * Only populated when `ParseOptions.collectPlayerPositions` is `true`.
+   * `undefined` otherwise. Sample cadence is controlled by
+   * `ParseOptions.positionSampleRateTicks` (default 32 ticks).
+   */
+  readonly playerPositions?: readonly PositionSnapshot[];
 }

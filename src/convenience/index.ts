@@ -4,3 +4,5 @@ export { DamageMatrix } from "./DamageMatrix.js";
 export type { DamageEntry } from "./DamageMatrix.js";
 export { EconomyTracker } from "./EconomyTracker.js";
 export type { PlayerRoundEconomy } from "./EconomyTracker.js";
+export { PositionTracker } from "./PositionTracker.js";
+export type { PositionSnapshot, PositionTrackerOptions } from "./PositionTracker.js";

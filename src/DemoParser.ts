@@ -74,6 +74,8 @@ import { ConvenienceRoundTracker } from "./convenience/RoundTracker.js";
 import { DamageMatrix } from "./convenience/DamageMatrix.js";
 import { EconomyTracker } from "./convenience/EconomyTracker.js";
 import type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
+import { PositionTracker } from "./convenience/PositionTracker.js";
+import type { PositionSnapshot } from "./convenience/PositionTracker.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -508,6 +510,18 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const economyTracker = new EconomyTracker();
     economyTracker.attach(parser);
 
+    // Position sampling is opt-in (ParseOptions.collectPlayerPositions).
+    // When omitted/false the tracker is never instantiated — no entityUpdated
+    // listener is registered, no per-tick sampling overhead is incurred, and
+    // `DemoResult.playerPositions` is left `undefined`.
+    let positionTracker: PositionTracker | undefined;
+    if (options.collectPlayerPositions === true) {
+      positionTracker = new PositionTracker();
+      positionTracker.attach(parser, {
+        sampleRateTicks: options.positionSampleRateTicks,
+      });
+    }
+
     parser.parseAll();
 
     const rounds = roundTracker.snapshot();
@@ -529,6 +543,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       }
     }
 
+    const playerPositions: readonly PositionSnapshot[] | undefined =
+      positionTracker?.snapshot();
+
     return Object.freeze({
       header: parser.header as DemoHeader,
       players: parser.players.map((p) => p.snapshot()),
@@ -538,6 +555,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       chatMessages,
       events,
       damageMatrix,
+      playerPositions,
     });
   }
 
