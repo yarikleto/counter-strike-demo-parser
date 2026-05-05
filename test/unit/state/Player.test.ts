@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Player } from "../../../src/state/Player.js";
 import type { Entity } from "../../../src/entities/Entity.js";
+import type { UserInfoIndex, UserInfo } from "../../../src/state/userInfoIndex.js";
 
 /**
  * Required prop entries (varName + sourceTableName) the Player overlay
@@ -288,6 +289,8 @@ describe("Player overlay — snapshot()", () => {
       viewAngle: { yaw: 90, pitch: -5 },
       isAlive: true,
       activeWeaponHandle: 0x12345,
+      name: undefined,
+      steamId: undefined,
     });
   });
 
@@ -299,5 +302,97 @@ describe("Player overlay — snapshot()", () => {
     values.set(1, 1); // mutate underlying after snapshot
     expect(snap.health).toBe(100);
     expect(player.health).toBe(1); // live view still reflects current
+  });
+});
+
+/**
+ * Minimal `UserInfoIndex` stub. The Player overlay only ever calls
+ * `userIdForEntitySlot` and `infoForUserId`, so the stub implements those
+ * two methods over a pair of in-memory maps. Cast through `unknown` to
+ * sidestep the production class's private fields without leaking `any`
+ * into the test surface.
+ */
+function makeFakeUserInfoIndex(
+  bySlot: ReadonlyMap<number, { userId: number; info: UserInfo }>,
+): UserInfoIndex {
+  const slotToUserId = new Map<number, number>();
+  const userIdToInfo = new Map<number, UserInfo>();
+  for (const [slot, { userId, info }] of bySlot) {
+    slotToUserId.set(slot, userId);
+    userIdToInfo.set(userId, info);
+  }
+  return {
+    userIdForEntitySlot: (slot: number) => slotToUserId.get(slot),
+    infoForUserId: (userId: number) => userIdToInfo.get(userId),
+    entitySlotForUserId: (userId: number) => {
+      for (const [slot, uid] of slotToUserId) {
+        if (uid === userId) return slot;
+      }
+      return undefined;
+    },
+    refresh: () => undefined,
+  } as unknown as UserInfoIndex;
+}
+
+describe("Player overlay — name / steamId (userinfo resolution)", () => {
+  // Wire xuid for `STEAM_0:1:19867136` ⇄ `[U:1:39734273]` ⇄ `76561198000000001`.
+  // Picked specifically because it round-trips through all three textual
+  // forms, so the test asserts the full Steam64-string → SteamId pipeline,
+  // not just an opaque BigInt comparison.
+  const HUMAN_INFO: UserInfo = Object.freeze({
+    name: "Brian",
+    xuid: "76561198000000001",
+    isFakePlayer: false,
+    entitySlot: 0,
+  });
+
+  it("resolves name from userinfo via slot - 1 → userId → info.name", () => {
+    // CSGO convention: Player.slot is 1-based entity id, userinfo table is
+    // 0-indexed by entity slot. Slot 1 must therefore look up table index 0.
+    const index = makeFakeUserInfoIndex(
+      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
+    );
+    const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
+    const player = new Player(1, entity, index);
+    expect(player.name).toBe("Brian");
+  });
+
+  it("returns undefined when userinfo has no entry for this slot yet", () => {
+    // Empty index models the in-tick race where the entity exists but the
+    // userinfo string-table update hasn't fired yet for this slot.
+    const index = makeFakeUserInfoIndex(new Map());
+    const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
+    const player = new Player(1, entity, index);
+    expect(player.name).toBeUndefined();
+    expect(player.steamId).toBeUndefined();
+  });
+
+  it("returns undefined for both getters when no userInfoIndex was supplied", () => {
+    const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
+    const player = new Player(1, entity);
+    expect(player.name).toBeUndefined();
+    expect(player.steamId).toBeUndefined();
+  });
+
+  it("steamId.toSteam64() round-trips through the wire xuid string", () => {
+    const index = makeFakeUserInfoIndex(
+      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
+    );
+    const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
+    const player = new Player(1, entity, index);
+    const steamId = player.steamId;
+    expect(steamId).toBeDefined();
+    expect(steamId!.toSteam64().toString()).toBe(HUMAN_INFO.xuid);
+  });
+
+  it("snapshot() captures resolved name and steamId at call time", () => {
+    const index = makeFakeUserInfoIndex(
+      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
+    );
+    const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
+    const player = new Player(1, entity, index);
+    const snap = player.snapshot();
+    expect(snap.name).toBe("Brian");
+    expect(snap.steamId?.toSteam64().toString()).toBe(HUMAN_INFO.xuid);
   });
 });

@@ -240,10 +240,11 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    */
   get players(): Player[] {
     if (this._playersCache !== null) return this._playersCache;
+    const userInfoIndex = this.userInfoIndex;
     const out: Player[] = [];
     for (const [id, entity] of this._entities.entries()) {
       if (entity.serverClass.className === "CCSPlayer") {
-        out.push(new Player(id, entity));
+        out.push(new Player(id, entity, userInfoIndex));
       }
     }
     this._playersCache = out;

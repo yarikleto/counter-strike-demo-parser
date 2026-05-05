@@ -30,6 +30,8 @@
  * View angles use Source's `[0] = pitch (X), [1] = yaw (Y)` convention.
  */
 import type { Entity } from "../entities/Entity.js";
+import type { UserInfoIndex } from "./userInfoIndex.js";
+import { SteamId } from "../utils/SteamId.js";
 
 /** A 3D position. Frozen on read so consumers can't mutate the overlay. */
 export interface Vector3 {
@@ -67,6 +69,20 @@ export interface PlayerSnapshot {
    * no cross-reference to the weapon overlay.
    */
   readonly activeWeaponHandle: number;
+  /**
+   * Display name as the player advertised it via userinfo at snapshot time.
+   * `undefined` when the userinfo index hasn't caught up to this slot yet
+   * (rare — only when the snapshot is taken in the same tick the player's
+   * entity was created, before the userinfo string-table update fires).
+   */
+  readonly name: string | undefined;
+  /**
+   * Steam ID at snapshot time, or `undefined` when userinfo isn't available.
+   * Project to your preferred form via `.toSteam2()`, `.toSteam3()`, or
+   * `.toSteam64()`. Bots carry `xuid: "0"` on the wire and resolve to a
+   * SteamId with `accountId === 0`.
+   */
+  readonly steamId: SteamId | undefined;
 }
 
 /**
@@ -127,6 +143,7 @@ function readNumOr0(value: unknown): number {
 export class Player {
   readonly slot: number;
   private readonly entity: Entity;
+  private readonly userInfoIndex: UserInfoIndex | undefined;
 
   // Cached flat-prop indices, resolved once in the constructor.
   private readonly teamIdx: number;
@@ -143,10 +160,22 @@ export class Player {
    * Build an overlay over an existing CCSPlayer `Entity`. Throws if any of
    * the required props are absent from the entity's ServerClass — this is
    * the loud-failure mechanism for schema drift.
+   *
+   * The optional `userInfoIndex` powers the `name` and `steamId` getters.
+   * It's accepted by reference, not copied, so the overlay observes the
+   * latest userinfo state on every read (handles in-game renames and
+   * mid-parse joins). When omitted, `name` and `steamId` always read
+   * `undefined` — useful for unit tests that don't need the userinfo
+   * resolution path.
    */
-  constructor(slot: number, entity: Entity) {
+  constructor(
+    slot: number,
+    entity: Entity,
+    userInfoIndex?: UserInfoIndex,
+  ) {
     this.slot = slot;
     this.entity = entity;
+    this.userInfoIndex = userInfoIndex;
 
     this.teamIdx = findIdx(entity, "m_iTeamNum");
     this.healthIdx = findIdx(entity, "m_iHealth");
@@ -243,6 +272,46 @@ export class Player {
   }
 
   /**
+   * Display name as the player advertised it via userinfo. Returns
+   * `undefined` when the userinfo index hasn't caught up yet (rare —
+   * happens only if a Player is read in the same tick the entity was
+   * created, before the userinfo string-table update for that slot).
+   *
+   * Live read — observes the latest userinfo state. Two reads in different
+   * ticks may return different values (e.g. a player rename via console).
+   *
+   * Resolution path: `entitySlot = slot - 1` per CSGO convention →
+   * `userIdForEntitySlot` → `infoForUserId.name`. Nothing cached: the
+   * underlying `UserInfoIndex` already memoises per-slot decode and the
+   * map lookups are O(1).
+   */
+  get name(): string | undefined {
+    if (this.userInfoIndex === undefined) return undefined;
+    const userId = this.userInfoIndex.userIdForEntitySlot(this.slot - 1);
+    if (userId === undefined) return undefined;
+    return this.userInfoIndex.infoForUserId(userId)?.name;
+  }
+
+  /**
+   * Steam ID as a `SteamId` instance, or `undefined` when userinfo isn't
+   * available yet for this slot. Use `steamId.toSteam2()`, `.toSteam3()`,
+   * or `.toSteam64()` to project to the form your tooling expects.
+   *
+   * Bot players carry `xuid: "0"` from the engine and resolve to a
+   * `SteamId` with `accountId === 0`. Live read — same liveness story as
+   * `name`: a fresh `SteamId` is constructed on every call against the
+   * current userinfo state.
+   */
+  get steamId(): SteamId | undefined {
+    if (this.userInfoIndex === undefined) return undefined;
+    const userId = this.userInfoIndex.userIdForEntitySlot(this.slot - 1);
+    if (userId === undefined) return undefined;
+    const info = this.userInfoIndex.infoForUserId(userId);
+    if (info === undefined) return undefined;
+    return SteamId.fromSteam64(info.xuid);
+  }
+
+  /**
    * Capture the current values into a frozen plain object. Use this when
    * deferring processing past the next tick — the live overlay's getters
    * would otherwise re-read updated state on the deferred read.
@@ -257,6 +326,8 @@ export class Player {
       viewAngle: this.viewAngle,
       isAlive: this.isAlive,
       activeWeaponHandle: this.activeWeaponHandle,
+      name: this.name,
+      steamId: this.steamId,
     });
   }
 }
