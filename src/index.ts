@@ -66,6 +66,7 @@ export {
   isValidHandle,
   resolveHandle,
 } from "./state/index.js";
+export { SteamId, SteamIdParseError } from "./utils/SteamId.js";
 export type { TypedServerInfo } from "./state/index.js";
 export {
   Player,
