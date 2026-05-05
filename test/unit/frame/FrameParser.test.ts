@@ -126,4 +126,54 @@ describe("iterateFrames", () => {
     expect(frames[0].consoleCmdData).toEqual(raw);
     expect(frames[0].consoleCmdData?.length).toBe(raw.length);
   });
+
+  it("should expose usercmd sequence and payload bytes verbatim", () => {
+    // dem_usercmd: int32 outgoing sequence + length-prefixed bit-packed blob.
+    // The parser surfaces both — decoding the blob is the consumer's job.
+    const cmdBlob = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05]);
+    const prefix = buildFramePrefix(DemoCommands.DEM_USERCMD, 123, 4);
+    const seqBuf = Buffer.alloc(4);
+    seqBuf.writeInt32LE(0xdead, 0);
+    const lenBuf = Buffer.alloc(4);
+    lenBuf.writeInt32LE(cmdBlob.length, 0);
+    const stop = buildFramePrefix(DemoCommands.DEM_STOP, 0, 0);
+
+    const buf = Buffer.concat([prefix, seqBuf, lenBuf, cmdBlob, stop]);
+    const reader = new ByteReader(buf);
+    const frames = [...iterateFrames(reader)];
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0].command).toBe(DemoCommands.DEM_USERCMD);
+    expect(frames[0].tick).toBe(123);
+    expect(frames[0].playerSlot).toBe(4);
+    expect(frames[0].packetData).toBeUndefined();
+    expect(frames[0].consoleCmdData).toBeUndefined();
+    expect(frames[0].customData).toBeUndefined();
+    expect(frames[0].userCmdData?.sequence).toBe(0xdead);
+    expect(frames[0].userCmdData?.data).toEqual(cmdBlob);
+  });
+
+  it("should expose customdata type and payload bytes verbatim", () => {
+    // dem_customdata: int32 type discriminator + length-prefixed payload.
+    // The engine doesn't define the discriminator's meaning — interpretation
+    // belongs to the recording plugin.
+    const blob = Buffer.from([0xaa, 0xbb, 0xcc]);
+    const prefix = buildFramePrefix(DemoCommands.DEM_CUSTOMDATA, 200, 0);
+    const typeBuf = Buffer.alloc(4);
+    typeBuf.writeInt32LE(7, 0);
+    const lenBuf = Buffer.alloc(4);
+    lenBuf.writeInt32LE(blob.length, 0);
+    const stop = buildFramePrefix(DemoCommands.DEM_STOP, 0, 0);
+
+    const buf = Buffer.concat([prefix, typeBuf, lenBuf, blob, stop]);
+    const reader = new ByteReader(buf);
+    const frames = [...iterateFrames(reader)];
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0].command).toBe(DemoCommands.DEM_CUSTOMDATA);
+    expect(frames[0].tick).toBe(200);
+    expect(frames[0].userCmdData).toBeUndefined();
+    expect(frames[0].customData?.type).toBe(7);
+    expect(frames[0].customData?.data).toEqual(blob);
+  });
 });

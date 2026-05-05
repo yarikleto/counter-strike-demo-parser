@@ -278,6 +278,44 @@ export interface Tier3EventMap {
     readonly command: string;
   };
   /**
+   * Fires for every `dem_usercmd` frame — a single client's outgoing input
+   * command (movement, view-angle, button bits) captured at record time.
+   * `sequence` is the client's monotonically increasing send number;
+   * `data` is the raw command-encoding blob (decoder is the consumer's
+   * responsibility — the format is a complex bit-packed structure that this
+   * library does not unpack).
+   *
+   * `playerSlot` from the frame header identifies which client issued the
+   * command. Bot-driven competitive demos typically have zero usercmd
+   * frames (the server records authoritative ticks, not client inputs);
+   * POV demos have one stream per recorder. A subscriber may legitimately
+   * observe zero events on a given fixture.
+   */
+  userCommand: {
+    readonly tick: number;
+    readonly playerSlot: number;
+    readonly sequence: number;
+    readonly data: Uint8Array;
+  };
+  /**
+   * Fires for every `dem_customdata` frame — plugin-specific blobs that
+   * predate the Source Tools era. `type` discriminates the payload format
+   * (the engine itself doesn't define what types mean — interpretation is
+   * up to the recording plugin). `data` is the raw payload byte slice,
+   * surfaced verbatim so the consumer's plugin-aware decoder can interpret
+   * it as the recording context dictates.
+   *
+   * Most competitive recordings carry zero customdata frames; the field
+   * was reserved for SourceTV / community plugins that have largely been
+   * superseded. A subscriber may legitimately observe zero events on a
+   * given fixture.
+   */
+  customData: {
+    readonly tick: number;
+    readonly type: number;
+    readonly data: Uint8Array;
+  };
+  /**
    * Recoverable parse failure (TASK-059). Fires when the parser encounters
    * truncated data, an invalid frame command byte, a corrupt protobuf
    * payload, a malformed string-table blob, or any other condition that

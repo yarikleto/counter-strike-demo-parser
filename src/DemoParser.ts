@@ -884,6 +884,25 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
             command: decodeConsoleCommand(frame.consoleCmdData),
           });
         }
+        if (frame.userCmdData !== undefined) {
+          // Surface the raw command-encoding blob as a Uint8Array view —
+          // matches the `unknownMessage` payload convention. No copy: the
+          // Buffer returned by FrameParser already aliases the input
+          // buffer, so callers who need ownership should clone explicitly.
+          this.emit("userCommand", {
+            tick: frame.tick,
+            playerSlot: frame.playerSlot,
+            sequence: frame.userCmdData.sequence,
+            data: frame.userCmdData.data,
+          });
+        }
+        if (frame.customData !== undefined) {
+          this.emit("customData", {
+            tick: frame.tick,
+            type: frame.customData.type,
+            data: frame.customData.data,
+          });
+        }
         if (frame.stringTablesData !== undefined) {
           // Snapshot frames can be malformed in unusual recordings — guard
           // them with the same `corrupt-stringtable` recovery used for

@@ -40,6 +40,13 @@ export interface FrameHeader {
  * `stringTablesData` contains the raw byte-level snapshot blob (decoded by
  * {@link parseStringTableSnapshot} — note this is a `bf_write` byte stream,
  * not a protobuf and not the bit-packed CreateStringTable encoding).
+ * For dem_usercmd, `userCmdData` carries the int32 outgoing sequence number
+ * paired with the raw length-prefixed command-encoding blob — the wire format
+ * is a complex bit-packed structure (movement, view-angle, button bits) whose
+ * decode is the consumer's responsibility. For dem_customdata, `customData`
+ * carries the int32 type discriminator paired with the raw plugin-defined
+ * payload; the engine itself does not specify what types mean — interpretation
+ * is up to the recording plugin.
  * For all other types, every payload field is undefined and the corresponding
  * payload has been skipped.
  */
@@ -53,6 +60,12 @@ export interface Frame extends FrameHeader {
   /** Raw byte-level payload of a dem_stringtables snapshot frame, undefined
    * otherwise. Decode with `parseStringTableSnapshot`. */
   stringTablesData: Buffer | undefined;
+  /** Outgoing sequence number + raw command-encoding blob for a dem_usercmd
+   * frame, undefined otherwise. */
+  userCmdData: { sequence: number; data: Buffer } | undefined;
+  /** Type discriminator + raw plugin-defined payload for a dem_customdata
+   * frame, undefined otherwise. */
+  customData: { type: number; data: Buffer } | undefined;
 }
 
 /**
@@ -94,6 +107,8 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData: undefined,
         consoleCmdData: undefined,
         stringTablesData: undefined,
+        userCmdData: undefined,
+        customData: undefined,
       };
 
     case DemoCommands.DEM_DATATABLES: {
@@ -107,6 +122,8 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData,
         consoleCmdData: undefined,
         stringTablesData: undefined,
+        userCmdData: undefined,
+        customData: undefined,
       };
     }
 
@@ -123,6 +140,8 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData: undefined,
         consoleCmdData,
         stringTablesData: undefined,
+        userCmdData: undefined,
+        customData: undefined,
       };
     }
 
@@ -141,13 +160,18 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData: undefined,
         consoleCmdData: undefined,
         stringTablesData,
+        userCmdData: undefined,
+        customData: undefined,
       };
     }
 
-    case DemoCommands.DEM_USERCMD:
-      // outgoing sequence (int32) + length-prefixed data
-      reader.readInt32();
-      skipLengthPrefixedData(reader);
+    case DemoCommands.DEM_USERCMD: {
+      // Outgoing client sequence (int32) + length-prefixed command blob.
+      // We surface both — the consumer pairs the sequence with the bit-
+      // packed payload to drive their own usercmd decoder.
+      const sequence = reader.readInt32();
+      const length = reader.readInt32();
+      const data = reader.readBytes(length);
       return {
         command,
         tick,
@@ -156,15 +180,21 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData: undefined,
         consoleCmdData: undefined,
         stringTablesData: undefined,
+        userCmdData: { sequence, data },
+        customData: undefined,
       };
+    }
 
     case DemoCommands.DEM_STOP:
       return null;
 
-    case DemoCommands.DEM_CUSTOMDATA:
-      // unknown int32 + length-prefixed data
-      reader.readInt32();
-      skipLengthPrefixedData(reader);
+    case DemoCommands.DEM_CUSTOMDATA: {
+      // Plugin-specific int32 type discriminator + length-prefixed payload.
+      // The engine doesn't define what types mean — interpretation is up
+      // to the recording plugin; we surface both verbatim.
+      const type = reader.readInt32();
+      const length = reader.readInt32();
+      const data = reader.readBytes(length);
       return {
         command,
         tick,
@@ -173,7 +203,10 @@ function readFrame(reader: ByteReader): Frame | null {
         dataTablesData: undefined,
         consoleCmdData: undefined,
         stringTablesData: undefined,
+        userCmdData: undefined,
+        customData: { type, data },
       };
+    }
 
     default:
       throw new Error(`FrameParser: unknown command byte ${command}`);
@@ -203,11 +236,7 @@ function readPacketFrame(
     dataTablesData: undefined,
     consoleCmdData: undefined,
     stringTablesData: undefined,
+    userCmdData: undefined,
+    customData: undefined,
   };
-}
-
-/** Skip a length-prefixed data block (int32 length + data bytes). */
-function skipLengthPrefixedData(reader: ByteReader): void {
-  const length = reader.readInt32();
-  reader.readBytes(length);
 }
