@@ -32,6 +32,7 @@ import type { ChatMessage } from "./UserMessageDecoder.js";
 import type { Entity } from "../entities/Entity.js";
 import type { StringTable } from "../stringtables/StringTable.js";
 import type { StringTableEntry } from "../stringtables/StringTable.js";
+import type { DecodedStringTableSnapshot } from "../stringtables/SnapshotParser.js";
 import type { CSVCMsg_ServerInfo } from "../proto/index.js";
 import type { RoundStateChange } from "../state/RoundTracker.js";
 // Tier-1 enriched event types — bomb lifecycle (TASK-039)
@@ -199,6 +200,16 @@ export interface Tier3EventMap {
   stringTableCreated: { name: string; table: StringTable };
   /** Emitted when a string table is updated from `CSVCMsg_UpdateStringTable`. */
   stringTableUpdated: { name: string; changedEntries: StringTableEntry[] };
+  /**
+   * Fires once per `dem_stringtables` snapshot frame encountered. The payload
+   * is the fully-decoded snapshot — power users can inspect the tables /
+   * entries directly without the StringTableManager. Wraps {@link
+   * DecodedStringTableSnapshot}.
+   */
+  stringTableSnapshot: {
+    readonly tick: number;
+    readonly snapshot: DecodedStringTableSnapshot;
+  };
   /** Emitted when an entity is created via `CSVCMsg_PacketEntities`. */
   entityCreated: Entity;
   /** Emitted when an entity is updated via `CSVCMsg_PacketEntities`. */

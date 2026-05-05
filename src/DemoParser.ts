@@ -51,6 +51,8 @@ import { StringTableManager } from "./stringtables/StringTableManager.js";
 import { PrecacheTable } from "./stringtables/precache.js";
 import { parseStringTableEntries } from "./stringtables/StringTableParser.js";
 import { decompressSnappy } from "./stringtables/Compression.js";
+import { parseStringTableSnapshot } from "./stringtables/SnapshotParser.js";
+import type { DecodedSnapshotTable } from "./stringtables/SnapshotParser.js";
 import { EntityList, decodePacketEntities } from "./entities/index.js";
 import { buildServerInfo } from "./state/ServerInfo.js";
 import type { TypedServerInfo } from "./state/ServerInfo.js";
@@ -882,6 +884,22 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
             command: decodeConsoleCommand(frame.consoleCmdData),
           });
         }
+        if (frame.stringTablesData !== undefined) {
+          // Snapshot frames can be malformed in unusual recordings — guard
+          // them with the same `corrupt-stringtable` recovery used for
+          // CreateStringTable / UpdateStringTable, so a single bad blob
+          // doesn't terminate the parse.
+          try {
+            this.handleStringTableSnapshot(frame.tick, frame.stringTablesData);
+          } catch (err) {
+            this.emitParserError(
+              "corrupt-stringtable",
+              err,
+              `dem_stringtables snapshot decode failed`,
+              this._lastFrameOffset,
+            );
+          }
+        }
       } catch (err) {
         // Frame-body decoder threw past the per-message guard — typically a
         // truncated packet whose internal varint length walks off the end of
@@ -1002,6 +1020,103 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       this._userInfoIndex.refresh();
     }
     this.emit("stringTableUpdated", { name: table.name, changedEntries });
+  }
+
+  /**
+   * Decode a `dem_stringtables` snapshot frame and merge it into the live
+   * StringTableManager. The snapshot is a periodic full dump of every
+   * server-side string table — distinct from the incremental
+   * CreateStringTable / UpdateStringTable bit-stream messages.
+   *
+   * Behaviour:
+   *   - For every decoded table whose name is already registered, entries
+   *     are overwritten by index — `entries[i]` of the snapshot becomes the
+   *     StringTable's entry at index `i`. Client-only entries (typically
+   *     `userinfo`'s reserved bot slots) are appended after the regular
+   *     entries.
+   *   - For every decoded table whose name is NOT registered yet, a fresh
+   *     `StringTable` is created with `maxEntries: max(numEntries, 256)` and
+   *     zero defaults for the rest of the construction fields, then
+   *     populated. This handles snapshots that reference tables predating
+   *     any CreateStringTable observation (rare but legal in older recording
+   *     pipelines).
+   *   - The `userinfo` index is refreshed once afterwards if any decoded
+   *     table touched it AND the index has already been built — same hook
+   *     used by Create/UpdateStringTable.
+   *   - Emits `stringTableSnapshot` exactly once with the fully-decoded
+   *     payload so power users can inspect the snapshot without needing the
+   *     StringTableManager.
+   */
+  private handleStringTableSnapshot(tick: number, data: Buffer): void {
+    const snapshot = parseStringTableSnapshot(data);
+    if (this._stringTables === undefined) {
+      this._stringTables = new StringTableManager();
+    }
+    let userInfoTouched = false;
+    for (const decoded of snapshot.tables) {
+      this.applySnapshotTable(decoded);
+      if (decoded.name === "userinfo") userInfoTouched = true;
+    }
+    if (userInfoTouched && this._userInfoIndex !== null) {
+      this._userInfoIndex.refresh();
+    }
+    this.emit("stringTableSnapshot", { tick, snapshot });
+  }
+
+  /**
+   * Apply a single decoded snapshot table to the live StringTableManager —
+   * registering a fresh StringTable if none with this name exists yet, then
+   * overwriting (or appending) entries by index.
+   */
+  private applySnapshotTable(decoded: DecodedSnapshotTable): void {
+    if (this._stringTables === undefined) {
+      // Defensive — caller (`handleStringTableSnapshot`) lazy-inits this. We
+      // re-check here so `applySnapshotTable` can be reasoned about in
+      // isolation without a non-null assertion below.
+      this._stringTables = new StringTableManager();
+    }
+    let table = this._stringTables.getByName(decoded.name);
+    if (table === undefined) {
+      // Snapshot references a table the parser hasn't seen a
+      // CreateStringTable for yet. Register a new one with a `maxEntries`
+      // floor of 256 — the common Source convention; large enough to
+      // accommodate any subsequent UpdateStringTable that may target this
+      // table while keeping `setEntry`'s range check meaningful.
+      const maxEntries = Math.max(decoded.entries.length + decoded.clientEntries.length, 256);
+      table = new StringTable({
+        name: decoded.name,
+        maxEntries,
+        userDataFixedSize: false,
+        userDataSize: 0,
+        userDataSizeBits: 0,
+        flags: 0,
+      });
+      const tableId = this._stringTables.register(table);
+      // Mirror CreateStringTable: every registered table needs a history ring
+      // so a later UpdateStringTable can reuse the same dictionary slot.
+      this.stringTableHistories.set(tableId, []);
+    }
+    // Overwrite regular entries by index. Skip out-of-range indices defensively
+    // — a snapshot from a re-recorded demo could legitimately exceed the
+    // StringTable's `maxEntries` if the original Create message used a smaller
+    // cap; surfacing this as a partial merge beats throwing.
+    for (let i = 0; i < decoded.entries.length; i++) {
+      const entry = decoded.entries[i];
+      if (i >= table.maxEntries) break;
+      const userData = entry.data.byteLength > 0 ? entry.data : undefined;
+      table.setEntry(i, entry.key, userData);
+    }
+    // Append client entries after the regular ones, continuing the index
+    // sequence. This matches the Source convention where client-only userinfo
+    // slots (reserved bot entries) live above the player count.
+    const clientStart = decoded.entries.length;
+    for (let i = 0; i < decoded.clientEntries.length; i++) {
+      const idx = clientStart + i;
+      if (idx >= table.maxEntries) break;
+      const entry = decoded.clientEntries[i];
+      const userData = entry.data.byteLength > 0 ? entry.data : undefined;
+      table.setEntry(idx, entry.key, userData);
+    }
   }
 
   /**

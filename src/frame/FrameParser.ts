@@ -36,8 +36,12 @@ export interface FrameHeader {
  * the stream of svc_SendTable messages followed by a single CSVCMsg_ClassInfo.
  * For dem_consolecmd, `consoleCmdData` contains the raw length-prefixed
  * ASCII payload (the recorded console command, possibly null-terminated —
- * decoding is the consumer's responsibility). For all other types, every
- * payload field is undefined and the corresponding payload has been skipped.
+ * decoding is the consumer's responsibility). For dem_stringtables,
+ * `stringTablesData` contains the raw byte-level snapshot blob (decoded by
+ * {@link parseStringTableSnapshot} — note this is a `bf_write` byte stream,
+ * not a protobuf and not the bit-packed CreateStringTable encoding).
+ * For all other types, every payload field is undefined and the corresponding
+ * payload has been skipped.
  */
 export interface Frame extends FrameHeader {
   /** Raw protobuf message stream for packet frames, undefined otherwise. */
@@ -46,6 +50,9 @@ export interface Frame extends FrameHeader {
   dataTablesData: Buffer | undefined;
   /** Raw ASCII payload of a dem_consolecmd frame, undefined otherwise. */
   consoleCmdData: Buffer | undefined;
+  /** Raw byte-level payload of a dem_stringtables snapshot frame, undefined
+   * otherwise. Decode with `parseStringTableSnapshot`. */
+  stringTablesData: Buffer | undefined;
 }
 
 /**
@@ -86,6 +93,7 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData: undefined,
         consoleCmdData: undefined,
+        stringTablesData: undefined,
       };
 
     case DemoCommands.DEM_DATATABLES: {
@@ -98,6 +106,7 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData,
         consoleCmdData: undefined,
+        stringTablesData: undefined,
       };
     }
 
@@ -113,11 +122,17 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData: undefined,
         consoleCmdData,
+        stringTablesData: undefined,
       };
     }
 
-    case DemoCommands.DEM_STRINGTABLES:
-      skipLengthPrefixedData(reader);
+    case DemoCommands.DEM_STRINGTABLES: {
+      // Byte-level snapshot blob (NOT bit-packed, NOT a protobuf — see
+      // SnapshotParser for the wire format). The int32 length prefix tells
+      // us exactly how many bytes belong to this frame's body; we read them
+      // verbatim and let the consumer decode.
+      const length = reader.readInt32();
+      const stringTablesData = reader.readBytes(length);
       return {
         command,
         tick,
@@ -125,7 +140,9 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData: undefined,
         consoleCmdData: undefined,
+        stringTablesData,
       };
+    }
 
     case DemoCommands.DEM_USERCMD:
       // outgoing sequence (int32) + length-prefixed data
@@ -138,6 +155,7 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData: undefined,
         consoleCmdData: undefined,
+        stringTablesData: undefined,
       };
 
     case DemoCommands.DEM_STOP:
@@ -154,6 +172,7 @@ function readFrame(reader: ByteReader): Frame | null {
         packetData: undefined,
         dataTablesData: undefined,
         consoleCmdData: undefined,
+        stringTablesData: undefined,
       };
 
     default:
@@ -183,6 +202,7 @@ function readPacketFrame(
     packetData,
     dataTablesData: undefined,
     consoleCmdData: undefined,
+    stringTablesData: undefined,
   };
 }
 
