@@ -677,6 +677,17 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       onUserMessage: (msg: CSVCMsg_UserMessage) => {
         this.handleUserMessage(msg);
       },
+      onUnknownMessage: (commandId: number, payload: Uint8Array) => {
+        // Forward-compat / unimplemented protobuf message variant. The
+        // dispatcher already skipped the payload bytes; we surface the raw
+        // (commandId, payload, tick) tuple as a typed event for power users
+        // who need to inspect or reverse-engineer it. Silent if no listener.
+        this.emit("unknownMessage", {
+          commandId,
+          payload,
+          tick: this._currentTick,
+        });
+      },
     });
 
     for (const frame of iterateFrames(reader)) {

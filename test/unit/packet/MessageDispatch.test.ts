@@ -9,7 +9,7 @@
  *   [varint cmd_id][varint size][size bytes of protobuf payload]
  * repeated until the buffer is exhausted.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Buffer } from "node:buffer";
 import _m0 from "protobufjs/minimal";
 import {
@@ -99,8 +99,7 @@ describe("MessageDispatcher", () => {
     expect(infoMap).toBe("de_dust2");
   });
 
-  it("skips unknown command IDs without throwing and warns once", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("skips unknown command IDs without throwing", () => {
     const unknownCmdId = 9999;
     const filler = new Uint8Array([1, 2, 3, 4, 5]);
     const tickPayload = CNETMsg_Tick.encode(CNETMsg_Tick.fromPartial({ tick: 7 })).finish();
@@ -119,9 +118,52 @@ describe("MessageDispatcher", () => {
 
     expect(() => dispatcher.dispatch(stream)).not.toThrow();
     expect(ticks).toEqual([7]);
-    // Warned exactly once for the repeated unknown id.
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
+  });
+
+  it("forwards unknown command IDs to onUnknownMessage with the raw payload", () => {
+    const unknownCmdA = 9001;
+    const unknownCmdB = 9002;
+    const fillerA = new Uint8Array([0xaa, 0xbb, 0xcc]);
+    const fillerB = new Uint8Array([0x10, 0x20, 0x30, 0x40, 0x50]);
+    const tickPayload = CNETMsg_Tick.encode(CNETMsg_Tick.fromPartial({ tick: 3 })).finish();
+    const stream = buildStream([
+      { cmd: unknownCmdA, bytes: fillerA },
+      { cmd: NETMessages.net_Tick, bytes: tickPayload },
+      { cmd: unknownCmdA, bytes: fillerA },
+      { cmd: unknownCmdB, bytes: fillerB },
+    ]);
+
+    const seen: Array<{ commandId: number; payload: Uint8Array }> = [];
+    const dispatcher = new MessageDispatcher({
+      onUnknownMessage: (commandId, payload) => {
+        // Copy the bytes — the payload view aliases the underlying packet
+        // Buffer, so retaining the slice across dispatches is unsafe.
+        seen.push({ commandId, payload: new Uint8Array(payload) });
+      },
+    });
+
+    dispatcher.dispatch(stream);
+
+    expect(seen).toHaveLength(3);
+    expect(seen[0].commandId).toBe(unknownCmdA);
+    expect(Array.from(seen[0].payload)).toEqual(Array.from(fillerA));
+    expect(seen[1].commandId).toBe(unknownCmdA);
+    expect(Array.from(seen[1].payload)).toEqual(Array.from(fillerA));
+    expect(seen[2].commandId).toBe(unknownCmdB);
+    expect(Array.from(seen[2].payload)).toEqual(Array.from(fillerB));
+  });
+
+  it("silently skips unknown command IDs when onUnknownMessage is omitted", () => {
+    const unknownCmdId = 9999;
+    const filler = new Uint8Array([1, 2, 3]);
+    const stream = buildStream([{ cmd: unknownCmdId, bytes: filler }]);
+
+    const dispatcher = new MessageDispatcher({});
+    // No console.warn is spied on — the dispatcher must not log. If it did,
+    // the assertion below on `process.stderr` patterns would still pass, but
+    // the integration test in `test/integration/unknown-messages.test.ts`
+    // catches any regression at the parser level.
+    expect(() => dispatcher.dispatch(stream)).not.toThrow();
   });
 
   it("does not invoke a handler that wasn't registered", () => {

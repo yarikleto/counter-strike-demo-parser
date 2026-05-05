@@ -14,8 +14,11 @@
  *     dispatcher invokes the matching handler with the decoded message.
  *   - Unknown command IDs are NOT fatal. Demos contain forward-compat
  *     messages we don't understand yet — we skip the payload by its prefixed
- *     size and keep going. A one-line `console.warn` is emitted (deduped per
- *     cmd ID so a noisy stream doesn't flood stderr).
+ *     size and keep going. The raw (commandId, payload) pair is forwarded
+ *     to the optional `onUnknownMessage` handler so a higher layer (e.g.
+ *     `DemoParser`) can surface a typed event for power users; if no handler
+ *     is registered the message is silently skipped. The dispatcher itself
+ *     never logs — keeping it pure and free of stderr noise.
  *   - Decoding uses ts-proto's `Type.decode(bytes, length?)` overload. We
  *     pass the raw `Uint8Array` slice; ts-proto wraps it in its own Reader.
  */
@@ -56,8 +59,16 @@ export interface RawPacketMessage {
 
 /**
  * Handlers keyed by command ID. Registered via the `on*` setters; absent
- * keys cause the corresponding payload to be skipped silently (after a
- * one-time warn for unknown IDs).
+ * keys cause the corresponding payload to be skipped silently.
+ *
+ * `onUnknownMessage` is the catch-all for command IDs not in the dispatch
+ * registry. It is OPTIONAL — when omitted, unknown messages are skipped
+ * silently with zero side effects (no logging, no allocations beyond the
+ * size-prefixed payload slice the dispatcher already reads). Provide one
+ * if you want to surface a typed event for power users (see
+ * `DemoParser`'s `unknownMessage` event) or to collect raw bytes for
+ * reverse-engineering a new message variant. The dispatcher never decodes
+ * the payload — the consumer owns interpretation.
  */
 export interface MessageHandlers {
   onServerInfo?: (msg: CSVCMsg_ServerInfoType) => void;
@@ -68,6 +79,7 @@ export interface MessageHandlers {
   onGameEventList?: (msg: CSVCMsg_GameEventListType) => void;
   onGameEvent?: (msg: CSVCMsg_GameEventType) => void;
   onUserMessage?: (msg: CSVCMsg_UserMessageType) => void;
+  onUnknownMessage?: (commandId: number, payload: Uint8Array) => void;
 }
 
 /** One row in the dispatch registry: command ID -> codec + handler key. */
@@ -101,7 +113,6 @@ export function* iterateRawMessages(data: Buffer): Generator<RawPacketMessage> {
  */
 export class MessageDispatcher {
   private readonly handlers: MessageHandlers;
-  private readonly warnedUnknown = new Set<number>();
 
   /**
    * Static dispatch table — command ID to (decoder, handler key). We type
@@ -178,13 +189,18 @@ export class MessageDispatcher {
    */
   dispatch(data: Buffer): void {
     for (const { commandType, payload } of iterateRawMessages(data)) {
-      const entry = MessageDispatcher.registry.get(commandType);
-      if (entry === undefined) {
-        this.warnOnce(commandType);
-        continue;
-      }
       // The Uint8Array view shares memory with the Buffer slice — no copy.
       const view = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
+      const entry = MessageDispatcher.registry.get(commandType);
+      if (entry === undefined) {
+        // Forward-compat / unimplemented message id. The payload bytes have
+        // already been consumed from the stream; hand them to the optional
+        // unknown-message handler verbatim and continue. No logging here —
+        // the dispatcher stays pure; surfacing this to user code is the
+        // higher layer's job (see `DemoParser`'s `unknownMessage` event).
+        this.handlers.onUnknownMessage?.(commandType, view);
+        continue;
+      }
       const decoded = entry.decoder.decode(view);
       const handler = this.handlers[entry.handlerKey];
       if (handler !== undefined) {
@@ -193,12 +209,5 @@ export class MessageDispatcher {
         (handler as (m: unknown) => void)(decoded);
       }
     }
-  }
-
-  private warnOnce(commandType: number): void {
-    if (this.warnedUnknown.has(commandType)) return;
-    this.warnedUnknown.add(commandType);
-    // eslint-disable-next-line no-console
-    console.warn(`MessageDispatcher: unknown command id ${commandType} — skipping payload`);
   }
 }

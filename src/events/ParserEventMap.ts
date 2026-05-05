@@ -223,6 +223,30 @@ export interface Tier3EventMap {
    * `gameEvent` has already fired for this event.
    */
   gameEventEnrichmentSkipped: { name: string; eventId: number };
+  /**
+   * Emitted when the protobuf message dispatcher encounters a command id
+   * that is not in its registry — i.e., a forward-compat or unimplemented
+   * NETMessages / SVCMessages variant. Different CS:GO build numbers ship
+   * different message tables, so this is expected on a long-running parser
+   * and is NOT fatal: the dispatcher reads the size-prefixed payload, hands
+   * it to listeners verbatim, and continues with the next message.
+   *
+   * Silent by default — no listener subscribed means the event is simply
+   * dropped, matching the dispatcher's "skip and continue" policy. Subscribe
+   * here only if you need to inspect raw bytes for unknown variants (e.g.
+   * to reverse-engineer a new message type or to gate analytics on the
+   * presence of a specific id). The `payload` is the exact slice taken from
+   * the wire — no copy, no decoding, no schema applied.
+   *
+   * `tick` is the parser's `currentTick` at the moment the message was
+   * dispatched, so listeners can correlate the unknown message with the
+   * surrounding game state.
+   */
+  unknownMessage: {
+    readonly commandId: number;
+    readonly payload: Uint8Array;
+    readonly tick: number;
+  };
 }
 
 /**
