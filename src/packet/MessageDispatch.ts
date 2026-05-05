@@ -34,6 +34,7 @@ import {
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
   CSVCMsg_UserMessage,
+  CSVCMsg_VoiceData,
 } from "../proto/index.js";
 import type {
   CNETMsg_Tick as CNETMsg_TickType,
@@ -44,6 +45,7 @@ import type {
   CSVCMsg_ServerInfo as CSVCMsg_ServerInfoType,
   CSVCMsg_UpdateStringTable as CSVCMsg_UpdateStringTableType,
   CSVCMsg_UserMessage as CSVCMsg_UserMessageType,
+  CSVCMsg_VoiceData as CSVCMsg_VoiceDataType,
 } from "../proto/index.js";
 
 /** Generic decoder shape exposed by every ts-proto codec object. */
@@ -89,6 +91,7 @@ export interface MessageHandlers {
   onGameEventList?: (msg: CSVCMsg_GameEventListType) => void;
   onGameEvent?: (msg: CSVCMsg_GameEventType) => void;
   onUserMessage?: (msg: CSVCMsg_UserMessageType) => void;
+  onVoiceData?: (msg: CSVCMsg_VoiceDataType) => void;
   onUnknownMessage?: (commandId: number, payload: Uint8Array) => void;
   onDecodeError?: (commandId: number, error: Error, payload: Uint8Array) => void;
 }
@@ -180,6 +183,13 @@ export class MessageDispatcher {
         {
           decoder: CSVCMsg_UserMessage,
           handlerKey: "onUserMessage",
+        },
+      ],
+      [
+        SVCMessages.svc_VoiceData,
+        {
+          decoder: CSVCMsg_VoiceData,
+          handlerKey: "onVoiceData",
         },
       ],
     ]);

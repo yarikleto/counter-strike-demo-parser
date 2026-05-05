@@ -29,6 +29,8 @@ import {
   CSVCMsgServerInfo,
   CSVCMsgUpdateStringTable,
   CSVCMsgUserMessage,
+  CSVCMsgVoiceData,
+  VoiceDataFormatT,
 } from '../generated/netmessages.js';
 import {
   CCSUsrMsgSayText,
@@ -73,6 +75,11 @@ export const CSVCMsg_GameEventList = CSVCMsgGameEventList;
 
 export type CSVCMsg_UserMessage = CSVCMsgUserMessage;
 export const CSVCMsg_UserMessage = CSVCMsgUserMessage;
+
+export type CSVCMsg_VoiceData = CSVCMsgVoiceData;
+export const CSVCMsg_VoiceData = CSVCMsgVoiceData;
+
+export { VoiceDataFormatT };
 
 // --- CSGO user-messages (cstrike15_usermessages.proto) -----------------------
 

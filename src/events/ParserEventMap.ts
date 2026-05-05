@@ -29,6 +29,7 @@
 import type { DecodedGameEvent } from "./GameEventDecoder.js";
 import type { EventDescriptorTable } from "./EventDescriptorTable.js";
 import type { ChatMessage } from "./UserMessageDecoder.js";
+import type { Player } from "../state/Player.js";
 import type { Entity } from "../entities/Entity.js";
 import type { StringTable } from "../stringtables/StringTable.js";
 import type { StringTableEntry } from "../stringtables/StringTable.js";
@@ -313,6 +314,31 @@ export interface Tier3EventMap {
   customData: {
     readonly tick: number;
     readonly type: number;
+    readonly data: Uint8Array;
+  };
+  /**
+   * Fires when a `CSVCMsg_VoiceData` message is decoded (TASK-051). `player`
+   * resolves the speaking client by entity slot via `userInfoIndex` — the
+   * value is `undefined` if the userinfo string-table entry hasn't been
+   * populated yet at this tick (rare; can happen for the briefest moment
+   * during signon while a client connects). `data` is the raw compressed
+   * audio payload — CELT or Opus depending on the demo era — emitted
+   * verbatim with no audio decoding. `format` carries the wire format enum
+   * (`VoiceDataFormatT`) so consumers that DO want to decode can route to
+   * the right codec; `proximity` is the 0/1 proximity-chat flag normalised
+   * from the proto's boolean field.
+   *
+   * Bot-driven competitive demos typically have zero voice messages — the
+   * server records authoritative ticks, not the client voice channel. POV
+   * recordings and casual demos with active voice chat will emit one event
+   * per ~20-50ms voice frame per active speaker. A subscriber may
+   * legitimately observe zero events on a given fixture.
+   */
+  voiceData: {
+    readonly tick: number;
+    readonly player: Player | undefined;
+    readonly format: number;
+    readonly proximity: number;
     readonly data: Uint8Array;
   };
   /**

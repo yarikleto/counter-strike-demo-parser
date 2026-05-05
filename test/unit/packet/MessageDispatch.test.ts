@@ -19,6 +19,7 @@ import {
 import {
   CNETMsg_Tick,
   CSVCMsg_ServerInfo,
+  CSVCMsg_VoiceData,
 } from "../../../src/proto/index.js";
 import { NETMessages, SVCMessages } from "../../../src/generated/netmessages.js";
 
@@ -179,6 +180,58 @@ describe("MessageDispatcher", () => {
     const known = MessageDispatcher.knownCommandIds();
     expect(known).toContain(SVCMessages.svc_ServerInfo);
     expect(known).toContain(NETMessages.net_Tick);
+  });
+
+  it("decodes and dispatches a CSVCMsg_VoiceData message (TASK-051)", () => {
+    // Synthesise a voice payload: client slot 3, proximity=true, a small
+    // raw audio blob, format=1 (engine). The dispatcher must hand the
+    // decoded message to onVoiceData with field shapes intact and the
+    // raw bytes preserved verbatim — no decoding, no copy semantics
+    // promised, but byte-for-byte equality after round-trip.
+    const audio = new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+    const original = CSVCMsg_VoiceData.fromPartial({
+      client: 3,
+      proximity: true,
+      voiceData: audio,
+      format: 1,
+    });
+    const payload = CSVCMsg_VoiceData.encode(original).finish();
+    const stream = buildStream([
+      { cmd: SVCMessages.svc_VoiceData, bytes: payload },
+    ]);
+
+    const seen: Array<{
+      client: number | undefined;
+      proximity: boolean | undefined;
+      format: number | undefined;
+      voiceData: Uint8Array | undefined;
+    }> = [];
+    const dispatcher = new MessageDispatcher({
+      onVoiceData: (msg) => {
+        seen.push({
+          client: msg.client,
+          proximity: msg.proximity,
+          format: msg.format,
+          voiceData: msg.voiceData,
+        });
+      },
+    });
+
+    dispatcher.dispatch(stream);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].client).toBe(3);
+    expect(seen[0].proximity).toBe(true);
+    expect(seen[0].format).toBe(1);
+    expect(seen[0].voiceData).toBeDefined();
+    expect(Array.from(seen[0].voiceData ?? new Uint8Array())).toEqual(
+      Array.from(audio),
+    );
+  });
+
+  it("registers svc_VoiceData as a known command id (TASK-051)", () => {
+    const known = MessageDispatcher.knownCommandIds();
+    expect(known).toContain(SVCMessages.svc_VoiceData);
   });
 
   it("iterateRawMessages yields cmd/payload pairs without decoding", () => {

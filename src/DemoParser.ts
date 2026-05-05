@@ -41,6 +41,7 @@ import type {
   CSVCMsg_ServerInfo,
   CSVCMsg_UpdateStringTable,
   CSVCMsg_UserMessage,
+  CSVCMsg_VoiceData,
 } from "./proto/index.js";
 import { parseDataTables } from "./datatables/DataTablesParser.js";
 import type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
@@ -808,6 +809,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       onUserMessage: (msg: CSVCMsg_UserMessage) => {
         this.handleUserMessage(msg);
       },
+      onVoiceData: (msg: CSVCMsg_VoiceData) => {
+        this.handleVoiceData(msg);
+      },
       onUnknownMessage: (commandId: number, payload: Uint8Array) => {
         // Forward-compat / unimplemented protobuf message variant. The
         // dispatcher already skipped the payload bytes; we surface the raw
@@ -1317,6 +1321,54 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const decoded = decodeChatMessage(msg, ctx);
     if (decoded === undefined) return;
     this.emit("chatMessage", decoded);
+  }
+
+  /**
+   * Handle a decoded `CSVCMsg_VoiceData` message (TASK-051) and emit the
+   * Tier-3 `voiceData` event verbatim — no audio decoding, only client
+   * resolution and field normalisation.
+   *
+   * `client` is the speaker's zero-based entity slot (per CSGO's wire
+   * convention for this message). We resolve it to a `Player` via the
+   * `userInfoIndex` slot→userId step, then scan the live `players` array
+   * for the matching `slot+1` entity id (same `slot+1` adjustment used by
+   * the chat-message and enricher contexts). When the userinfo table hasn't
+   * caught up yet — only seen during the brief signon window before the
+   * `userinfo` string table populates a slot — `player` is `undefined`,
+   * which the event's typed payload allows.
+   *
+   * The proto's `proximity` is a boolean; we normalise it to a `0|1`
+   * number to match the documented wire shape and to keep the payload free
+   * of provider-specific quirks. The `voiceData` byte slice is forwarded
+   * by reference (no copy) — consumers that need to retain it across
+   * dispatches must clone explicitly, same convention as `unknownMessage`
+   * and `userCommand`. An empty / missing `voiceData` is skipped silently
+   * (a voice frame with zero audio bytes is not a meaningful event).
+   */
+  private handleVoiceData(msg: CSVCMsg_VoiceData): void {
+    const data = msg.voiceData;
+    if (data === undefined || data.length === 0) return;
+    const client = msg.client;
+    let player: Player | undefined;
+    if (client !== undefined && client >= 0) {
+      const userId = this.userInfoIndex.userIdForEntitySlot(client);
+      if (userId !== undefined) {
+        const entityId = client + 1;
+        for (const p of this.players) {
+          if (p.slot === entityId) {
+            player = p;
+            break;
+          }
+        }
+      }
+    }
+    this.emit("voiceData", {
+      tick: this._currentTick,
+      player,
+      format: msg.format ?? 0,
+      proximity: msg.proximity === true ? 1 : 0,
+      data,
+    });
   }
 
   /**
