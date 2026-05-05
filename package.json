@@ -35,7 +35,8 @@
     "test:watch": "vitest",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint --fix . && prettier --write .",
-    "generate:proto": "bash scripts/generate-proto.sh"
+    "generate:proto": "bash scripts/generate-proto.sh",
+    "bench": "npx tsx scripts/benchmark.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
