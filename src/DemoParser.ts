@@ -23,6 +23,7 @@
  */
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import type { Readable } from "node:stream";
 import { TypedEventEmitter } from "./events/TypedEventEmitter.js";
 import type { ParserEventMap, Tier1EventMap } from "./events/ParserEventMap.js";
 import { ByteReader } from "./reader/ByteReader.js";
@@ -480,9 +481,29 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    * `options.includeRawEvents` (default `false`) opts into collecting every
    * raw `DecodedGameEvent`. Leave it off on competitive demos — the raw event
    * stream is large and callers rarely need it alongside the Tier-1 arrays.
+   *
+   * A Node `Readable` (e.g. `fs.createReadStream`, an `http.IncomingMessage`,
+   * or any `Readable.from(...)` producer) is also accepted. The stream is
+   * fully drained into a Buffer via {@link DemoParser.fromStream} before
+   * parsing — see that method for the trade-off (TASK-071a vs. TASK-071's
+   * future true-streaming work).
    */
-  static async parse(input: string | Buffer, options: ParseOptions = {}): Promise<DemoResult> {
-    const buffer: Buffer = typeof input === "string" ? await readFile(input) : input;
+  static async parse(
+    input: string | Buffer | Readable,
+    options: ParseOptions = {},
+  ): Promise<DemoResult> {
+    let buffer: Buffer;
+    if (typeof input === "string") {
+      buffer = await readFile(input);
+    } else if (Buffer.isBuffer(input)) {
+      buffer = input;
+    } else {
+      // Node `Readable` — drain to a Buffer. Duck-typed via `Symbol.asyncIterator`
+      // through `fromStream` so any compliant async-iterable stream works
+      // (http.IncomingMessage, fs.createReadStream, Readable.from, …).
+      const streamParser = await DemoParser.fromStream(input);
+      buffer = streamParser.buffer;
+    }
 
     // Yield once so I/O-heavy callers don't starve the event loop between
     // sequential parse() calls. Negligible overhead (~0 ms) for single calls.
@@ -577,6 +598,47 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    */
   static fromBuffer(buffer: Buffer): DemoParser {
     return new DemoParser(buffer);
+  }
+
+  /**
+   * Create a parser by draining a Node `Readable` stream (TASK-071a).
+   *
+   * Accepts any Node `Readable` — `fs.createReadStream(path)`, an
+   * `http.IncomingMessage` from a download, an S3 SDK body stream, or a
+   * synthetic `Readable.from([chunkA, chunkB, …])`. Chunks are collected via
+   * `for await` (so any stream that implements `Symbol.asyncIterator` works),
+   * normalized through `Buffer.from(chunk)` to coerce string chunks if the
+   * stream happens to be in text mode, and concatenated exactly once at the
+   * end before construction — minimal allocator churn, single contiguous
+   * Buffer hand-off to the parser.
+   *
+   * Error propagation is automatic: if the underlying stream errors mid-read,
+   * `for await` rethrows and the returned Promise rejects with the original
+   * error. No special wiring is needed.
+   *
+   * Trade-off: the entire demo is buffered into memory before parsing begins.
+   * For an HTTP download of a typical competitive demo (~50–150 MB) this is
+   * negligible; for very large or memory-constrained environments it is a
+   * known limitation. v1 deliberately does NOT do incremental / true-streaming
+   * parse — that's tracked separately under TASK-071 (perf-tracked benchmarks
+   * for the future streaming pipeline). The wire format does not support
+   * streaming entity decode without first observing the signon-phase
+   * datatables, so partial-buffer parsing is a non-trivial redesign rather
+   * than a small extension.
+   *
+   * @example
+   * ```ts
+   * import { createReadStream } from "node:fs";
+   * const parser = await DemoParser.fromStream(createReadStream("match.dem"));
+   * parser.parseAll();
+   * ```
+   */
+  static async fromStream(readable: Readable): Promise<DemoParser> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of readable) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return new DemoParser(Buffer.concat(chunks));
   }
 
   /**
