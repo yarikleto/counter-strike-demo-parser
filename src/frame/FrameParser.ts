@@ -34,14 +34,18 @@ export interface FrameHeader {
  * For dem_signon/dem_packet, `packetData` contains the raw protobuf message
  * stream. For dem_datatables, `dataTablesData` contains the raw blob carrying
  * the stream of svc_SendTable messages followed by a single CSVCMsg_ClassInfo.
- * For all other types, both fields are undefined and the payload has been
- * skipped.
+ * For dem_consolecmd, `consoleCmdData` contains the raw length-prefixed
+ * ASCII payload (the recorded console command, possibly null-terminated —
+ * decoding is the consumer's responsibility). For all other types, every
+ * payload field is undefined and the corresponding payload has been skipped.
  */
 export interface Frame extends FrameHeader {
   /** Raw protobuf message stream for packet frames, undefined otherwise. */
   packetData: Buffer | undefined;
   /** Raw payload of a dem_datatables frame, undefined otherwise. */
   dataTablesData: Buffer | undefined;
+  /** Raw ASCII payload of a dem_consolecmd frame, undefined otherwise. */
+  consoleCmdData: Buffer | undefined;
 }
 
 /**
@@ -81,6 +85,7 @@ function readFrame(reader: ByteReader): Frame | null {
         playerSlot,
         packetData: undefined,
         dataTablesData: undefined,
+        consoleCmdData: undefined,
       };
 
     case DemoCommands.DEM_DATATABLES: {
@@ -92,10 +97,25 @@ function readFrame(reader: ByteReader): Frame | null {
         playerSlot,
         packetData: undefined,
         dataTablesData,
+        consoleCmdData: undefined,
       };
     }
 
-    case DemoCommands.DEM_CONSOLECMD:
+    case DemoCommands.DEM_CONSOLECMD: {
+      // Length-prefixed ASCII payload. CSGO sometimes null-terminates the
+      // string, sometimes not — decoding is the consumer's responsibility.
+      const length = reader.readInt32();
+      const consoleCmdData = reader.readBytes(length);
+      return {
+        command,
+        tick,
+        playerSlot,
+        packetData: undefined,
+        dataTablesData: undefined,
+        consoleCmdData,
+      };
+    }
+
     case DemoCommands.DEM_STRINGTABLES:
       skipLengthPrefixedData(reader);
       return {
@@ -104,6 +124,7 @@ function readFrame(reader: ByteReader): Frame | null {
         playerSlot,
         packetData: undefined,
         dataTablesData: undefined,
+        consoleCmdData: undefined,
       };
 
     case DemoCommands.DEM_USERCMD:
@@ -116,6 +137,7 @@ function readFrame(reader: ByteReader): Frame | null {
         playerSlot,
         packetData: undefined,
         dataTablesData: undefined,
+        consoleCmdData: undefined,
       };
 
     case DemoCommands.DEM_STOP:
@@ -131,6 +153,7 @@ function readFrame(reader: ByteReader): Frame | null {
         playerSlot,
         packetData: undefined,
         dataTablesData: undefined,
+        consoleCmdData: undefined,
       };
 
     default:
@@ -159,6 +182,7 @@ function readPacketFrame(
     playerSlot,
     packetData,
     dataTablesData: undefined,
+    consoleCmdData: undefined,
   };
 }
 

@@ -69,6 +69,16 @@ export interface RawPacketMessage {
  * `DemoParser`'s `unknownMessage` event) or to collect raw bytes for
  * reverse-engineering a new message variant. The dispatcher never decodes
  * the payload — the consumer owns interpretation.
+ *
+ * `onDecodeError` (TASK-059) is the catch-all for protobuf decode failures
+ * on KNOWN command IDs — i.e. ts-proto's `decode()` threw on a corrupt
+ * payload. It is OPTIONAL — when omitted, the dispatcher rethrows so the
+ * outer parse loop can surface the error. When provided (as `DemoParser`
+ * does), the dispatcher swallows the error and continues with the next
+ * message in the same packet, keeping per-message granularity: a single
+ * corrupt SayText2 must not abort the rest of the demo. The handler
+ * receives the original command id, the caught `Error`, and the raw
+ * payload bytes.
  */
 export interface MessageHandlers {
   onServerInfo?: (msg: CSVCMsg_ServerInfoType) => void;
@@ -80,6 +90,7 @@ export interface MessageHandlers {
   onGameEvent?: (msg: CSVCMsg_GameEventType) => void;
   onUserMessage?: (msg: CSVCMsg_UserMessageType) => void;
   onUnknownMessage?: (commandId: number, payload: Uint8Array) => void;
+  onDecodeError?: (commandId: number, error: Error, payload: Uint8Array) => void;
 }
 
 /** One row in the dispatch registry: command ID -> codec + handler key. */
@@ -201,7 +212,26 @@ export class MessageDispatcher {
         this.handlers.onUnknownMessage?.(commandType, view);
         continue;
       }
-      const decoded = entry.decoder.decode(view);
+      // Decode is the only step that can throw on a corrupt payload (ts-
+      // proto's reader rejects oversized varints, premature EOF, etc.). When
+      // an `onDecodeError` handler is registered we swallow the error so a
+      // single bad message does not abort the rest of the packet. Without a
+      // handler the error propagates so callers retain the legacy
+      // throw-on-corruption behaviour.
+      let decoded: unknown;
+      try {
+        decoded = entry.decoder.decode(view);
+      } catch (err) {
+        if (this.handlers.onDecodeError !== undefined) {
+          this.handlers.onDecodeError(
+            commandType,
+            err instanceof Error ? err : new Error(String(err)),
+            view,
+          );
+          continue;
+        }
+        throw err;
+      }
       const handler = this.handlers[entry.handlerKey];
       if (handler !== undefined) {
         // Cast is sound because the registry binds decoder output type to

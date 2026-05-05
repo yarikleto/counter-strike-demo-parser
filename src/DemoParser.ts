@@ -31,6 +31,7 @@ import { BitReader } from "./reader/BitReader.js";
 import { parseHeader } from "./frame/header.js";
 import type { DemoHeader } from "./frame/header.js";
 import { iterateFrames } from "./frame/FrameParser.js";
+import type { Frame } from "./frame/FrameParser.js";
 import { MessageDispatcher } from "./packet/MessageDispatch.js";
 import type {
   CSVCMsg_CreateStringTable,
@@ -425,6 +426,17 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private _currentTick = 0;
 
   /**
+   * Byte offset into the input buffer where the most recent frame iteration
+   * began (TASK-059). Captured BEFORE each `iterateFrames` step so that a
+   * mid-frame throw — truncation, invalid command byte, or a corrupt
+   * payload picked up during `dispatcher.dispatch(...)` — can be reported
+   * with the offset of the failing read rather than the random offset the
+   * reader happens to have advanced to. Reset to `0` at the start of
+   * `parseAll()`; only meaningful while parsing is in progress.
+   */
+  private _lastFrameOffset = 0;
+
+  /**
    * `userid -> entitySlot` / `userid -> UserInfo` resolver (TASK-037b),
    * the canonical decoder of the `userinfo` string-table's `player_info_t`
    * userdata blob. Per ADR-006 every Tier-1 event enricher routes its
@@ -643,6 +655,15 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
 
   /**
    * Parse the entire demo file synchronously, emitting events as they occur.
+   *
+   * Defensive parsing (TASK-059): malformed input never throws past this
+   * boundary. Recoverable failures — truncated buffers, an invalid frame
+   * command byte, ts-proto decode failures on a single message, corrupt
+   * string-table blobs — are surfaced through the typed `parserError` event
+   * and the parser either continues with the next message/frame (per-message
+   * granularity) or returns cleanly (frame-level desync). The only thrown
+   * error path is a hard precondition violation: `Empty demo file` when the
+   * caller hands in a zero-byte buffer.
    */
   parseAll(): void {
     if (this.buffer.length === 0) {
@@ -660,10 +681,32 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
         this.emit("serverInfo", info);
       },
       onCreateStringTable: (msg: CSVCMsg_CreateStringTable) => {
-        this.handleCreateStringTable(msg);
+        // Surface string-table parse failures through `parserError` rather
+        // than letting them bubble up and abort the whole demo. Losing a
+        // single table (e.g. a corrupt `userinfo` snapshot) is local damage
+        // — subsequent frames still produce useful entity / game-event data.
+        try {
+          this.handleCreateStringTable(msg);
+        } catch (err) {
+          this.emitParserError(
+            "corrupt-stringtable",
+            err,
+            `CreateStringTable parse failed for "${msg.name ?? ""}"`,
+            reader.position,
+          );
+        }
       },
       onUpdateStringTable: (msg: CSVCMsg_UpdateStringTable) => {
-        this.handleUpdateStringTable(msg);
+        try {
+          this.handleUpdateStringTable(msg);
+        } catch (err) {
+          this.emitParserError(
+            "corrupt-stringtable",
+            err,
+            `UpdateStringTable parse failed for table id ${msg.tableId ?? -1}`,
+            reader.position,
+          );
+        }
       },
       onPacketEntities: (msg: CSVCMsg_PacketEntities) => {
         this.handlePacketEntities(msg);
@@ -688,25 +731,112 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
           tick: this._currentTick,
         });
       },
+      onDecodeError: (commandId: number, error: Error, _payload: Uint8Array) => {
+        // ts-proto threw on a known command id's payload — corruption is
+        // isolated to this single message. The dispatcher has already moved
+        // past it; surface a `parserError` and continue with the next
+        // message in the same packet. `byteOffset` is the frame's start
+        // offset (we don't track per-message offsets — the dispatcher reads
+        // from a private ByteReader over the packet payload), which is the
+        // tightest locator available for the corruption.
+        this.emitParserError(
+          "corrupt-protobuf",
+          error,
+          `Protobuf decode failed for command id ${commandId}`,
+          this._lastFrameOffset,
+        );
+      },
     });
 
-    for (const frame of iterateFrames(reader)) {
+    // Iterate frames defensively. `iterateFrames` is a generator that calls
+    // `readFrame`; any throw inside that generator (RangeError on truncation,
+    // "unknown command byte" on a corrupt frame header) propagates here. We
+    // capture `reader.position` BEFORE each `next()` so a thrown failure
+    // reports the offset where the failing read began.
+    const frames = iterateFrames(reader);
+    for (;;) {
+      this._lastFrameOffset = reader.position;
+      let next: IteratorResult<Frame>;
+      try {
+        next = frames.next();
+      } catch (err) {
+        const classified = classifyFrameError(err);
+        this.emitParserError(
+          classified.kind,
+          err,
+          classified.message,
+          this._lastFrameOffset,
+        );
+        // A frame-header desync cannot be re-synced (we'd be guessing where
+        // the next valid header begins). Both `truncated` and `invalid-frame`
+        // terminate the parse cleanly.
+        return;
+      }
+      if (next.done === true) return;
+      const frame = next.value;
       // Update current tick before dispatching so event listeners always read
       // the correct frame tick when they access `parser.currentTick`.
       this._currentTick = frame.tick;
-      if (frame.packetData) {
-        dispatcher.dispatch(frame.packetData);
-      }
-      if (frame.dataTablesData !== undefined && this._sendTables === undefined) {
-        const { sendTables, serverClasses } = parseDataTables(frame.dataTablesData);
-        this._sendTables = sendTables;
-        const registry = new ServerClassRegistry();
-        for (const sc of serverClasses) {
-          registry.register(sc);
+      try {
+        if (frame.packetData) {
+          dispatcher.dispatch(frame.packetData);
         }
-        this._serverClasses = registry;
+        if (frame.dataTablesData !== undefined && this._sendTables === undefined) {
+          const { sendTables, serverClasses } = parseDataTables(frame.dataTablesData);
+          this._sendTables = sendTables;
+          const registry = new ServerClassRegistry();
+          for (const sc of serverClasses) {
+            registry.register(sc);
+          }
+          this._serverClasses = registry;
+        }
+        if (frame.consoleCmdData !== undefined) {
+          this.emit("consoleCommand", {
+            tick: frame.tick,
+            command: decodeConsoleCommand(frame.consoleCmdData),
+          });
+        }
+      } catch (err) {
+        // Frame-body decoder threw past the per-message guard — typically a
+        // truncated packet whose internal varint length walks off the end of
+        // the dispatcher's private ByteReader, or a corrupt datatables blob.
+        // Surface as `parserError` and terminate: we've lost wire-stream
+        // alignment within this frame and cannot safely advance to the next.
+        const isTruncation = err instanceof RangeError;
+        this.emitParserError(
+          isTruncation ? "truncated" : "other",
+          err,
+          isTruncation
+            ? `Unexpected EOF inside frame body: ${(err as RangeError).message}`
+            : `Frame body decode failed: ${err instanceof Error ? err.message : String(err)}`,
+          this._lastFrameOffset,
+        );
+        return;
       }
     }
+  }
+
+  /**
+   * Common emit helper for the typed `parserError` event. Coerces unknown
+   * thrown values into `Error` so the public `cause` field is always the
+   * documented type, and clamps `byteOffset` to a finite non-negative
+   * integer for downstream tooling.
+   */
+  private emitParserError(
+    kind: ParserErrorKind,
+    cause: unknown,
+    message: string,
+    byteOffset: number,
+  ): void {
+    const errCause = cause instanceof Error ? cause : new Error(String(cause));
+    const offset = Number.isFinite(byteOffset) && byteOffset >= 0 ? byteOffset : 0;
+    this.emit("parserError", {
+      kind,
+      tick: this._currentTick,
+      byteOffset: offset,
+      message,
+      cause: errCause,
+    });
   }
 
   /**
@@ -1029,3 +1159,70 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
  * compatible event signature.
  */
 export type _StringTableEntryEventPayload = StringTableEntry;
+
+/**
+ * Decode the raw payload of a `dem_consolecmd` frame into its ASCII command
+ * string. CSGO records the buffer verbatim and *sometimes* includes the
+ * trailing C-string null terminator inside the length-prefixed slice — so we
+ * strip exactly one trailing `\0` when present and leave any other content
+ * (including embedded nulls, which are not expected but harmless) alone.
+ *
+ * The payload is treated as `latin1` rather than UTF-8 because console
+ * commands have always been ASCII in the engine; defaulting to `latin1`
+ * avoids Buffer's UTF-8 replacement character substitution if a non-ASCII
+ * byte ever sneaks through (e.g. a user-typed alias with locale-specific
+ * characters).
+ */
+function decodeConsoleCommand(data: Buffer): string {
+  if (data.length === 0) return "";
+  const end = data[data.length - 1] === 0x00 ? data.length - 1 : data.length;
+  return data.toString("latin1", 0, end);
+}
+
+/**
+ * Discriminator for {@link ParserEventMap.parserError}. Mirrors the public
+ * union exactly — kept as a local alias so the DemoParser implementation
+ * doesn't have to reach back through the event map's index types every time
+ * it constructs a payload.
+ */
+type ParserErrorKind = ParserEventMap["parserError"]["kind"];
+
+/**
+ * Classify a throw caught from `iterateFrames(...).next()` into a
+ * {@link ParserErrorKind} plus a human-readable description.
+ *
+ * The two recoverable categories are:
+ *   - `truncated`    — `ByteReader.ensureAvailable` throws `RangeError` when
+ *                      a read runs past the buffer end. Mid-frame EOF on a
+ *                      .dem cut short by a network drop or a partial file
+ *                      copy is the canonical case.
+ *   - `invalid-frame`— `FrameParser.readFrame` throws a generic `Error` with
+ *                      the literal "FrameParser: unknown command byte" prefix
+ *                      when the first byte of a frame is not in the
+ *                      `DemoCommands` enum.
+ *
+ * Anything else falls through to `"other"` — fatal by default. The message
+ * preserves the original `err.message` so downstream tooling can string-match
+ * if it needs finer-grained dispatch.
+ */
+function classifyFrameError(err: unknown): {
+  kind: ParserErrorKind;
+  message: string;
+} {
+  if (err instanceof RangeError) {
+    return {
+      kind: "truncated",
+      message: `Unexpected EOF: ${err.message}`,
+    };
+  }
+  if (err instanceof Error && err.message.startsWith("FrameParser: unknown command byte")) {
+    return {
+      kind: "invalid-frame",
+      message: err.message,
+    };
+  }
+  if (err instanceof Error) {
+    return { kind: "other", message: err.message };
+  }
+  return { kind: "other", message: String(err) };
+}

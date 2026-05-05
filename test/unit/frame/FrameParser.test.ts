@@ -88,7 +88,7 @@ describe("iterateFrames", () => {
     expect(frames[1].tick).toBe(20);
   });
 
-  it("should skip consolecmd frames (length-prefixed data)", () => {
+  it("should expose consolecmd payload bytes verbatim (length-prefixed ASCII)", () => {
     const cmdData = Buffer.from("echo test", "utf8");
     const prefix = buildFramePrefix(DemoCommands.DEM_CONSOLECMD, 50, 0);
     const lenBuf = Buffer.alloc(4);
@@ -102,5 +102,28 @@ describe("iterateFrames", () => {
     expect(frames).toHaveLength(1);
     expect(frames[0].command).toBe(DemoCommands.DEM_CONSOLECMD);
     expect(frames[0].packetData).toBeUndefined();
+    expect(frames[0].dataTablesData).toBeUndefined();
+    // The raw length-prefixed slice is preserved verbatim — no null-strip,
+    // no decoding. Decoding is the consumer's responsibility.
+    expect(frames[0].consoleCmdData).toEqual(cmdData);
+  });
+
+  it("should preserve a null-terminated consolecmd payload byte-for-byte", () => {
+    // CSGO frequently records the trailing C-string null inside the
+    // length-prefixed slice. The parser leaves it intact — the higher-level
+    // DemoParser strips it during string decode.
+    const raw = Buffer.from("say hello\0", "ascii");
+    const prefix = buildFramePrefix(DemoCommands.DEM_CONSOLECMD, 77, 0);
+    const lenBuf = Buffer.alloc(4);
+    lenBuf.writeInt32LE(raw.length, 0);
+    const stop = buildFramePrefix(DemoCommands.DEM_STOP, 0, 0);
+
+    const buf = Buffer.concat([prefix, lenBuf, raw, stop]);
+    const reader = new ByteReader(buf);
+    const frames = [...iterateFrames(reader)];
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0].consoleCmdData).toEqual(raw);
+    expect(frames[0].consoleCmdData?.length).toBe(raw.length);
   });
 });

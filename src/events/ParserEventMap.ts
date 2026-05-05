@@ -247,6 +247,62 @@ export interface Tier3EventMap {
     readonly payload: Uint8Array;
     readonly tick: number;
   };
+  /**
+   * Fires for every `dem_consolecmd` frame encountered during the parse —
+   * recorded console commands such as cvars, aliases, and rcon commands
+   * issued by players or the server. The payload is the raw ASCII string
+   * captured at record time; a single trailing `\0` (when CSGO null-
+   * terminates the buffer) is stripped, but no other normalisation is
+   * applied. `tick` is the frame's tick — typically equal to
+   * `parser.currentTick` at emission time, but observe it from the payload
+   * to be safe.
+   *
+   * Console commands are rare on competitive demos (which are recorded
+   * server-side and typically have no client console activity) and far
+   * more common on POV demos and lobby/casual recordings. A subscriber
+   * may legitimately observe zero events on a given fixture.
+   */
+  consoleCommand: {
+    readonly tick: number;
+    readonly command: string;
+  };
+  /**
+   * Recoverable parse failure (TASK-059). Fires when the parser encounters
+   * truncated data, an invalid frame command byte, a corrupt protobuf
+   * payload, a malformed string-table blob, or any other condition that
+   * prevents progress past the current frame/message but does NOT compromise
+   * the overall parse contract. After emitting, `parseAll()` returns cleanly
+   * — it never throws on malformed input.
+   *
+   * `kind` discriminates the failure category for power users that want
+   * different recovery behaviour. `tick` is `parser.currentTick` at the
+   * point of failure (may be `-1` or `0` if failure occurred before the
+   * first frame). `byteOffset` is the absolute byte offset into the input
+   * buffer where the failing read began. `message` is a human-readable
+   * description. `cause` is the original `Error` for stack-trace inspection.
+   *
+   * Recovery semantics by kind:
+   *   - `truncated`            — fatal for the parse; loop terminates.
+   *   - `invalid-frame`        — fatal; the wire stream cannot be re-synced
+   *                              once a frame header is misaligned.
+   *   - `corrupt-protobuf`     — recoverable; the dispatcher swallows the
+   *                              single message and continues with the next.
+   *   - `corrupt-stringtable`  — recoverable; one missing/partial table
+   *                              does not invalidate subsequent frames.
+   *   - `other`                — fatal by default; treat as terminate.
+   */
+  parserError: {
+    readonly kind:
+      | "truncated"
+      | "invalid-frame"
+      | "corrupt-protobuf"
+      | "corrupt-stringtable"
+      | "other";
+    readonly tick: number;
+    readonly byteOffset: number;
+    readonly message: string;
+    readonly cause: Error;
+  };
 }
 
 /**
