@@ -48,6 +48,7 @@ import { ServerClassRegistry } from "./datatables/ServerClassRegistry.js";
 import { StringTable } from "./stringtables/StringTable.js";
 import type { StringTableEntry } from "./stringtables/StringTable.js";
 import { StringTableManager } from "./stringtables/StringTableManager.js";
+import { PrecacheTable } from "./stringtables/precache.js";
 import { parseStringTableEntries } from "./stringtables/StringTableParser.js";
 import { decompressSnappy } from "./stringtables/Compression.js";
 import { EntityList, decodePacketEntities } from "./entities/index.js";
@@ -158,6 +159,17 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    * parser's lifetime.
    */
   private _userInfoIndex: UserInfoIndex | null = null;
+  /**
+   * Memoized {@link PrecacheTable} wrappers for the three Source precache
+   * string tables (TASK-052/053/054). Each wrapper holds the
+   * `StringTableManager` by reference, so a single instance per accessor
+   * stays correct for the parser's lifetime — entries added to the
+   * underlying table after construction are visible on subsequent reads
+   * without re-instantiation. `null` is the not-yet-built sentinel.
+   */
+  private _modelPrecache: PrecacheTable | null = null;
+  private _soundPrecache: PrecacheTable | null = null;
+  private _downloadables: PrecacheTable | null = null;
 
   constructor(buffer: Buffer) {
     super();
@@ -465,6 +477,80 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const built = new UserInfoIndex(this._stringTables);
     built.refresh();
     this._userInfoIndex = built;
+    return built;
+  }
+
+  /**
+   * Live wrapper over the `modelprecache` string table (TASK-052).
+   *
+   * Resolves a model index — the integer carried by every entity's
+   * `m_nModelIndex` prop — to its `models/...` file path. Use
+   * `parser.modelPrecache.get(entity.props.m_nModelIndex)` to discover
+   * what model an entity is currently using.
+   *
+   * Memoization is safe: `PrecacheTable` holds the
+   * `StringTableManager` by reference, so a single wrapper instance per
+   * accessor sees every subsequent CreateStringTable / UpdateStringTable
+   * mutation. The wrapper is constructed lazily on first access so callers
+   * who never read the precache pay nothing.
+   *
+   * Returns an empty wrapper (`size === 0`, `get` returns `undefined`)
+   * before the underlying table has been observed.
+   */
+  get modelPrecache(): PrecacheTable {
+    if (this._modelPrecache !== null) return this._modelPrecache;
+    // Mirror `userInfoIndex`: ensure a single canonical manager exists
+    // before binding the wrapper to it, so a pre-signon access doesn't
+    // capture `undefined` permanently. The manager normally arrives the
+    // moment the first CreateStringTable fires, but a defensive create
+    // here means the wrapper stays live for every subsequent access.
+    if (this._stringTables === undefined) {
+      this._stringTables = new StringTableManager();
+    }
+    const built = new PrecacheTable(this._stringTables, "modelprecache");
+    this._modelPrecache = built;
+    return built;
+  }
+
+  /**
+   * Live wrapper over the `soundprecache` string table (TASK-053).
+   *
+   * Resolves a sound index to its `sound/...` file path. Same liveness
+   * and memoization semantics as {@link modelPrecache} — see that getter
+   * for the rationale on caching a single instance.
+   *
+   * Returns an empty wrapper before the underlying table is created;
+   * note that some demos register no soundprecache entries at all (the
+   * server only precaches sounds it intends to network), in which case
+   * `size` legitimately stays at `0` for the entire parse.
+   */
+  get soundPrecache(): PrecacheTable {
+    if (this._soundPrecache !== null) return this._soundPrecache;
+    if (this._stringTables === undefined) {
+      this._stringTables = new StringTableManager();
+    }
+    const built = new PrecacheTable(this._stringTables, "soundprecache");
+    this._soundPrecache = built;
+    return built;
+  }
+
+  /**
+   * Live wrapper over the `downloadables` string table (TASK-054).
+   *
+   * Lists arbitrary files the server requested clients download — custom
+   * maps, sprays, mod content, sound packs, etc. Often empty on clean
+   * competitive matches that ship only stock content; populated on
+   * community / FaceIt / pug demos that pull in extra assets.
+   *
+   * Same liveness and memoization semantics as {@link modelPrecache}.
+   */
+  get downloadables(): PrecacheTable {
+    if (this._downloadables !== null) return this._downloadables;
+    if (this._stringTables === undefined) {
+      this._stringTables = new StringTableManager();
+    }
+    const built = new PrecacheTable(this._stringTables, "downloadables");
+    this._downloadables = built;
     return built;
   }
 

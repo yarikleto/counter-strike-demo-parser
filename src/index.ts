@@ -51,6 +51,7 @@ export type {
   StringTableOptions,
   ParseStringTableResult,
 } from "./stringtables/index.js";
+export { PrecacheTable } from "./stringtables/precache.js";
 export { decodeProp } from "./properties/index.js";
 export type { PropertyValue, Vector2, Vector3 } from "./properties/index.js";
 export { Entity, EntityList, MAX_EDICTS } from "./entities/index.js";
