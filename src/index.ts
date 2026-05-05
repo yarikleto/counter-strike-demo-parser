@@ -193,3 +193,8 @@ export type {
   GrenadeType,
   TrajectoryPoint,
 } from "./convenience/GrenadeTrajectoryTracker.js";
+
+// Optional native addon (TASK-082). `nativeAddon` is `undefined` if the
+// native module wasn't built for the host; consumers must always check.
+export { nativeAddon } from "./native/index.js";
+export type { NativeAddon } from "./native/index.js";

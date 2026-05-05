@@ -41,6 +41,7 @@ yarn-error.log*
 
 # Optional: native addon build artifacts
 build/
+native/build/
 prebuilds/
 
 # Benchmark output (one JSON per run; not part of the package)

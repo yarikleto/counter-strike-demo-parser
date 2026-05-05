@@ -21,13 +21,19 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "native/binding.gyp",
+    "native/src",
+    "native/README.md"
   ],
+  "gypfile": true,
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "build": "tsup",
+    "build:native": "node-gyp configure --directory native && node-gyp build --directory native",
+    "rebuild:native": "node-gyp rebuild --directory native",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run --config vitest.unit.config.ts",
@@ -44,6 +50,7 @@
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
+    "node-gyp": "^10.2.0",
     "prettier": "^3.0.0",
     "ts-proto": "^1.181.2",
     "tsup": "^8.0.0",
@@ -66,6 +73,7 @@
     "url": "https://github.com/yarikleto/counter-strike-demo-parser.git"
   },
   "dependencies": {
+    "node-addon-api": "^8.2.0",
     "protobufjs": "^8.0.3",
     "snappyjs": "^0.7.0"
   }
