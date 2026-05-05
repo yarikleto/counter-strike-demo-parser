@@ -76,6 +76,7 @@ import { EconomyTracker } from "./convenience/EconomyTracker.js";
 import type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
 import { PositionTracker } from "./convenience/PositionTracker.js";
 import type { PositionSnapshot } from "./convenience/PositionTracker.js";
+import { GrenadeTrajectoryTracker } from "./convenience/GrenadeTrajectoryTracker.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -510,6 +511,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const economyTracker = new EconomyTracker();
     economyTracker.attach(parser);
 
+    const grenadeTrajectoryTracker = new GrenadeTrajectoryTracker();
+    grenadeTrajectoryTracker.attach(parser);
+
     // Position sampling is opt-in (ParseOptions.collectPlayerPositions).
     // When omitted/false the tracker is never instantiated — no entityUpdated
     // listener is registered, no per-tick sampling overhead is incurred, and
@@ -552,6 +556,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       kills,
       rounds,
       grenades,
+      grenadeTrajectories: grenadeTrajectoryTracker.snapshot(),
       chatMessages,
       events,
       damageMatrix,

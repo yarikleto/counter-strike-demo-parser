@@ -179,3 +179,9 @@ export { DamageMatrix } from "./convenience/DamageMatrix.js";
 export type { DamageEntry } from "./convenience/DamageMatrix.js";
 export { EconomyTracker } from "./convenience/EconomyTracker.js";
 export type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
+export { GrenadeTrajectoryTracker } from "./convenience/GrenadeTrajectoryTracker.js";
+export type {
+  GrenadeTrajectory,
+  GrenadeType,
+  TrajectoryPoint,
+} from "./convenience/GrenadeTrajectoryTracker.js";

@@ -18,6 +18,7 @@ import type { PlayerDeathEvent } from "../../../src/events/enrichers/playerDeath
 import type { GrenadeThrownEvent } from "../../../src/events/enrichers/grenadeThrown.js";
 import type { ChatMessage } from "../../../src/events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../../../src/events/GameEventDecoder.js";
+import type { GrenadeTrajectory } from "../../../src/convenience/GrenadeTrajectoryTracker.js";
 
 describe("DemoResult types", () => {
   it("DemoResult shape is compile-checkable via satisfies", () => {
@@ -27,6 +28,7 @@ describe("DemoResult types", () => {
     const stubKills: PlayerDeathEvent[] = [];
     const stubRounds: RoundSummary[] = [];
     const stubGrenades: GrenadeThrownEvent[] = [];
+    const stubGrenadeTrajectories: readonly GrenadeTrajectory[] = [];
     const stubChatMessages: ChatMessage[] = [];
     const stubEvents: DecodedGameEvent[] = [];
     const stubDamageMatrix = new DamageMatrix();
@@ -38,6 +40,7 @@ describe("DemoResult types", () => {
       kills: stubKills,
       rounds: stubRounds,
       grenades: stubGrenades,
+      grenadeTrajectories: stubGrenadeTrajectories,
       chatMessages: stubChatMessages,
       events: stubEvents,
       damageMatrix: stubDamageMatrix,
@@ -56,6 +59,7 @@ describe("DemoResult types", () => {
       kills: [] as PlayerDeathEvent[],
       rounds: [] as RoundSummary[],
       grenades: [] as GrenadeThrownEvent[],
+      grenadeTrajectories: [] as readonly GrenadeTrajectory[],
       chatMessages: [] as ChatMessage[],
       damageMatrix: new DamageMatrix(),
     } satisfies DemoResult;

@@ -27,6 +27,7 @@ import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import type { RoundSummary } from "./RoundTracker.js";
 import type { DamageMatrix } from "./DamageMatrix.js";
 import type { PositionSnapshot } from "./PositionTracker.js";
+import type { GrenadeTrajectory } from "./GrenadeTrajectoryTracker.js";
 
 /** Options for `DemoParser.parse()`. */
 export interface ParseOptions {
@@ -78,6 +79,14 @@ export interface DemoResult {
   readonly damageMatrix: DamageMatrix;
   /** All `grenade_thrown` events emitted during the demo, in wire order. */
   readonly grenades: GrenadeThrownEvent[];
+  /**
+   * Reconstructed trajectories for every grenade projectile observed in the
+   * demo, from spawn to detonation. Built by
+   * {@link GrenadeTrajectoryTracker} from the entity-lifecycle stream and
+   * the matching `*_detonate` events. See its file-level docstring for the
+   * detection / disambiguation rules.
+   */
+  readonly grenadeTrajectories: readonly GrenadeTrajectory[];
   /** All chat messages decoded from `CSVCMsg_UserMessage` frames, in wire order. */
   readonly chatMessages: ChatMessage[];
   /**
