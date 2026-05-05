@@ -99,60 +99,80 @@ export class BitReader {
 
   /** Read a single bit (0 or 1). Advances cursor by 1. */
   readBit(): 0 | 1 {
-    if (this.bitCursor + 1 > this.totalBits) {
+    const cursor = this.bitCursor;
+    if (cursor + 1 > this.totalBits) {
       throw new RangeError(
-        `BitReader: cannot read 1 bit at position ${this.bitCursor} ` +
+        `BitReader: cannot read 1 bit at position ${cursor} ` +
           `(total bits: ${this.totalBits})`,
       );
     }
-    const byteIndex = this.bitCursor >>> 3;
-    const bitIndex = this.bitCursor & 7;
-    this.bitCursor += 1;
-    return ((this.view[byteIndex] >>> bitIndex) & 1) as 0 | 1;
+    this.bitCursor = cursor + 1;
+    return ((this.view[cursor >>> 3] >>> (cursor & 7)) & 1) as 0 | 1;
   }
 
   /**
    * Read `n` bits as an unsigned integer. `n` must be in [0, 32].
    * For n === 32 we apply `>>> 0` to keep the result in the unsigned
    * range (JavaScript bitwise ops are signed 32-bit otherwise).
+   *
+   * Hot path: for n <= 25 we can read 4 bytes and shift, since the
+   * worst case cursor offset is 7, so we touch at most 4 source bytes.
+   * For n in (25, 32] we use a slower accumulating path that handles
+   * the 33-bit window without overflow.
    */
   readBits(n: number): number {
+    const cursor = this.bitCursor;
+    const totalBits = this.totalBits;
     if (n < 0 || n > 32) {
       throw new RangeError(
         `BitReader: readBits(n) requires 0 <= n <= 32, got ${n}`,
       );
     }
     if (n === 0) return 0;
-    if (this.bitCursor + n > this.totalBits) {
+    if (cursor + n > totalBits) {
       throw new RangeError(
-        `BitReader: cannot read ${n} bits at position ${this.bitCursor} ` +
-          `(total bits: ${this.totalBits})`,
+        `BitReader: cannot read ${n} bits at position ${cursor} ` +
+          `(total bits: ${totalBits})`,
       );
     }
 
     const view = this.view;
-    let cursor = this.bitCursor;
-    let result = 0;
-    let bitsCollected = 0;
+    const byteIndex = cursor >>> 3;
+    const bitIndex = cursor & 7;
+    this.bitCursor = cursor + n;
 
-    while (bitsCollected < n) {
-      const byteIndex = cursor >>> 3;
-      const bitIndex = cursor & 7;
-      const bitsAvailableInByte = 8 - bitIndex;
-      const bitsToTake =
-        bitsAvailableInByte < n - bitsCollected
-          ? bitsAvailableInByte
-          : n - bitsCollected;
-      const mask = (1 << bitsToTake) - 1;
-      const chunk = (view[byteIndex] >>> bitIndex) & mask;
-      // Use multiplication to shift past 31 safely; for typical small
-      // shifts this still emits a fast path in V8.
-      result += chunk * Math.pow(2, bitsCollected);
-      cursor += bitsToTake;
-      bitsCollected += bitsToTake;
+    if (n <= 25) {
+      // 25 bits + worst-case bitIndex 7 = 32 bits, fits in 4 bytes.
+      // Read up to 4 bytes into a 32-bit word, then shift+mask.
+      // Out-of-bounds bytes (when bitIndex === 0 and n <= 24) are not
+      // actually read because we mask them off.
+      const lastByte = (cursor + n - 1) >>> 3;
+      let word = view[byteIndex];
+      if (lastByte >= byteIndex + 1) word |= view[byteIndex + 1] << 8;
+      if (lastByte >= byteIndex + 2) word |= view[byteIndex + 2] << 16;
+      if (lastByte >= byteIndex + 3) word |= view[byteIndex + 3] << 24;
+      // Unsigned right shift gives correct unsigned result; mask to n bits.
+      return (word >>> bitIndex) & ((1 << n) - 1);
     }
 
-    this.bitCursor = cursor;
+    // n in (25, 32]: window can span up to 5 bytes. Accumulate two halves
+    // and combine with a multiplication (avoids signed-shift quirks).
+    const lowBits = 16;
+    const lowMask = 0xffff;
+    const low = (view[byteIndex] |
+      (view[byteIndex + 1] << 8) |
+      (view[byteIndex + 2] << 16)) >>> bitIndex;
+    const lowResult = low & lowMask; // first 16 bits
+    const highBitsToTake = n - lowBits;
+    // High part: starts (lowBits) bits later than `cursor`.
+    const hiCursor = cursor + lowBits;
+    const hiByte = hiCursor >>> 3;
+    const hiBitIndex = hiCursor & 7;
+    let hiWord = view[hiByte];
+    if (hiByte + 1 < view.length) hiWord |= view[hiByte + 1] << 8;
+    if (hiByte + 2 < view.length) hiWord |= view[hiByte + 2] << 16;
+    const high = (hiWord >>> hiBitIndex) & ((1 << highBitsToTake) - 1);
+    const result = lowResult + high * 0x10000;
     return n === 32 ? result >>> 0 : result;
   }
 
@@ -225,12 +245,29 @@ export class BitReader {
    * via `>>> 0`.
    */
   readVarInt32(): number {
+    // Inline the readBits(8) loop; each iteration reads exactly 8 bits.
+    const view = this.view;
+    const totalBits = this.totalBits;
+    let cursor = this.bitCursor;
     let result = 0;
     for (let i = 0; i < 5; i++) {
-      const b = this.readBits(8);
+      if (cursor + 8 > totalBits) {
+        throw new RangeError(
+          `BitReader: cannot read 8 bits at position ${cursor} ` +
+            `(total bits: ${totalBits})`,
+        );
+      }
+      const byteIndex = cursor >>> 3;
+      const bitIndex = cursor & 7;
+      const b =
+        bitIndex === 0
+          ? view[byteIndex]
+          : ((view[byteIndex] | (view[byteIndex + 1] << 8)) >>> bitIndex) & 0xff;
+      cursor += 8;
       result |= (b & 0x7f) << (7 * i);
       if ((b & 0x80) === 0) break;
     }
+    this.bitCursor = cursor;
     return result >>> 0;
   }
 
