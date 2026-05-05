@@ -1,0 +1,93 @@
+[
+  {
+    "slot": 1,
+    "name": "Brian",
+    "steamId": "0",
+    "team": 3,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 786.6839,
+      "y": -472.0095,
+      "z": -415.9687
+    }
+  },
+  {
+    "slot": 2,
+    "name": "Wayne",
+    "steamId": "0",
+    "team": 3,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 786.6839,
+      "y": -472.0095,
+      "z": -415.9687
+    }
+  },
+  {
+    "slot": 3,
+    "name": "Brad",
+    "steamId": "0",
+    "team": 3,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 786.6839,
+      "y": -472.0095,
+      "z": -415.9687
+    }
+  },
+  {
+    "slot": 4,
+    "name": "GOTV",
+    "steamId": "0",
+    "team": 0,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": -901,
+      "y": -2165,
+      "z": -55
+    }
+  },
+  {
+    "slot": 5,
+    "name": "Erik",
+    "steamId": "0",
+    "team": 2,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 769.6375,
+      "y": -598.8035,
+      "z": -399.3687
+    }
+  },
+  {
+    "slot": 6,
+    "name": "Cory",
+    "steamId": "0",
+    "team": 2,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 769.6375,
+      "y": -598.8035,
+      "z": -399.3687
+    }
+  },
+  {
+    "slot": 7,
+    "name": "Finn",
+    "steamId": "0",
+    "team": 2,
+    "isAlive": false,
+    "money": 800,
+    "position": {
+      "x": 769.6375,
+      "y": -598.8035,
+      "z": -399.3687
+    }
+  }
+]

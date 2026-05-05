@@ -1,0 +1,219 @@
+[
+  {
+    "index": 0,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 1,
+    "scoreT": 0
+  },
+  {
+    "index": 1,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 2,
+    "scoreT": 0
+  },
+  {
+    "index": 2,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 3,
+    "scoreT": 0
+  },
+  {
+    "index": 3,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 4,
+    "scoreT": 0
+  },
+  {
+    "index": 4,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 5,
+    "scoreT": 0
+  },
+  {
+    "index": 5,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 6,
+    "scoreT": 0
+  },
+  {
+    "index": 6,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 6,
+    "scoreT": 1
+  },
+  {
+    "index": 7,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 7,
+    "scoreT": 1
+  },
+  {
+    "index": 8,
+    "winner": 3,
+    "endReason": 12,
+    "scoreCT": 8,
+    "scoreT": 1
+  },
+  {
+    "index": 9,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 8,
+    "scoreT": 2
+  },
+  {
+    "index": 10,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 9,
+    "scoreT": 2
+  },
+  {
+    "index": 11,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 10,
+    "scoreT": 2
+  },
+  {
+    "index": 12,
+    "winner": 2,
+    "endReason": 1,
+    "scoreCT": 10,
+    "scoreT": 3
+  },
+  {
+    "index": 13,
+    "winner": 2,
+    "endReason": 1,
+    "scoreCT": 10,
+    "scoreT": 4
+  },
+  {
+    "index": 14,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 10,
+    "scoreT": 5
+  },
+  {
+    "index": 15,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 10,
+    "scoreT": 6
+  },
+  {
+    "index": 16,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 10,
+    "scoreT": 7
+  },
+  {
+    "index": 17,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 10,
+    "scoreT": 8
+  },
+  {
+    "index": 18,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 10,
+    "scoreT": 9
+  },
+  {
+    "index": 19,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 11,
+    "scoreT": 9
+  },
+  {
+    "index": 20,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 12,
+    "scoreT": 9
+  },
+  {
+    "index": 21,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 13,
+    "scoreT": 9
+  },
+  {
+    "index": 22,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 14,
+    "scoreT": 9
+  },
+  {
+    "index": 23,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 14,
+    "scoreT": 10
+  },
+  {
+    "index": 24,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 14,
+    "scoreT": 11
+  },
+  {
+    "index": 25,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 14,
+    "scoreT": 12
+  },
+  {
+    "index": 26,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 15,
+    "scoreT": 12
+  },
+  {
+    "index": 27,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 16,
+    "scoreT": 12
+  },
+  {
+    "index": 28,
+    "winner": 3,
+    "endReason": 8,
+    "scoreCT": 17,
+    "scoreT": 12
+  },
+  {
+    "index": 29,
+    "winner": 3,
+    "endReason": 7,
+    "scoreCT": 18,
+    "scoreT": 12
+  },
+  {
+    "index": 30,
+    "winner": 2,
+    "endReason": 9,
+    "scoreCT": 18,
+    "scoreT": 13
+  }
+]

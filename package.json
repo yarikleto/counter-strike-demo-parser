@@ -36,7 +36,8 @@
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint --fix . && prettier --write .",
     "generate:proto": "bash scripts/generate-proto.sh",
-    "bench": "npx tsx scripts/benchmark.ts"
+    "bench": "npx tsx scripts/benchmark.ts",
+    "goldens:update": "npx tsx scripts/generate-goldens.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

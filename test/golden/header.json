@@ -1,0 +1,20 @@
+{
+  "header": {
+    "magic": "HL2DEMO\u0000",
+    "demoProtocol": 4,
+    "networkProtocol": 13881,
+    "serverName": "WIX_CSGO_CLUB_1",
+    "clientName": "GOTV Demo",
+    "mapName": "de_nuke",
+    "gameDirectory": "csgo",
+    "playbackTime": 3112.164063,
+    "playbackTicks": 398357,
+    "playbackFrames": 99502,
+    "signonLength": 440889
+  },
+  "serverInfo": {
+    "tickInterval": 0.007813,
+    "maxClasses": 284,
+    "mapName": "de_nuke"
+  }
+}
