@@ -63,6 +63,8 @@ import {
 export interface ChatMessageContext {
   readonly players: readonly Player[];
   readonly userInfoIndex: UserInfoIndex;
+  /** Frame tick at which this user-message is being decoded. */
+  readonly tick: number;
   /**
    * Resolve a CS:GO event `userid` to a live `Player` overlay. Same
    * semantics as `EnricherContext.resolvePlayer` — `undefined` when the
@@ -90,6 +92,8 @@ export interface ChatMessageContext {
  * carry orthogonal engine semantics.
  */
 export interface ChatMessage {
+  /** Frame tick at which this message was networked (`DemoParser.currentTick`). */
+  readonly tick: number;
   readonly sender: Player | undefined;
   readonly senderName: string;
   readonly message: string;
@@ -157,6 +161,7 @@ function isTeamChatTemplate(msgName: string): boolean {
 function decodeSayText2(
   data: Uint8Array,
   ctx: ChatMessageContext,
+  tick: number,
 ): ChatMessage {
   const inner = CCSUsrMsg_SayText2.decode(data);
   const msgName = inner.msgName ?? "";
@@ -191,6 +196,7 @@ function decodeSayText2(
     ? substituteParams(msgName, params)
     : messageParam;
   return Object.freeze({
+    tick,
     sender,
     senderName,
     message,
@@ -203,10 +209,11 @@ function decodeSayText2(
  * Decode the inner SayText blob into a `ChatMessage`. SayText carries no
  * localization template — the literal `text` field is the message.
  */
-function decodeSayText(data: Uint8Array): ChatMessage {
+function decodeSayText(data: Uint8Array, tick: number): ChatMessage {
   const inner = CCSUsrMsg_SayText.decode(data);
   const text = inner.text ?? "";
   return Object.freeze({
+    tick,
     sender: undefined,
     senderName: "",
     message: text,
@@ -226,12 +233,13 @@ function decodeSayText(data: Uint8Array): ChatMessage {
  * `substituteParams`'s 1-indexed `%sN` convention against the
  * substitution slice, we drop `params[0]` before passing it through.
  */
-function decodeTextMsg(data: Uint8Array): ChatMessage {
+function decodeTextMsg(data: Uint8Array, tick: number): ChatMessage {
   const inner = CCSUsrMsg_TextMsg.decode(data);
   const params = inner.params;
   const template = params[0] ?? "";
   const substitutions = params.slice(1);
   return Object.freeze({
+    tick,
     sender: undefined,
     senderName: "",
     message: substituteParams(template, substitutions),
@@ -267,11 +275,11 @@ export function decodeChatMessage(
   }
   switch (msgType) {
     case ECstrike15UserMessages.CS_UM_SayText:
-      return decodeSayText(data);
+      return decodeSayText(data, ctx.tick);
     case ECstrike15UserMessages.CS_UM_SayText2:
-      return decodeSayText2(data, ctx);
+      return decodeSayText2(data, ctx, ctx.tick);
     case ECstrike15UserMessages.CS_UM_TextMsg:
-      return decodeTextMsg(data);
+      return decodeTextMsg(data, ctx.tick);
     default:
       return undefined;
   }

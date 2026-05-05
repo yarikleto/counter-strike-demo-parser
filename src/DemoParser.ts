@@ -908,6 +908,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
     const ctx: ChatMessageContext = {
       players,
       userInfoIndex,
+      tick: this._currentTick,
       resolvePlayer(userId: number): Player | undefined {
         const tableSlot = userInfoIndex.entitySlotForUserId(userId);
         if (tableSlot === undefined) return undefined;

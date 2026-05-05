@@ -28,6 +28,8 @@ function makeCtx(opts: {
   info?: UserInfo;
   /** Players list — Player.slot must equal entitySlot+1 for resolution. */
   players?: Player[];
+  /** Frame tick to surface in the resulting `ChatMessage`. */
+  tick?: number;
 }): ChatMessageContext {
   const players = opts.players ?? [];
   const fakeIndex = {
@@ -46,6 +48,7 @@ function makeCtx(opts: {
   return Object.freeze({
     players,
     userInfoIndex: fakeIndex,
+    tick: opts.tick ?? 0,
     resolvePlayer(_userId: number): Player | undefined {
       const slot = opts.entitySlot;
       if (slot === undefined) return undefined;
@@ -259,6 +262,23 @@ describe("decodeChatMessage", () => {
         msgData: undefined,
       });
       expect(decodeChatMessage(msg, ctx)).toBeUndefined();
+    });
+  });
+
+  describe("tick propagation", () => {
+    it("propagates ctx.tick onto the decoded ChatMessage for all three variants", () => {
+      const ctx = makeCtx({ tick: 12345 });
+
+      const sayText2 = decodeChatMessage(
+        wrapSayText2({ msgName: "Cstrike_Chat_All", params: ["A", "hi", "", ""] }),
+        ctx,
+      )!;
+      const sayText = decodeChatMessage(wrapSayText({ text: "*DEAD*" }), ctx)!;
+      const textMsg = decodeChatMessage(wrapTextMsg({ params: ["Server says hi"] }), ctx)!;
+
+      expect(sayText2.tick).toBe(12345);
+      expect(sayText.tick).toBe(12345);
+      expect(textMsg.tick).toBe(12345);
     });
   });
 });
