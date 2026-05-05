@@ -32,16 +32,70 @@ const DEMO_MAGIC_PREFIX = "HL2DEMO";
 const HEADER_STRING_SIZE = 260;
 
 export interface DemoHeader {
+  /**
+   * 8-byte magic identifier — always `"HL2DEMO\0"` on a valid Source demo.
+   * `parseHeader` validates this; consumers see the literal string here for
+   * provenance / logging.
+   */
   magic: string;
+  /**
+   * Demo file format protocol — currently `4` for CSGO. A bump signals a
+   * file-format break (different field layout, new sections); we don't
+   * branch on it today but it's surfaced for forward-compat callers.
+   */
   demoProtocol: number;
+  /**
+   * Source network protocol version active when the demo was recorded.
+   * Mirrors `CSVCMsg_ServerInfo.protocol` — useful for distinguishing major
+   * CSGO build eras when interpreting wire-level edge cases.
+   */
   networkProtocol: number;
+  /**
+   * Server hostname / record source. Often the recording server's
+   * `hostname` cvar; on GOTV recordings carries the relay name. Trimmed at
+   * the first null byte from the 260-byte fixed-width field.
+   */
   serverName: string;
+  /**
+   * Recording client's display name. Empty on server-side recordings;
+   * populated on POV demos with the recording player's Steam display name.
+   */
   clientName: string;
+  /**
+   * Map shortname as it lived in the recorder's filesystem
+   * (e.g. `"de_nuke"`). The server-authoritative value lives on
+   * `CSVCMsg_ServerInfo.mapName` and may differ on workshop maps; prefer
+   * that one when both are available (see {@link TypedServerInfo}).
+   */
   mapName: string;
+  /**
+   * Game directory at record time (e.g. `"csgo"`). Useful for
+   * disambiguating mod content — community mods have differing values.
+   */
   gameDirectory: string;
+  /**
+   * Demo playback duration in seconds. Equal to `playbackTicks * tickInterval`
+   * once `tickInterval` is known from `CSVCMsg_ServerInfo`.
+   */
   playbackTime: number;
+  /**
+   * Total number of ticks recorded. Combined with `tickInterval` from
+   * `CSVCMsg_ServerInfo` to compute real-time duration; combined with
+   * `playbackFrames` to get the average frames-per-tick (typically 1).
+   */
   playbackTicks: number;
+  /**
+   * Total number of demo frames recorded. Each frame carries a single
+   * tick worth of network packets, console commands, or string-table
+   * snapshots — see {@link DemoCommands}.
+   */
   playbackFrames: number;
+  /**
+   * Length in bytes of the signon section — the prologue carrying
+   * `dem_signon` packet frames before the first `dem_packet`. Useful for
+   * skipping straight to gameplay frames if a consumer doesn't care about
+   * signon-only state (we always parse signon, this is informational).
+   */
   signonLength: number;
 }
 

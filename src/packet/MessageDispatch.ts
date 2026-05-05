@@ -194,6 +194,13 @@ export class MessageDispatcher {
       ],
     ]);
 
+  /**
+   * Construct a dispatcher with the supplied handler bundle. The handlers
+   * record is stored by reference — passing in a mutable object and
+   * swapping fields later is supported but not idiomatic; prefer a fresh
+   * dispatcher per parser. Defaults to no handlers, in which case
+   * `dispatch` consumes every message and invokes nothing.
+   */
   constructor(handlers: MessageHandlers = {}) {
     this.handlers = handlers;
   }

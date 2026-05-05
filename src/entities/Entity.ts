@@ -31,9 +31,39 @@ import { StaleEntityError } from "./errors.js";
  * / `propByName()`.
  */
 export class Entity {
+  /**
+   * Wire-level entity index — the dense `entityId` slot in `EntityList`,
+   * range `[0, MAX_EDICTS)`. Stable for the entity's lifetime; reused for
+   * a different entity after a delete (with a fresh `serialNumber` and an
+   * advanced storage version that invalidates any stale view).
+   *
+   * On CCSPlayer entities this happens to match the player's 1-based
+   * connection slot — the canonical bridge `Player.slot === entity.id`.
+   */
   readonly id: number;
+  /**
+   * The networked C++ class registered for this entity. Carries the
+   * `className` (e.g. `"CCSPlayer"`), the root `dtName`, and the
+   * flattened decode template the property accessors index into.
+   */
   readonly serverClass: ServerClass;
+  /**
+   * Per-slot serial number assigned at create time. Combined with `id`
+   * to form an entity handle; gates `resolveHandle` so a handle issued
+   * before a delete-and-reuse cycle resolves to `undefined` rather than
+   * silently picking up the new occupant.
+   */
   readonly serialNumber: number;
+  /**
+   * Lifecycle phase of the entity:
+   *   - `"active"`  — present in PVS, all property reads valid.
+   *   - `"dormant"` — left PVS but storage preserved; reads return the
+   *                   last-known value (no event fires for re-entries).
+   *   - `"free"`    — slot has been freed; the view is stale and any
+   *                   property read throws `StaleEntityError`.
+   * Mutated by `EntityList` as PacketEntities decode reaches PVS-leave /
+   * delete transitions.
+   */
   state: "active" | "dormant" | "free";
 
   /** @internal The ServerClass's storage bundle. Exposed for EntityList. */

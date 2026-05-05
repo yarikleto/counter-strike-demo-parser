@@ -57,11 +57,34 @@ export interface StringTableOptions {
 }
 
 export class StringTable {
+  /** Server-assigned table name (e.g. `"userinfo"`, `"instancebaseline"`). */
   readonly name: string;
+  /**
+   * Hard cap on entry count for this table. Source uses this both as a
+   * range check on entry indices and to derive the bit width of the
+   * index field on the wire (`bitsForMaxEntries`).
+   */
   readonly maxEntries: number;
+  /** True when every entry's userdata is the same fixed bit width. */
   readonly userDataFixedSize: boolean;
+  /**
+   * Userdata length in bytes when `userDataFixedSize === true`. Always
+   * exactly `userDataSizeBits / 8` rounded up; we trust `userDataSizeBits`
+   * for the bit-stream read path because Source sometimes ships
+   * non-byte-aligned bit widths.
+   */
   readonly userDataSize: number;
+  /**
+   * Userdata length in BITS when `userDataFixedSize === true`. Authoritative
+   * for the bit-stream parser; supersedes `userDataSize` when they disagree
+   * (Source occasionally networks a non-byte-aligned width).
+   */
   readonly userDataSizeBits: number;
+  /**
+   * `CSVCMsg_CreateStringTable.flags` — bit semantics depend on the demo's
+   * Source build. Surfaced verbatim for downstream consumers; the parser
+   * itself does not branch on these bits today.
+   */
   readonly flags: number;
 
   /**

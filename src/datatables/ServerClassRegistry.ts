@@ -13,6 +13,13 @@
  */
 import type { ServerClass } from "./ServerClass.js";
 
+/**
+ * Build-once / read-many store of every `ServerClass` decoded from the
+ * trailing `CSVCMsg_ClassInfo` of a `dem_datatables` frame. Indexed by both
+ * dense numeric `classId` (the wire-level identifier on every entity) and
+ * by C++ `className` for diagnostics. Immutable after `parseDataTables`
+ * fills it.
+ */
 export class ServerClassRegistry {
   private readonly byClassId = new Map<number, ServerClass>();
   private readonly byClassName = new Map<string, ServerClass>();

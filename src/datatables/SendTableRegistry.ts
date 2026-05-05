@@ -14,6 +14,12 @@
  */
 import type { SendTable } from "./SendTable.js";
 
+/**
+ * Build-once / read-many name-keyed store of every `SendTable` parsed from
+ * the demo's `dem_datatables` frame. After `parseDataTables` populates it
+ * the registry is effectively immutable — entity decode and the flattening
+ * pass treat it as a frozen schema.
+ */
 export class SendTableRegistry {
   private readonly tables = new Map<string, SendTable>();
 

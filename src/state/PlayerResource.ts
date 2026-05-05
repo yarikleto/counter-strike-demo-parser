@@ -118,22 +118,51 @@ export class PlayerResource {
     return typeof v === "number" ? v : 0;
   }
 
+  /**
+   * Kills credited to the player at `slot` so far this match. Live read —
+   * reflects the latest tick. Out-of-range slot returns `0` (not throw)
+   * so callers can iterate `0..MAX_PLAYER_SLOTS-1` without bounds checks.
+   *
+   * @param slot - 0-based player slot (matches the `userinfo` table index;
+   *   on CSGO this is `Player.slot - 1`).
+   */
   killsForSlot(slot: number): number {
     return this.readSlot(this.killsIdx, slot);
   }
 
+  /**
+   * Deaths recorded for the player at `slot` so far this match. Live read.
+   * Out-of-range slot returns `0`. See {@link killsForSlot} for the slot
+   * convention.
+   */
   deathsForSlot(slot: number): number {
     return this.readSlot(this.deathsIdx, slot);
   }
 
+  /**
+   * Assists credited to the player at `slot` so far this match. Live read.
+   * Out-of-range slot returns `0`. See {@link killsForSlot} for the slot
+   * convention.
+   */
   assistsForSlot(slot: number): number {
     return this.readSlot(this.assistsIdx, slot);
   }
 
+  /**
+   * Scoreboard score for the player at `slot` so far this match (kill +
+   * objective points per CSGO's scoring rules — NOT the same as kills).
+   * Live read. Out-of-range slot returns `0`.
+   */
   scoreForSlot(slot: number): number {
     return this.readSlot(this.scoresIdx, slot);
   }
 
+  /**
+   * Last reported ping for the player at `slot` in milliseconds. Live read,
+   * but the underlying value updates at the server's ping-report cadence
+   * (typically once per few seconds), not every tick. Out-of-range slot
+   * returns `0`.
+   */
   pingForSlot(slot: number): number {
     return this.readSlot(this.pingsIdx, slot);
   }
