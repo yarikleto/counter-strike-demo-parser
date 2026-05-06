@@ -1,6 +1,6 @@
 {
   "name": "counter-strike-demo-parser",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TypeScript library for parsing CS:GO .dem files. Streaming event-emitter architecture, fully typed, minimal dependencies.",
   "author": "Yaroslav Pakhaliuk",
   "license": "MIT",
@@ -8,6 +8,7 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": {
@@ -24,9 +25,11 @@
     "dist",
     "native/binding.gyp",
     "native/src",
-    "native/README.md"
+    "native/README.md",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
   ],
-  "gypfile": true,
   "engines": {
     "node": ">=22.0.0"
   },
@@ -72,11 +75,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yarikleto/counter-strike-demo-parser.git"
+    "url": "https://github.com/yarikleto/counter-strike-demo-parser.git",
+    "directory": "."
   },
   "dependencies": {
-    "node-addon-api": "^8.2.0",
     "protobufjs": "^8.0.3",
     "snappyjs": "^0.7.0"
+  },
+  "optionalDependencies": {
+    "node-addon-api": "^8.2.0"
   }
 }

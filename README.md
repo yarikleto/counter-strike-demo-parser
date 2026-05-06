@@ -1,213 +1,202 @@
-<p align="center">
-  <img src="./assets/logo.svg" alt="counter-strike-demo-parser" width="800" />
-</p>
+# counter-strike-demo-parser
 
-**A streaming, fully-typed Counter-Strike demo parser for Node.js. CS:GO now, CS2 coming soon.**
+> TypeScript CS:GO `.dem` parser. Type-safe, streaming, fast.
 
+[![CI](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/counter-strike-demo-parser.svg)](https://www.npmjs.com/package/counter-strike-demo-parser)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-417e38)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org)
 
----
+Parse CS:GO `.dem` files and extract everything: every kill, every entity,
+every event. Pure TypeScript, ESM-first with CJS dual export, zero native
+dependencies in the default install path.
 
-Parse `.dem` files and extract everything: every tick, every entity, every event. Fully typed, zero native dependencies.
+## Features
 
-## Quick Start
+- Pure TypeScript, ESM-first with CJS dual export, no native deps required.
+- Two API levels: high-level one-shot `DemoParser.parse()` async API, plus a
+  streaming event-emitter for power users.
+- Bit-identical to [`demoinfocs-golang`](https://github.com/markus-wa/demoinfocs-golang)
+  on the cross-validated kill stream (337/337 kills match on the `de_nuke`
+  fixture).
+- 105 MB/s parse throughput on Apple M4 Pro / Node 22 (765 ms median for an
+  80 MB demo, post-TASK-072 BitReader tuning).
+- Convenience trackers: economy, damage matrix, rounds, grenades, positions,
+  chat.
+- Defensive parsing: malformed demos surface via the `parserError` event,
+  never throw out of the parse loop.
+- Goldens regression suite + Go cross-validation harness.
+
+## Install
 
 ```bash
 npm install counter-strike-demo-parser
 ```
 
-```typescript
-import { DemoParser } from 'counter-strike-demo-parser';
+Requires Node.js 22 or newer. The default install is pure TypeScript — no
+toolchain, no `node-gyp`, no compile step on the consumer's machine.
 
-const demo = await DemoParser.parse('match.dem');
+## Quickstart
+
+Parse a demo and print every kill:
+
+```typescript
+import { DemoParser } from "counter-strike-demo-parser";
+
+const demo = await DemoParser.parse("match.dem");
 
 for (const kill of demo.kills) {
-  const hs = kill.headshot ? ' (headshot)' : '';
-  console.log(`${kill.attacker?.name} killed ${kill.victim.name} with ${kill.weapon}${hs}`);
+  const tag = kill.headshot ? " (headshot)" : "";
+  console.log(`${kill.attacker?.name ?? "world"} -> ${kill.victim.name} [${kill.weapon}]${tag}`);
 }
 ```
 
-That's it. One call, all data, fully typed.
-
-## Features
-
-- **Full player state** — position, health, armor, inventory, money, angles, and 30+ properties at every tick
-- **All game events** — kills, assists, bomb plants, round ends, and 100+ other typed events
-- **Grenade trajectories** — follow every smoke, flash, molotov, and HE from throw to detonation
-- **Economy tracking** — money, purchases, equipment value per player per round
-- **Complete entity system** — every networked object decoded via SendTable/ServerClass with delta compression
-- **Two API levels** — high-level async/await for simplicity, low-level streaming for power users
-- **Zero native dependencies** — pure TypeScript, works everywhere Node.js runs
-- **Full TypeScript types** — every event, every entity property, every API surface is typed
-
-## Examples
-
-### Match Scoreboard
+Tally a scoreboard from the kill stream:
 
 ```typescript
-import { DemoParser } from 'counter-strike-demo-parser';
+import { DemoParser } from "counter-strike-demo-parser";
 
-const demo = await DemoParser.parse('match.dem');
+const demo = await DemoParser.parse("match.dem");
 
-for (const player of demo.players) {
-  console.log(
-    `${player.name.padEnd(20)} K: ${player.kills}  D: ${player.deaths}  A: ${player.assists}  ` +
-    `Score: ${player.score}  MVPs: ${player.mvps}`
-  );
+const board = new Map<string, { kills: number; deaths: number }>();
+const bump = (name: string, key: "kills" | "deaths") => {
+  const row = board.get(name) ?? { kills: 0, deaths: 0 };
+  row[key] += 1;
+  board.set(name, row);
+};
+
+for (const kill of demo.kills) {
+  if (kill.attacker?.name) bump(kill.attacker.name, "kills");
+  if (kill.victim.name) bump(kill.victim.name, "deaths");
+}
+
+for (const [name, row] of board) {
+  console.log(`${name.padEnd(20)}  K:${row.kills}  D:${row.deaths}`);
 }
 ```
 
-### Position Heatmap Data
+## API
+
+### High-level: `DemoParser.parse(input, options)`
+
+For most use cases. Parses the demo end-to-end and returns a structured
+`DemoResult`.
 
 ```typescript
-import { DemoParser } from 'counter-strike-demo-parser';
+const demo = await DemoParser.parse("match.dem");
 
-const demo = await DemoParser.parse('match.dem');
-
-// All player positions across all ticks
-for (const snapshot of demo.playerPositions) {
-  console.log(`Tick ${snapshot.tick}: ${snapshot.player.name} at (${snapshot.x}, ${snapshot.y})`);
-}
+demo.header        // map, tick rate, server info
+demo.players       // PlayerSnapshot[] — players present at dem_stop
+demo.kills         // PlayerDeathEvent[] — every kill in wire order
+demo.rounds        // RoundSummary[] — per-round K/D/A/damage + bomb events
+demo.grenades      // GrenadeThrownEvent[] — every throw
+demo.chatMessages  // ChatMessage[] — in-game chat with resolved senders
+demo.damageMatrix  // DamageMatrix — attacker -> victim aggregation
+demo.playerPositions // optional, opt in with collectPlayerPositions: true
+demo.events        // optional, opt in with includeRawEvents: true
 ```
 
-### Grenade Trajectories
+`input` accepts a file path, a `Buffer`, or a Node.js `Readable`.
+
+### Streaming: `DemoParser.fromFile()` / `DemoParser.fromBuffer()`
+
+For per-tick control or long-running pipelines that can't afford to buffer
+the whole result.
 
 ```typescript
-import { DemoParser } from 'counter-strike-demo-parser';
+import { DemoParser } from "counter-strike-demo-parser";
 
-const demo = await DemoParser.parse('match.dem');
+const parser = DemoParser.fromFile("match.dem");
 
-for (const grenade of demo.grenades) {
-  const start = grenade.trajectory[0];
-  const end = grenade.trajectory.at(-1);
-  console.log(`${grenade.thrower.name} threw ${grenade.type}: (${start.x}, ${start.y}) → (${end.x}, ${end.y})`);
-}
-```
-
-### Round-by-Round Economy
-
-```typescript
-import { DemoParser } from 'counter-strike-demo-parser';
-
-const demo = await DemoParser.parse('match.dem');
-
-for (const round of demo.rounds) {
-  console.log(`\nRound ${round.number} — winner: ${round.winner.name}`);
-  for (const player of round.players) {
-    console.log(`  ${player.name.padEnd(20)} $${player.startMoney} → $${player.endMoney}`);
-  }
-}
-```
-
-## Two API Levels
-
-### High-level: `DemoParser.parse()` — async/await, all data collected
-
-For most use cases. Parses the entire demo and returns a structured result object.
-
-```typescript
-const demo = await DemoParser.parse('match.dem');
-
-demo.header       // map, duration, tick count, server info
-demo.players      // final player states with full stats
-demo.kills        // all kills with attacker, victim, weapon, headshot...
-demo.rounds       // round-by-round results, economy, events
-demo.grenades     // grenade trajectories from throw to detonation
-demo.chatMessages // in-game chat
-demo.events       // every raw game event, if you need it
-```
-
-### Low-level: streaming events — per-tick control, constant memory
-
-For power users processing huge files or building real-time pipelines. Subscribe to events, parse frame-by-frame.
-
-```typescript
-const parser = await DemoParser.fromFile('match.dem');
-
-parser.on('playerDeath', (event) => {
-  console.log(`${event.attacker?.name} killed ${event.victim.name}`);
+parser.on("player_death", (e) => {
+  console.log(`${e.attacker?.name ?? "world"} -> ${e.victim.name}`);
 });
 
-parser.on('tickEnd', () => {
-  for (const player of parser.players) {
-    // access current state at this tick
-  }
+parser.on("round_end", (e) => {
+  console.log(`Round ended, winning side: ${e.winner}`);
 });
 
 await parser.parseAll();
 ```
 
-## API Overview
+`parser.on(name, ...)` is fully type-inferred via the three-tier
+`ParserEventMap`: enriched events resolve to typed payloads (`PlayerDeathEvent`,
+`BombPlantedEvent`, etc.); raw game events fall back to the catch-all
+`gameEvent` channel.
 
-| Class / Type | Description |
+### Trackers
+
+Trackers can be used standalone against the streaming parser, or accessed
+through `DemoResult` for the one-shot path:
+
+| Tracker | Surface |
 |---|---|
-| `DemoParser.parse()` | High-level: parse a file and return all collected data. |
-| `DemoParser.fromFile()` | Low-level: create a streaming parser from a file path. |
-| `DemoParser.fromBuffer()` | Low-level: create a streaming parser from a Buffer. |
-| `DemoResult` | The result of `parse()` — header, players, kills, rounds, grenades, and more. |
-| `Player` | Full player state: position, health, armor, weapons, money, stats. |
-| `Team` | Team name, score, player list, side (CT/T). |
-| `GameState` | Current round, phase, bomb state, map, server info. |
-| `Entity` | Low-level networked entity with typed property access. |
+| `EconomyTracker` | `startMoney` / `endMoney` / purchases per player per round. |
+| `DamageMatrix` | Full-match and per-round attacker -> victim aggregation. |
+| `RoundTracker` | Per-round summary: K/D/A, damage, bomb events, winning side. |
+| `GrenadeTrajectoryTracker` | Throw -> bounces -> detonation per grenade entity. |
+| `PositionTracker` | Player positions sampled at a configurable tick rate. |
 
-## Supported Data
+## Status
 
-**Player state** (per tick): position, angles, velocity, health, armor, helmet, defuse kit, money, equipment value, active weapon, all weapons, ammo, scope state, flash duration, burn duration, alive/dead, connected, team, Steam ID, and more.
+`v0.1.0` — first public release. The parser has shipped the milestones it
+was scoped against (M5 13/13, M6 10/10, M7 12/15) and is bit-identical to
+`demoinfocs-golang` on the kill stream of the `de_nuke` fixture. The public
+API surface may still evolve before `1.0`.
 
-**Game events** (100+ types): player_death, round_start, round_end, bomb_planted, bomb_defused, weapon_fire, player_hurt, flashbang_detonate, smokegrenade_detonate, hegrenade_detonate, molotov_detonate, begin_new_match, round_mvp, player_connect, player_disconnect, and many more.
-
-**Entity system**: full SendTable/ServerClass decoding, delta compression, every networked object in the game (players, weapons, projectiles, C4, world entities).
-
-**String tables**: model precache, user info, server info, downloadables.
-
-**Other**: console commands, user messages, chat messages, voice data (raw CELT frames), server metadata, demo header (map, duration, tick count, protocol version).
+CS2 (Source 2) demo format is not supported — CS:GO / Source 1 only.
 
 ## Performance
 
-Built for speed from the ground up:
+Numbers from `npm run bench` on the bundled 80 MB `de_nuke` fixture, Apple M4
+Pro / Node 22, 5 iterations after 2 warmup runs:
 
-- **Streaming architecture** — constant memory regardless of demo size. Parse gigabytes without breaking a sweat.
-- **Optional native C++ addon** — hot-path acceleration via N-API for the BitReader and entity decoding. Drop-in, zero API changes, automatic fallback to pure TypeScript when native module isn't available.
-- **Optimized bit-level readers** — the inner loops that decode millions of entity property updates per demo are tuned for V8.
+| Metric | Value |
+|---|---|
+| Parse duration | 765 ms median |
+| Throughput | 105 MB/s |
+| Peak RSS | 230 MB |
 
-Pure TypeScript works everywhere out of the box. Add the native addon when you need maximum throughput.
+The BitReader tuning in TASK-072 cut parse time roughly in half from the
+v0.0.x baseline (~1810 ms -> 765 ms median on the same fixture).
 
-## Other Parsers
+## Native addon (optional)
 
-There are demo parsers in other languages. Here's how they compare:
+The repo ships an opt-in N-API native addon scaffold under `native/`. It is
+**not** built or required by the default install path; a fresh
+`npm install counter-strike-demo-parser` is pure TypeScript.
 
-| | **counter-strike-demo-parser** | demoinfocs-golang | demofile | demoparser2 |
-|---|---|---|---|---|
-| Language | **TypeScript** | Go | JavaScript | Rust/Python |
-| API | **async/await + streaming** | Streaming | Streaming | Query-based |
-| TypeScript types | **Full** | N/A | Partial | N/A |
-| CS:GO support | **Yes** | Yes | Yes | Yes |
-| CS2 support | **Planned** | Yes | No | Yes |
-| Maintained | **Yes** | Yes | No (3+ years) | Yes |
-| Native acceleration | **Optional C++ addon** | N/A | N/A | Rust core |
-| Node.js native | **Yes** | No | Yes | No (Python bindings) |
+To build the native addon locally:
 
-If you're in the Node.js/TypeScript ecosystem — this is the parser to use.
+```bash
+npm install
+npm run build:native
+```
 
-## Roadmap
+In `v0.1.0` the addon is a toolchain-validation spike only (TASK-082) — real
+acceleration via the batched native pipeline is tracked in TASK-086. Most
+consumers should ignore it; the pure-TS path delivers the throughput numbers
+above.
 
-- **v1** — CS:GO demo parsing: full entity system, all game events, player/team/round state, streaming API
-- **v2** — CS2 demo parsing: Source 2 format support (separate API surface — CS2 uses a fundamentally different entity system)
-- **Performance** — optional native C++ addon for hot-path acceleration
-- **Convenience** — grenade trajectories, economy tracking, damage matrix, match summaries
-
-## Contributing
-
-Contributions are welcome. Please open an issue before starting work on anything substantial so we can discuss the approach.
+## Contributing / development
 
 ```bash
 git clone https://github.com/yarikleto/counter-strike-demo-parser.git
 cd counter-strike-demo-parser
 npm install
-npm test
+
+npm run typecheck          # tsc --noEmit (src + test projects)
+npm run lint               # eslint + prettier check
+npm run test               # full unit + integration suite
+npm run build              # tsup -> dist/ (CJS + ESM + .d.ts + .d.cts)
+npm run bench              # benchmark harness, JSON output to bench/
+npm run goldens:update     # regenerate test/golden/*.json snapshots
+npm run cross-validate     # diff against demoinfocs-golang (Go required)
+npm run validate:corpus    # run the parser over a directory of .dem fixtures
 ```
+
+Please open an issue before starting work on anything substantial so we can
+discuss the approach.
 
 ## License
 

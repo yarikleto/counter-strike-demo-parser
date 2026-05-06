@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: build & test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22.x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run test:integration
+
+  golden-regression:
+    name: golden regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: regenerate goldens
+        run: npm run goldens:update
+      - name: fail on golden drift
+        run: git diff --exit-code test/golden/
+
+  pack-smoke:
+    name: pack smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: pack (dry run)
+        run: npm pack --dry-run --json > pack.json
+      - name: verify tarball size & contents
+        run: |
+          set -euo pipefail
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('pack.json', 'utf8'))[0];
+            const sizeMb = p.size / (1024 * 1024);
+            console.log('packed size:', sizeMb.toFixed(2), 'MB');
+            console.log('unpacked size:', (p.unpackedSize / (1024 * 1024)).toFixed(2), 'MB');
+            if (p.size > 5 * 1024 * 1024) {
+              console.error('tarball exceeds 5 MB cap');
+              process.exit(1);
+            }
+            const files = new Set(p.files.map(f => f.path));
+            const required = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'native/binding.gyp'];
+            for (const f of required) {
+              if (!files.has(f)) {
+                console.error('missing required file in tarball:', f);
+                process.exit(1);
+              }
+            }
+            const hasDist = [...files].some(f => f.startsWith('dist/'));
+            const hasNativeSrc = [...files].some(f => f.startsWith('native/src/'));
+            if (!hasDist) { console.error('no dist/ files in tarball'); process.exit(1); }
+            if (!hasNativeSrc) { console.error('no native/src/ files in tarball'); process.exit(1); }
+            console.log('pack-smoke OK');
+          "
