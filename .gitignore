@@ -46,3 +46,6 @@ prebuilds/
 
 # Benchmark output (one JSON per run; not part of the package)
 bench/results-*.json
+
+# demoinfocs-golang cross-validation export (per-run output)
+bench/demoinfocs-export.json
