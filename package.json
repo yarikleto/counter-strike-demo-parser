@@ -44,7 +44,8 @@
     "generate:proto": "bash scripts/generate-proto.sh",
     "bench": "npx tsx scripts/benchmark.ts",
     "goldens:update": "npx tsx scripts/generate-goldens.ts",
-    "cross-validate": "npx tsx scripts/cross-validate.ts"
+    "cross-validate": "npx tsx scripts/cross-validate.ts",
+    "validate:corpus": "npx tsx scripts/validate-corpus.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
