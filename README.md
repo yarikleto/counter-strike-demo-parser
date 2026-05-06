@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/logo.svg" alt="counter-strike-demo-parser" width="800">
+</p>
+
 # counter-strike-demo-parser
 
 > TypeScript CS:GO `.dem` parser. Type-safe, streaming, fast.
@@ -20,7 +24,7 @@ dependencies in the default install path.
   on the cross-validated kill stream (337/337 kills match on the `de_nuke`
   fixture).
 - 105 MB/s parse throughput on Apple M4 Pro / Node 22 (765 ms median for an
-  80 MB demo, post-TASK-072 BitReader tuning).
+  80 MB demo).
 - Convenience trackers: economy, damage matrix, rounds, grenades, positions,
   chat.
 - Defensive parsing: malformed demos surface via the `parserError` event,
@@ -157,8 +161,8 @@ Pro / Node 22, 5 iterations after 2 warmup runs:
 | Throughput | 105 MB/s |
 | Peak RSS | 230 MB |
 
-The BitReader tuning in TASK-072 cut parse time roughly in half from the
-v0.0.x baseline (~1810 ms -> 765 ms median on the same fixture).
+A targeted pass on the BitReader hot path cut parse time roughly in half
+(~1810 ms -> 765 ms median on the same fixture).
 
 ## Native addon (optional)
 
@@ -173,10 +177,10 @@ npm install
 npm run build:native
 ```
 
-In `v0.1.0` the addon is a toolchain-validation spike only (TASK-082) — real
-acceleration via the batched native pipeline is tracked in TASK-086. Most
-consumers should ignore it; the pure-TS path delivers the throughput numbers
-above.
+In `v0.1.0` the addon is a toolchain-validation spike — real acceleration
+via a batched native pipeline is on the roadmap, not in this release. Most
+consumers should ignore the native path; pure TypeScript delivers the
+throughput numbers above.
 
 ## Contributing / development
 

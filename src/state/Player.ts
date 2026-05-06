@@ -308,7 +308,16 @@ export class Player {
     if (userId === undefined) return undefined;
     const info = this.userInfoIndex.infoForUserId(userId);
     if (info === undefined) return undefined;
-    return SteamId.fromSteam64(info.xuid);
+    // Bots have xuid="0" — they don't have a real Steam account. Return
+    // undefined rather than letting SteamId.fromSteam64 throw on the invalid
+    // base. Defensive try/catch covers any other unparseable xuid we might
+    // see in practice.
+    if (info.xuid === undefined || info.xuid === "0") return undefined;
+    try {
+      return SteamId.fromSteam64(info.xuid);
+    } catch {
+      return undefined;
+    }
   }
 
   /**
