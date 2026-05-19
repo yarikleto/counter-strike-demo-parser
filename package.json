@@ -79,7 +79,7 @@
     "directory": "."
   },
   "dependencies": {
-    "protobufjs": "^8.0.3",
+    "protobufjs": "^8.4.0",
     "snappyjs": "^0.7.0"
   },
   "optionalDependencies": {
