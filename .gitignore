@@ -25,11 +25,9 @@ Desktop.ini
 *.swo
 *~
 
-# Project management — commit the briefs and decision archive, but skip
-# machine-local + ephemeral state.
-.claude/worktrees/
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
+# Claude Code — agent config and decision archive, kept local only.
+CLAUDE.md
+.claude/
 
 # Demo files (large binaries) — except test fixtures
 *.dem
