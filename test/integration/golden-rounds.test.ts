@@ -11,6 +11,7 @@ import { DemoParser } from "../../src/DemoParser.js";
 import { ConvenienceRoundTracker } from "../../src/convenience/RoundTracker.js";
 import type { Player } from "../../src/state/Player.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -23,7 +24,7 @@ function nameOf(player: Player | undefined, parser: DemoParser): string {
   return info?.name ?? `slot ${player.slot}`;
 }
 
-describe("golden: rounds", () => {
+describe.skipIf(!fixtureAvailable)("golden: rounds", () => {
   it("matches the committed snapshot", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     const roundTracker = new ConvenienceRoundTracker();

@@ -6,6 +6,7 @@ import type {
   HostagePickedUpEvent,
   HostageHurtEvent,
 } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -24,7 +25,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 //   hostage_hurt     (id=120) keys: { userid:short, hostage:short }
 // No `hostage_grab` descriptor exists — `hostage_follows` is the canonical
 // pickup signal.
-describe("Hostage events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Hostage events (Tier-1) — integration on de_nuke.dem", () => {
   it("wires up the three hostage enrichers without crashing (counts likely 0 on defuse map)", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 
@@ -33,9 +34,7 @@ describe("Hostage events (Tier-1) — integration on de_nuke.dem", () => {
     const hurt: HostageHurtEvent[] = [];
 
     parser.on("hostage_rescued", (e: HostageRescuedEvent) => rescued.push(e));
-    parser.on("hostage_follows", (e: HostagePickedUpEvent) =>
-      pickedUp.push(e),
-    );
+    parser.on("hostage_follows", (e: HostagePickedUpEvent) => pickedUp.push(e));
     parser.on("hostage_hurt", (e: HostageHurtEvent) => hurt.push(e));
 
     parser.parseAll();

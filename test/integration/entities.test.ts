@@ -11,17 +11,16 @@ import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { ServerClass } from "../../src/datatables/index.js";
 import type { Vector3 } from "../../src/properties/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
 /** Find a flat-prop index by SendProp varName. -1 if not present. */
 function findPropIdx(serverClass: ServerClass, varName: string): number {
-  return serverClass.flattenedProps.findIndex(
-    (p) => p.prop.varName === varName,
-  );
+  return serverClass.flattenedProps.findIndex((p) => p.prop.varName === varName);
 }
 
-describe("entities — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("entities — integration on de_nuke.dem", () => {
   it("populates EntityList during parseAll", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();

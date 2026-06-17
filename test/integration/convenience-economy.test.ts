@@ -13,11 +13,12 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, "../fixtures/de_nuke.dem");
 
-describe("EconomyTracker integration (de_nuke)", () => {
+describe.skipIf(!fixtureAvailable)("EconomyTracker integration (de_nuke)", () => {
   it("round 1 has at least one player with positive startMoney and non-negative endMoney", async () => {
     const result = await DemoParser.parse(FIXTURE);
 
@@ -25,9 +26,7 @@ describe("EconomyTracker integration (de_nuke)", () => {
     const round1 = result.rounds[1];
     expect(round1).toBeDefined();
 
-    const statsWithEcon = [...round1!.players.values()].filter(
-      (s) => s.economy !== undefined,
-    );
+    const statsWithEcon = [...round1!.players.values()].filter((s) => s.economy !== undefined);
 
     // Log a sample for the reviewer.
     const sample = statsWithEcon[0];

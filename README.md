@@ -7,9 +7,11 @@
 > TypeScript CS:GO `.dem` parser. Type-safe, streaming, fast.
 
 [![CI](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/counter-strike-demo-parser.svg)](https://www.npmjs.com/package/counter-strike-demo-parser)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-417e38)](https://nodejs.org)
+
+> Note: not yet published to npm — install from source (see
+> [Contributing / development](#contributing--development)) for now.
 
 Parse CS:GO `.dem` files and extract everything: every kill, every entity,
 every event. Pure TypeScript, ESM-first with CJS dual export, zero native
@@ -184,9 +186,18 @@ throughput numbers above.
 
 ## Contributing / development
 
+**Prerequisites:** Node.js >= 22 and [Git LFS](https://git-lfs.com). The
+integration and golden suites parse `test/fixtures/de_nuke.dem`, an ~80 MB demo
+tracked via Git LFS. Without it, those suites **skip** automatically (the unit
+suite, typecheck, lint, and build all work without it) — but to run the full
+suite you must pull the fixture:
+
 ```bash
+git lfs install           # one-time, enables LFS for your git
 git clone https://github.com/yarikleto/counter-strike-demo-parser.git
 cd counter-strike-demo-parser
+git lfs pull              # fetch test/fixtures/de_nuke.dem (skip and the
+                         # integration/golden suites simply report as skipped)
 npm install
 
 npm run typecheck          # tsc --noEmit (src + test projects)

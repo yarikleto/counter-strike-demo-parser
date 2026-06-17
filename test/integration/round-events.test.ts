@@ -8,6 +8,7 @@ import type {
   RoundPrestartEvent,
   RoundPoststartEvent,
 } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -16,7 +17,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 // on a real 30-round MM demo. Asserts the dispatcher invokes each enricher,
 // the typed payloads carry sensible defaults, and `roundNumber` increments
 // monotonically across `round_end` events.
-describe("Round events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Round events (Tier-1) — integration on de_nuke.dem", () => {
   it("emits typed round_start / round_end / round_freeze_end / round_prestart / round_poststart with monotonic round numbers", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 
@@ -28,13 +29,9 @@ describe("Round events (Tier-1) — integration on de_nuke.dem", () => {
 
     parser.on("round_start", (e: RoundStartEvent) => starts.push(e));
     parser.on("round_end", (e: RoundEndEvent) => ends.push(e));
-    parser.on("round_freeze_end", (e: RoundFreezeEndEvent) =>
-      freezeEnds.push(e),
-    );
+    parser.on("round_freeze_end", (e: RoundFreezeEndEvent) => freezeEnds.push(e));
     parser.on("round_prestart", (e: RoundPrestartEvent) => prestarts.push(e));
-    parser.on("round_poststart", (e: RoundPoststartEvent) =>
-      poststarts.push(e),
-    );
+    parser.on("round_poststart", (e: RoundPoststartEvent) => poststarts.push(e));
 
     parser.parseAll();
 
@@ -67,9 +64,7 @@ describe("Round events (Tier-1) — integration on de_nuke.dem", () => {
     // And it must move forward over the demo — first vs last must differ
     // for any multi-round demo.
     if (ends.length >= 2) {
-      expect(ends[ends.length - 1]!.roundNumber).toBeGreaterThan(
-        ends[0]!.roundNumber,
-      );
+      expect(ends[ends.length - 1]!.roundNumber).toBeGreaterThan(ends[0]!.roundNumber);
     }
 
     // Sample a frozen round_start and verify the typed shape.

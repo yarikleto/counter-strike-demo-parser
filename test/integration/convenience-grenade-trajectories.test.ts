@@ -25,11 +25,12 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, "../fixtures/de_nuke.dem");
 
-describe("GrenadeTrajectoryTracker integration (de_nuke)", () => {
+describe.skipIf(!fixtureAvailable)("GrenadeTrajectoryTracker integration (de_nuke)", () => {
   it("captures trajectories for HE, flashbang, smoke, and decoy projectiles", async () => {
     const result = await DemoParser.parse(FIXTURE);
     const traj = result.grenadeTrajectories;
@@ -67,9 +68,7 @@ describe("GrenadeTrajectoryTracker integration (de_nuke)", () => {
     expect(longest).toBeGreaterThan(5);
 
     // Sanity-check sample shape on the first non-empty trajectory.
-    const sample = result.grenadeTrajectories.find(
-      (t) => t.trajectory.length > 0,
-    );
+    const sample = result.grenadeTrajectories.find((t) => t.trajectory.length > 0);
     expect(sample).toBeDefined();
     const point = sample!.trajectory[0]!;
     expect(typeof point.x).toBe("number");
@@ -83,9 +82,7 @@ describe("GrenadeTrajectoryTracker integration (de_nuke)", () => {
     const result = await DemoParser.parse(FIXTURE);
 
     const detonated = result.grenadeTrajectories.filter(
-      (t) =>
-        (t.type === "he" || t.type === "flash") &&
-        t.detonationPosition !== undefined,
+      (t) => (t.type === "he" || t.type === "flash") && t.detonationPosition !== undefined,
     );
     expect(detonated.length).toBeGreaterThan(0);
 
@@ -99,9 +96,7 @@ describe("GrenadeTrajectoryTracker integration (de_nuke)", () => {
   it("at least one grenade has a resolved thrower", async () => {
     const result = await DemoParser.parse(FIXTURE);
 
-    const withThrower = result.grenadeTrajectories.filter(
-      (t) => t.thrower !== undefined,
-    );
+    const withThrower = result.grenadeTrajectories.filter((t) => t.thrower !== undefined);
 
     // Bot fixture has 30 rounds with hundreds of nades; at least one
     // should resolve (the m_hThrower handle is reliably written by the

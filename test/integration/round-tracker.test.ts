@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { RoundStateChange } from "../../src/state/RoundTracker.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("M3 RoundTracker — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("M3 RoundTracker — integration on de_nuke.dem", () => {
   it("emits a non-zero stream of roundStateChanged events covering all four phases", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     const events: RoundStateChange[] = [];
@@ -41,9 +42,7 @@ describe("M3 RoundTracker — integration on de_nuke.dem", () => {
     // round completions and must be non-decreasing.
     const overEvents = events.filter((e) => e.phase === "over");
     for (let i = 1; i < overEvents.length; i++) {
-      expect(overEvents[i].roundNumber).toBeGreaterThanOrEqual(
-        overEvents[i - 1].roundNumber,
-      );
+      expect(overEvents[i].roundNumber).toBeGreaterThanOrEqual(overEvents[i - 1].roundNumber);
     }
 
     // After the parse the tracker has settled on a defined phase.

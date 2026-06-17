@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
-import type {
-  ItemPickupEvent,
-  ItemPurchaseEvent,
-  ItemEquipEvent,
-} from "../../src/events/index.js";
+import type { ItemPickupEvent, ItemPurchaseEvent, ItemEquipEvent } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -21,7 +18,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 // Floors are set conservatively below the probe value to avoid drift
 // across protobuf rebuilds; item_purchase floors at zero on this fixture
 // per the brief — the unit test pins the field-mapping behaviour.
-describe("Item events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Item events (Tier-1) — integration on de_nuke.dem", () => {
   it("emits typed item_pickup / item_purchase / item_equip with resolved players", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 

@@ -3,4 +3,11 @@ node_modules/
 src/generated/
 coverage/
 *.dem
-README.md
+
+# Prose Markdown is not code and is excluded from style enforcement.
+# Prettier's Markdown formatter mangles technical prose: it reinterprets
+# identifiers like `de_nuke` and `m_iMatchStats_*` as emphasis/escape syntax
+# (e.g. `de*nuke`, `*on\*`) and strips significant whitespace around inline
+# code, corrupting the `.claude/` decision archive and docs. README.md was
+# already excluded for the same reason; this generalises that intent.
+*.md

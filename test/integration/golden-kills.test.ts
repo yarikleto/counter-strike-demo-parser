@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { Player } from "../../src/state/Player.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -22,7 +23,7 @@ function nameOf(player: Player | undefined, parser: DemoParser): string {
   return info?.name ?? `slot ${player.slot}`;
 }
 
-describe("golden: kills", () => {
+describe.skipIf(!fixtureAvailable)("golden: kills", () => {
   it("matches the committed snapshot", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 
@@ -31,7 +32,7 @@ describe("golden: kills", () => {
       currentRound += 1;
     });
 
-    const killRows: Array<{
+    const killRows: {
       tick: number;
       attacker: string;
       victim: string;
@@ -42,7 +43,7 @@ describe("golden: kills", () => {
       thrusmoke: boolean;
       attackerblind: boolean;
       round: number;
-    }> = [];
+    }[] = [];
     parser.on("player_death", (e) => {
       killRows.push({
         tick: parser.currentTick,

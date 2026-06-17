@@ -12,13 +12,14 @@ import type {
   BombBeginDefuseEvent,
   BombAbortDefuseEvent,
 } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
 // TASK-039: end-to-end smoke test for the bomb-lifecycle Tier-1 enrichers
 // (plant / defuse / explode / pickup / drop, plus the begin/abort
 // signaling pair) on a real 30-round MM demo.
-describe("Bomb events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Bomb events (Tier-1) — integration on de_nuke.dem", () => {
   it("emits typed bomb-lifecycle events with resolved players", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 

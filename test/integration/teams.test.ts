@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import { TeamSide } from "../../src/enums/TeamSide.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("M3 team overlays — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("M3 team overlays — integration on de_nuke.dem", () => {
   it("parser.teams returns at least the T and CT sides", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
@@ -16,12 +17,9 @@ describe("M3 team overlays — integration on de_nuke.dem", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
     for (const team of parser.teams) {
-      expect([
-        TeamSide.Unassigned,
-        TeamSide.Spectator,
-        TeamSide.T,
-        TeamSide.CT,
-      ]).toContain(team.team);
+      expect([TeamSide.Unassigned, TeamSide.Spectator, TeamSide.T, TeamSide.CT]).toContain(
+        team.team,
+      );
     }
   });
 
@@ -56,9 +54,7 @@ describe("M3 team overlays — integration on de_nuke.dem", () => {
     // doesn't over-constrain the fixture (a 16-0 stomp would still pass).
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
-    const playing = parser.teams.filter(
-      (tm) => tm.team === TeamSide.T || tm.team === TeamSide.CT,
-    );
+    const playing = parser.teams.filter((tm) => tm.team === TeamSide.T || tm.team === TeamSide.CT);
     expect(playing.some((tm) => tm.score > 0)).toBe(true);
   });
 

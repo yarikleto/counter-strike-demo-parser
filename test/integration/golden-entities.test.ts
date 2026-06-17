@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { Entity } from "../../src/entities/Entity.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -21,7 +22,7 @@ function sortKeys<T>(record: Record<string, T>): Record<string, T> {
   return out;
 }
 
-describe("golden: entities", () => {
+describe.skipIf(!fixtureAvailable)("golden: entities", () => {
   it("matches the committed snapshot", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 

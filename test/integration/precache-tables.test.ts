@@ -15,10 +15,11 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("precache tables — integration with de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("precache tables — integration with de_nuke.dem", () => {
   it("modelPrecache is populated and entries look like .mdl paths", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     parser.parseAll();
@@ -77,7 +78,7 @@ describe("precache tables — integration with de_nuke.dem", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     parser.parseAll();
     // Visible during `vitest run` for empirical sanity-check.
-    // eslint-disable-next-line no-console
+
     console.log(
       `[precache sizes] modelprecache=${parser.modelPrecache.size} ` +
         `soundprecache=${parser.soundPrecache.size} ` +

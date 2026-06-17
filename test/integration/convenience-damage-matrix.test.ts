@@ -12,11 +12,12 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, "../fixtures/de_nuke.dem");
 
-describe("DamageMatrix integration (de_nuke)", () => {
+describe.skipIf(!fixtureAvailable)("DamageMatrix integration (de_nuke)", () => {
   it("produces > 50 damage entries across the match", async () => {
     const result = await DemoParser.parse(FIXTURE);
     const entries = [...result.damageMatrix.entries()];

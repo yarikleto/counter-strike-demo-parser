@@ -3,6 +3,7 @@ import { createReadStream, readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -15,7 +16,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 // suite. The header read is the smallest non-trivial proof that bytes round-
 // trip correctly through the stream path; full-pipeline coverage already
 // exists elsewhere via the path-based parse.
-describe("DemoParser.fromStream() — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("DemoParser.fromStream() — integration on de_nuke.dem", () => {
   it("parses a file streamed via fs.createReadStream and recovers the full demo header", async () => {
     const stream = createReadStream(FIXTURE);
     const streamParser = await DemoParser.fromStream(stream);

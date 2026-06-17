@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import { GameRules } from "../../src/state/GameRules.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("M3 GameRules overlay — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("M3 GameRules overlay — integration on de_nuke.dem", () => {
   it("parser.gameRules returns a GameRules overlay after parse", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();
