@@ -30,17 +30,19 @@ function fakeEntity(id: number, serial: number): Entity {
 /** Encode the 32-bit Source handle form (21 bits serial | 11 bits index). */
 function encode32(index: number, serial: number): number {
   return (
-    ((serial & ((1 << ENTITY_SERIAL_BITS_32) - 1)) << ENTITY_INDEX_BITS) |
-    (index & ENTITY_INDEX_MASK)
-  ) >>> 0;
+    (((serial & ((1 << ENTITY_SERIAL_BITS_32) - 1)) << ENTITY_INDEX_BITS) |
+      (index & ENTITY_INDEX_MASK)) >>>
+    0
+  );
 }
 
 /** Encode the 21-bit packed-from-SendProp form (10 bits serial | 11 bits index). */
 function encode21(index: number, serial: number): number {
   return (
-    ((serial & ((1 << ENTITY_SERIAL_BITS_21) - 1)) << ENTITY_INDEX_BITS) |
-    (index & ENTITY_INDEX_MASK)
-  ) >>> 0;
+    (((serial & ((1 << ENTITY_SERIAL_BITS_21) - 1)) << ENTITY_INDEX_BITS) |
+      (index & ENTITY_INDEX_MASK)) >>>
+    0
+  );
 }
 
 describe("EntityHandle constants", () => {

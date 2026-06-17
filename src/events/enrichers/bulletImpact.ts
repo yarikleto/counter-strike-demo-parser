@@ -30,10 +30,7 @@ function readNum(value: unknown): number {
 
 export const enrichBulletImpact: Enricher<BulletImpactEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+  const player = typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
 
   const position = Object.freeze({
     x: readNum(raw.data.x),

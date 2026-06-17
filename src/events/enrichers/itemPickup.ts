@@ -32,8 +32,7 @@ export interface ItemPickupEvent extends EnrichedEvent {
 
 export const enrichItemPickup: Enricher<ItemPickupEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const item = typeof raw.data.item === "string" ? raw.data.item : "";

@@ -50,29 +50,22 @@ export interface PlayerDeathEvent extends EnrichedEvent {
 
 export const enrichPlayerDeath: Enricher<PlayerDeathEvent> = (raw, ctx) => {
   const victimId = raw.data.userid;
-  const victim =
-    typeof victimId === "number" ? ctx.resolvePlayer(victimId) : undefined;
+  const victim = typeof victimId === "number" ? ctx.resolvePlayer(victimId) : undefined;
   if (victim === undefined) return null;
 
   const attackerId = raw.data.attacker;
   const attacker =
-    typeof attackerId === "number" && attackerId !== 0
-      ? ctx.resolvePlayer(attackerId)
-      : undefined;
+    typeof attackerId === "number" && attackerId !== 0 ? ctx.resolvePlayer(attackerId) : undefined;
 
   const assisterId = raw.data.assister;
   const assister =
-    typeof assisterId === "number" && assisterId !== 0
-      ? ctx.resolvePlayer(assisterId)
-      : undefined;
+    typeof assisterId === "number" && assisterId !== 0 ? ctx.resolvePlayer(assisterId) : undefined;
 
   const weapon = typeof raw.data.weapon === "string" ? raw.data.weapon : "";
   const headshot = raw.data.headshot === true;
   const penetratedRaw = raw.data.penetrated;
   const penetrated =
-    typeof penetratedRaw === "number"
-      ? penetratedRaw !== 0
-      : penetratedRaw === true;
+    typeof penetratedRaw === "number" ? penetratedRaw !== 0 : penetratedRaw === true;
   const noscope = raw.data.noscope === true;
   const thrusmoke = raw.data.thrusmoke === true;
   const attackerblind = raw.data.attackerblind === true;

@@ -10,9 +10,7 @@ import type { Player } from "../../../../src/state/Player.js";
 // weptype: short, ispainted: bool }. Wire field for the weapon class
 // name is `item`. The Tier-1 enricher resolves userid -> Player and
 // surfaces `item` directly. Returns null when the player does not resolve.
-function makeCtx(
-  resolvePlayer: (uid: number) => Player | undefined,
-): EnricherContext {
+function makeCtx(resolvePlayer: (uid: number) => Player | undefined): EnricherContext {
   return {
     players: [],
     entities: undefined,
@@ -28,9 +26,7 @@ function makeCtx(
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "item_equip",
     eventId: 62,

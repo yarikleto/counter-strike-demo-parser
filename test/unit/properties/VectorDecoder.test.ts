@@ -3,14 +3,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { BitReader } from "../../../src/reader/BitReader.js";
-import {
-  decodeVector,
-  decodeVectorXY,
-} from "../../../src/properties/VectorDecoder.js";
-import {
-  SendPropType,
-  type SendProp,
-} from "../../../src/datatables/SendTable.js";
+import { decodeVector, decodeVectorXY } from "../../../src/properties/VectorDecoder.js";
+import { SendPropType, type SendProp } from "../../../src/datatables/SendTable.js";
 import { SPropFlags } from "../../../src/datatables/SPropFlags.js";
 import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
@@ -45,10 +39,7 @@ function float32x3(a: number, b: number, c: number): Uint8Array {
 describe("VectorDecoder — decodeVector", () => {
   it("decodes three NOSCALE floats as { x, y, z }", () => {
     const reader = new BitReader(float32x3(1.5, -2.5, 3.5));
-    const v = decodeVector(
-      reader,
-      vectorProp(SendPropType.VECTOR, { flags: SPropFlags.NOSCALE }),
-    );
+    const v = decodeVector(reader, vectorProp(SendPropType.VECTOR, { flags: SPropFlags.NOSCALE }));
     expect(v.x).toBeCloseTo(1.5, 6);
     expect(v.y).toBeCloseTo(-2.5, 6);
     expect(v.z).toBeCloseTo(3.5, 6);

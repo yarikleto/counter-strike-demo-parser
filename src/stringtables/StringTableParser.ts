@@ -53,7 +53,7 @@
  * userdata bytes follow at the current bit alignment. BitReader.readBytes
  * handles unaligned reads transparently.
  */
-import { BitReader } from "../reader/BitReader.js";
+import type { BitReader } from "../reader/BitReader.js";
 import type { StringTable, StringTableEntry } from "./StringTable.js";
 
 /** Maximum entries kept in the recent-history ring for prefix references.

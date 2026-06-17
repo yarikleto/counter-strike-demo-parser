@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   // Wire key verified via the de_nuke descriptor table:
   //   hostage_follows (id=119): { userid:short, hostage:short }
   // (No `hostage_grab` descriptor exists in CS:GO's networked event list —
@@ -34,10 +32,7 @@ describe("enrichHostagePickedUp", () => {
     const grabber = { slot: 7 } as Player;
     const ctx = makeCtx(new Map([[55, grabber]]));
 
-    const result = enrichHostagePickedUp(
-      makeRaw({ userid: 55, hostage: 81 }),
-      ctx,
-    );
+    const result = enrichHostagePickedUp(makeRaw({ userid: 55, hostage: 81 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("hostage_follows");
@@ -49,10 +44,7 @@ describe("enrichHostagePickedUp", () => {
 
   it("returns null when player doesn't resolve", () => {
     const ctx = makeCtx(new Map());
-    const result = enrichHostagePickedUp(
-      makeRaw({ userid: 999, hostage: 81 }),
-      ctx,
-    );
+    const result = enrichHostagePickedUp(makeRaw({ userid: 999, hostage: 81 }), ctx);
     expect(result).toBeNull();
   });
 

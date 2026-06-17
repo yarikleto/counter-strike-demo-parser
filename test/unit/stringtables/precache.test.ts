@@ -151,9 +151,6 @@ describe("PrecacheTable — generic across table names", () => {
     expect(wrapper.size).toBe(2);
     expect(wrapper.get(0)).toBe("materials/sprays/custom_clan.vtf");
     expect(wrapper.get(1)).toBe("maps/de_custom.bsp");
-    expect(wrapper.all()).toEqual([
-      "materials/sprays/custom_clan.vtf",
-      "maps/de_custom.bsp",
-    ]);
+    expect(wrapper.all()).toEqual(["materials/sprays/custom_clan.vtf", "maps/de_custom.bsp"]);
   });
 });

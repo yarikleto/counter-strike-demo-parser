@@ -22,7 +22,7 @@
  *   - Decoding uses ts-proto's `Type.decode(bytes, length?)` overload. We
  *     pass the raw `Uint8Array` slice; ts-proto wraps it in its own Reader.
  */
-import { Buffer } from "node:buffer";
+import type { Buffer } from "node:buffer";
 import { ByteReader } from "../reader/ByteReader.js";
 import { NETMessages, SVCMessages } from "../generated/netmessages.js";
 import {
@@ -135,14 +135,8 @@ export class MessageDispatcher {
    */
   private static readonly registry: ReadonlyMap<number, DispatchEntry<keyof MessageHandlers>> =
     new Map<number, DispatchEntry<keyof MessageHandlers>>([
-      [
-        SVCMessages.svc_ServerInfo,
-        { decoder: CSVCMsg_ServerInfo, handlerKey: "onServerInfo" },
-      ],
-      [
-        NETMessages.net_Tick,
-        { decoder: CNETMsg_Tick, handlerKey: "onNetTick" },
-      ],
+      [SVCMessages.svc_ServerInfo, { decoder: CSVCMsg_ServerInfo, handlerKey: "onServerInfo" }],
+      [NETMessages.net_Tick, { decoder: CNETMsg_Tick, handlerKey: "onNetTick" }],
       [
         SVCMessages.svc_CreateStringTable,
         {

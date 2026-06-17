@@ -40,16 +40,12 @@ export interface PlayerTeamChangeEvent extends EnrichedEvent {
   readonly isBot: boolean;
 }
 
-export const enrichPlayerTeamChange: Enricher<PlayerTeamChangeEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichPlayerTeamChange: Enricher<PlayerTeamChangeEvent> = (raw, ctx) => {
   const userId = typeof raw.data.userid === "number" ? raw.data.userid : 0;
   const player = ctx.resolvePlayer(userId);
 
   const newTeamRaw = typeof raw.data.team === "number" ? raw.data.team : 0;
-  const oldTeamRaw =
-    typeof raw.data.oldteam === "number" ? raw.data.oldteam : 0;
+  const oldTeamRaw = typeof raw.data.oldteam === "number" ? raw.data.oldteam : 0;
 
   const newTeam: TeamSide | number = KNOWN_TEAMS.has(newTeamRaw)
     ? (newTeamRaw as TeamSide)

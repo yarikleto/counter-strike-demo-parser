@@ -30,9 +30,7 @@ export interface GrenadeThrownEvent extends EnrichedEvent {
 export const enrichGrenadeThrown: Enricher<GrenadeThrownEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
   const thrower =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+    typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
   if (thrower === undefined) return null;
 
   const weapon = typeof raw.data.weapon === "string" ? raw.data.weapon : "";

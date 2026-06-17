@@ -56,7 +56,7 @@ import type { StringTableManager } from "../stringtables/StringTableManager.js";
 import type { FlattenedSendProp } from "../datatables/ServerClass.js";
 import type { PropertyValue } from "../properties/Property.js";
 import { decodeProp } from "../properties/decodeProp.js";
-import { EntityList } from "./EntityList.js";
+import type { EntityList } from "./EntityList.js";
 import type { Entity } from "./Entity.js";
 import { getOrDecodeBaseline, applyBaseline } from "./InstanceBaseline.js";
 
@@ -84,11 +84,7 @@ import { getOrDecodeBaseline, applyBaseline } from "./InstanceBaseline.js";
  * `newWay` is a one-bit flag read once per entity, BEFORE the field-index
  * loop. Modern CSGO demos always set it; older demos may not.
  */
-function readFieldIndex(
-  reader: BitReader,
-  lastIndex: number,
-  newWay: boolean,
-): number {
+function readFieldIndex(reader: BitReader, lastIndex: number, newWay: boolean): number {
   if (newWay && reader.readBit() === 1) {
     return lastIndex + 1;
   }
@@ -156,8 +152,7 @@ export function readChangedFieldIndicesAndDecode(
   }
 
   // Phase 2: decode prop values in the same order.
-  for (let i = 0; i < indices.length; i++) {
-    const idx = indices[i]!;
+  for (const idx of indices) {
     const value = decodeProp(reader, flattenedProps[idx]!);
     writeProp(idx, value);
   }
@@ -209,10 +204,7 @@ export function decodePacketEntities(
 
   // Bits to encode a class ID. Source uses `ceil(log2(numClasses))`, with a
   // floor of 1 for the (degenerate) one-class case.
-  const classIdBits = Math.max(
-    1,
-    Math.ceil(Math.log2(Math.max(2, serverClassRegistry.size))),
-  );
+  const classIdBits = Math.max(1, Math.ceil(Math.log2(Math.max(2, serverClassRegistry.size))));
 
   let prevEntityIndex = -1;
 
@@ -250,9 +242,7 @@ export function decodePacketEntities(
 
       const serverClass = serverClassRegistry.byId(classId);
       if (serverClass === undefined) {
-        throw new Error(
-          `decodePacketEntities: unknown classId ${classId} at entityId ${entityId}`,
-        );
+        throw new Error(`decodePacketEntities: unknown classId ${classId} at entityId ${entityId}`);
       }
 
       // ADR-002 amendment line 254 forbade enter-PVS-with-different-class
@@ -299,9 +289,7 @@ export function decodePacketEntities(
     // PVS_PRESERVE: standard update — existing entity, just read changed props.
     const entity = entityList.get(entityId);
     if (entity === undefined) {
-      throw new Error(
-        `decodePacketEntities: update for unknown entity ${entityId}`,
-      );
+      throw new Error(`decodePacketEntities: update for unknown entity ${entityId}`);
     }
     readAndApplyChangedProps(reader, entity);
     emit.onUpdate(entity);

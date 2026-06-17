@@ -66,15 +66,13 @@ export function decompressSnappy(data: Uint8Array): Uint8Array | undefined {
     return undefined;
   }
   const expectedLength =
-    (data[4] | 0) | ((data[5] | 0) << 8) | ((data[6] | 0) << 16) | ((data[7] | 0) << 24);
+    data[4] | 0 | ((data[5] | 0) << 8) | ((data[6] | 0) << 16) | ((data[7] | 0) << 24);
   const snappy = loadSnappy();
   if (snappy === null) return undefined;
   const compressedBody = data.subarray(8);
   const out = snappy.uncompress(compressedBody);
   if (out.length !== expectedLength) {
-    throw new Error(
-      `decompressSnappy: decoded length ${out.length} != expected ${expectedLength}`,
-    );
+    throw new Error(`decompressSnappy: decoded length ${out.length} != expected ${expectedLength}`);
   }
   return out;
 }

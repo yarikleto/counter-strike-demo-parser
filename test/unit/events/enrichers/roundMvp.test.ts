@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  enrichRoundMvp,
-  type RoundMvpEvent,
-} from "../../../../src/events/enrichers/roundMvp.js";
+import { enrichRoundMvp, type RoundMvpEvent } from "../../../../src/events/enrichers/roundMvp.js";
 import type { DecodedGameEvent } from "../../../../src/events/GameEventDecoder.js";
 import type { EnricherContext } from "../../../../src/events/EnricherContext.js";
 import type { Player } from "../../../../src/state/Player.js";
@@ -18,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "round_mvp",
     eventId: 27,
@@ -48,10 +43,7 @@ describe("enrichRoundMvp", () => {
 
   it("returns null when player doesn't resolve", () => {
     const ctx = makeCtx(new Map());
-    const result = enrichRoundMvp(
-      makeRaw({ userid: 999, reason: 1 }),
-      ctx,
-    );
+    const result = enrichRoundMvp(makeRaw({ userid: 999, reason: 1 }), ctx);
     expect(result).toBeNull();
   });
 

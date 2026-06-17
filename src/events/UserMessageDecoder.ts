@@ -158,11 +158,7 @@ function isTeamChatTemplate(msgName: string): boolean {
  * party builds), `substituteParams` is still applied so the message stays
  * useful — but the common path is "params[1] is the message".
  */
-function decodeSayText2(
-  data: Uint8Array,
-  ctx: ChatMessageContext,
-  tick: number,
-): ChatMessage {
+function decodeSayText2(data: Uint8Array, ctx: ChatMessageContext, tick: number): ChatMessage {
   const inner = CCSUsrMsg_SayText2.decode(data);
   const msgName = inner.msgName ?? "";
   const params = inner.params;
@@ -192,9 +188,7 @@ function decodeSayText2(
   // placeholders, expand them; otherwise return the chat-body param
   // directly (the empirical CSGO common case).
   const hasPlaceholder = /%s[1-9]/.test(msgName);
-  const message = hasPlaceholder
-    ? substituteParams(msgName, params)
-    : messageParam;
+  const message = hasPlaceholder ? substituteParams(msgName, params) : messageParam;
   return Object.freeze({
     tick,
     sender,

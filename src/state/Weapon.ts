@@ -84,9 +84,7 @@ export class Weapon {
     this.entity = entity;
 
     const findIdx = (name: string): number => {
-      const idx = entity.serverClass.flattenedProps.findIndex(
-        (p) => p.prop.varName === name,
-      );
+      const idx = entity.serverClass.flattenedProps.findIndex((p) => p.prop.varName === name);
       if (idx < 0) {
         throw new Error(
           `Weapon overlay: prop "${name}" not in ${entity.serverClass.className} schema`,

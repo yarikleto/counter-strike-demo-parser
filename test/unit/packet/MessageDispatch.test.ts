@@ -12,15 +12,8 @@
 import { describe, it, expect } from "vitest";
 import { Buffer } from "node:buffer";
 import _m0 from "protobufjs/minimal";
-import {
-  MessageDispatcher,
-  iterateRawMessages,
-} from "../../../src/packet/MessageDispatch.js";
-import {
-  CNETMsg_Tick,
-  CSVCMsg_ServerInfo,
-  CSVCMsg_VoiceData,
-} from "../../../src/proto/index.js";
+import { MessageDispatcher, iterateRawMessages } from "../../../src/packet/MessageDispatch.js";
+import { CNETMsg_Tick, CSVCMsg_ServerInfo, CSVCMsg_VoiceData } from "../../../src/proto/index.js";
 import { NETMessages, SVCMessages } from "../../../src/generated/netmessages.js";
 
 /**
@@ -31,7 +24,7 @@ import { NETMessages, SVCMessages } from "../../../src/generated/netmessages.js"
  * payload itself is appended verbatim because it's already a complete
  * protobuf-encoded message body produced by ts-proto.
  */
-function buildStream(messages: Array<{ cmd: number; bytes: Uint8Array }>): Buffer {
+function buildStream(messages: { cmd: number; bytes: Uint8Array }[]): Buffer {
   return Buffer.concat(
     messages.map(({ cmd, bytes }) => {
       const w = _m0.Writer.create();
@@ -52,11 +45,9 @@ describe("MessageDispatcher", () => {
       maxClasses: 284,
     });
     const payload = CSVCMsg_ServerInfo.encode(original).finish();
-    const stream = buildStream([
-      { cmd: SVCMessages.svc_ServerInfo, bytes: payload },
-    ]);
+    const stream = buildStream([{ cmd: SVCMessages.svc_ServerInfo, bytes: payload }]);
 
-    const seen: Array<typeof original> = [];
+    const seen: (typeof original)[] = [];
     const dispatcher = new MessageDispatcher({
       onServerInfo: (info) => {
         seen.push(info);
@@ -134,7 +125,7 @@ describe("MessageDispatcher", () => {
       { cmd: unknownCmdB, bytes: fillerB },
     ]);
 
-    const seen: Array<{ commandId: number; payload: Uint8Array }> = [];
+    const seen: { commandId: number; payload: Uint8Array }[] = [];
     const dispatcher = new MessageDispatcher({
       onUnknownMessage: (commandId, payload) => {
         // Copy the bytes — the payload view aliases the underlying packet
@@ -196,16 +187,14 @@ describe("MessageDispatcher", () => {
       format: 1,
     });
     const payload = CSVCMsg_VoiceData.encode(original).finish();
-    const stream = buildStream([
-      { cmd: SVCMessages.svc_VoiceData, bytes: payload },
-    ]);
+    const stream = buildStream([{ cmd: SVCMessages.svc_VoiceData, bytes: payload }]);
 
-    const seen: Array<{
+    const seen: {
       client: number | undefined;
       proximity: boolean | undefined;
       format: number | undefined;
       voiceData: Uint8Array | undefined;
-    }> = [];
+    }[] = [];
     const dispatcher = new MessageDispatcher({
       onVoiceData: (msg) => {
         seen.push({
@@ -224,9 +213,7 @@ describe("MessageDispatcher", () => {
     expect(seen[0].proximity).toBe(true);
     expect(seen[0].format).toBe(1);
     expect(seen[0].voiceData).toBeDefined();
-    expect(Array.from(seen[0].voiceData ?? new Uint8Array())).toEqual(
-      Array.from(audio),
-    );
+    expect(Array.from(seen[0].voiceData ?? new Uint8Array())).toEqual(Array.from(audio));
   });
 
   it("registers svc_VoiceData as a known command id (TASK-051)", () => {

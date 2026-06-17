@@ -31,10 +31,7 @@ import { SPropFlags } from "../datatables/SPropFlags.js";
 import { decodeFloat } from "./FloatDecoder.js";
 import type { Vector2, Vector3 } from "./Property.js";
 
-export function decodeVector(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): Vector3 {
+export function decodeVector(reader: BitReader, prop: FlattenedSendProp): Vector3 {
   const x = decodeFloat(reader, prop);
   const y = decodeFloat(reader, prop);
 
@@ -51,10 +48,7 @@ export function decodeVector(
   return { x, y, z };
 }
 
-export function decodeVectorXY(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): Vector2 {
+export function decodeVectorXY(reader: BitReader, prop: FlattenedSendProp): Vector2 {
   const x = decodeFloat(reader, prop);
   const y = decodeFloat(reader, prop);
   return { x, y };

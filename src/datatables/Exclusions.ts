@@ -41,10 +41,7 @@ export function exclusionKey(dtName: string, varName: string): string {
  * the registry. A `visited` set prevents infinite loops in the rare case
  * a malformed demo declares a cyclic table reference.
  */
-export function gatherExclusions(
-  rootTable: SendTable,
-  registry: SendTableRegistry,
-): Set<string> {
+export function gatherExclusions(rootTable: SendTable, registry: SendTableRegistry): Set<string> {
   const exclusions = new Set<string>();
   const visited = new Set<string>();
   walk(rootTable, registry, exclusions, visited);

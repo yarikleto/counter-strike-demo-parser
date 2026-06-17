@@ -17,9 +17,7 @@ function makeCtx(): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "cs_win_panel_round",
     eventId: 121,
@@ -57,10 +55,7 @@ describe("enrichCsWinPanelRound", () => {
   });
 
   it("coerces missing fields to safe defaults rather than throwing", () => {
-    const result = enrichCsWinPanelRound(
-      makeRaw({}),
-      makeCtx(),
-    ) as Readonly<CsWinPanelRoundEvent>;
+    const result = enrichCsWinPanelRound(makeRaw({}), makeCtx()) as Readonly<CsWinPanelRoundEvent>;
 
     expect(result.finalEvent).toBe(0);
     expect(result.funFactToken).toBe("");

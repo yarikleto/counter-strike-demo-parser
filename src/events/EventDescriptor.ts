@@ -26,14 +26,7 @@
  */
 
 /** Wire-level value type of a single game-event key. */
-export type EventKeyType =
-  | "string"
-  | "float"
-  | "long"
-  | "short"
-  | "byte"
-  | "bool"
-  | "uint64";
+export type EventKeyType = "string" | "float" | "long" | "short" | "byte" | "bool" | "uint64";
 
 /** One named key inside an {@link EventDescriptor}. */
 export interface EventKeyDescriptor {

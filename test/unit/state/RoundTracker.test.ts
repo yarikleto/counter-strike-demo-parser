@@ -179,11 +179,11 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
     // initial state IS emitted exactly once because there is no previous
     // phase — but we surface that via `previousPhase: undefined` so listeners
     // can decide to ignore it. Track this contract here.
-    const events: Array<{
+    const events: {
       phase: RoundPhase;
       previousPhase: RoundPhase | undefined;
       roundNumber: number;
-    }> = [];
+    }[] = [];
     const tracker = new RoundTracker((e) => events.push(e));
     tracker.onUpdate(
       makeFakeGameRules({
@@ -203,7 +203,7 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
   });
 
   it("does not re-emit when the phase is unchanged across updates", () => {
-    const events: Array<{ phase: RoundPhase }> = [];
+    const events: { phase: RoundPhase }[] = [];
     const tracker = new RoundTracker((e) => events.push(e));
     const live = makeFakeGameRules({
       gamePhase: 2,
@@ -220,11 +220,11 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
   });
 
   it("emits the canonical warmup -> live -> over -> freeze -> live sequence", () => {
-    const events: Array<{
+    const events: {
       phase: RoundPhase;
       previousPhase: RoundPhase | undefined;
       roundNumber: number;
-    }> = [];
+    }[] = [];
     const tracker = new RoundTracker((e) => events.push(e));
     // warmup
     tracker.onUpdate(
@@ -276,13 +276,7 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
         totalRoundsPlayed: 1,
       }),
     );
-    expect(events.map((e) => e.phase)).toEqual([
-      "warmup",
-      "live",
-      "over",
-      "freeze",
-      "live",
-    ]);
+    expect(events.map((e) => e.phase)).toEqual(["warmup", "live", "over", "freeze", "live"]);
     expect(events.map((e) => e.previousPhase)).toEqual([
       undefined,
       "warmup",
@@ -294,7 +288,9 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
   });
 
   it("exposes current phase and round number after updates", () => {
-    const tracker = new RoundTracker(() => {});
+    const tracker = new RoundTracker(() => {
+      // no-op
+    });
     tracker.onUpdate(
       makeFakeGameRules({
         gamePhase: 2,
@@ -309,7 +305,9 @@ describe("RoundTracker — onUpdate emits phase changes", () => {
   });
 
   it("phase getter is undefined before any update", () => {
-    const tracker = new RoundTracker(() => {});
+    const tracker = new RoundTracker(() => {
+      // no-op
+    });
     expect(tracker.phase).toBeUndefined();
     expect(tracker.roundNumber).toBe(0);
   });

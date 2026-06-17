@@ -52,31 +52,22 @@ import { EventEmitter } from "node:events";
  * make the type-level event-name machinery harder to reason about and they
  * don't appear in any of our use cases.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+
 export type EventMap = object;
 
 /** Listener signature for a given event. */
 export type Listener<T> = (payload: T) => void;
 
 export class TypedEventEmitter<TEvents extends EventMap> extends EventEmitter {
-  override on<K extends keyof TEvents & string>(
-    event: K,
-    listener: Listener<TEvents[K]>,
-  ): this {
+  override on<K extends keyof TEvents & string>(event: K, listener: Listener<TEvents[K]>): this {
     return super.on(event, listener as (...args: unknown[]) => void);
   }
 
-  override off<K extends keyof TEvents & string>(
-    event: K,
-    listener: Listener<TEvents[K]>,
-  ): this {
+  override off<K extends keyof TEvents & string>(event: K, listener: Listener<TEvents[K]>): this {
     return super.off(event, listener as (...args: unknown[]) => void);
   }
 
-  override once<K extends keyof TEvents & string>(
-    event: K,
-    listener: Listener<TEvents[K]>,
-  ): this {
+  override once<K extends keyof TEvents & string>(event: K, listener: Listener<TEvents[K]>): this {
     return super.once(event, listener as (...args: unknown[]) => void);
   }
 
@@ -91,22 +82,14 @@ export class TypedEventEmitter<TEvents extends EventMap> extends EventEmitter {
     event: K,
     listener: Listener<TEvents[K]>,
   ): this {
-    return super.removeListener(
-      event,
-      listener as (...args: unknown[]) => void,
-    );
+    return super.removeListener(event, listener as (...args: unknown[]) => void);
   }
 
-  override removeAllListeners<K extends keyof TEvents & string>(
-    event?: K,
-  ): this {
+  override removeAllListeners<K extends keyof TEvents & string>(event?: K): this {
     return super.removeAllListeners(event);
   }
 
-  override emit<K extends keyof TEvents & string>(
-    event: K,
-    payload: TEvents[K],
-  ): boolean {
+  override emit<K extends keyof TEvents & string>(event: K, payload: TEvents[K]): boolean {
     return super.emit(event, payload);
   }
 

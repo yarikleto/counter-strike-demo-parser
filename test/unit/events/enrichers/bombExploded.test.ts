@@ -14,9 +14,7 @@ function makeCtx(): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "bomb_exploded",
     eventId: 110,
@@ -26,10 +24,7 @@ function makeRaw(
 
 describe("enrichBombExploded", () => {
   it("happy path: surfaces site without resolving any player, never returns null", () => {
-    const result = enrichBombExploded(
-      makeRaw({ userid: 109, site: 425 }),
-      makeCtx(),
-    );
+    const result = enrichBombExploded(makeRaw({ userid: 109, site: 425 }), makeCtx());
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("bomb_exploded");

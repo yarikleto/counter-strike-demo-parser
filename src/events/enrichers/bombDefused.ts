@@ -21,8 +21,7 @@ export interface BombDefusedEvent extends EnrichedEvent {
 
 export const enrichBombDefused: Enricher<BombDefusedEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const site = typeof raw.data.site === "number" ? raw.data.site : 0;

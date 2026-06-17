@@ -19,11 +19,7 @@ import type {
   PlayerConnectEvent,
   ChatMessage,
 } from "../../src/index.js";
-import type {
-  Tier1EventMap,
-  Tier2EventMap,
-  Tier3EventMap,
-} from "../../src/events/index.js";
+import type { Tier1EventMap, Tier2EventMap, Tier3EventMap } from "../../src/events/index.js";
 import type { Entity } from "../../src/entities/Entity.js";
 import type { StringTable } from "../../src/stringtables/StringTable.js";
 import type { StringTableEntry } from "../../src/stringtables/StringTable.js";
@@ -80,11 +76,10 @@ const _t3EntityCreated: Equals<Tier3EventMap["entityCreated"], Entity> = true;
 const _t3EntityUpdated: Equals<Tier3EventMap["entityUpdated"], Entity> = true;
 const _t3EntityDeleted: Equals<Tier3EventMap["entityDeleted"], Entity> = true;
 const _t3EntityDecodeError: Equals<Tier3EventMap["entityDecodeError"], unknown> = true;
-const _t3GameEventListReady: Equals<Tier3EventMap["gameEventListReady"], EventDescriptorTable> = true;
-const _t3GameEventDecodeError: Equals<
-  Tier3EventMap["gameEventDecodeError"],
-  { eventId: number }
-> = true;
+const _t3GameEventListReady: Equals<Tier3EventMap["gameEventListReady"], EventDescriptorTable> =
+  true;
+const _t3GameEventDecodeError: Equals<Tier3EventMap["gameEventDecodeError"], { eventId: number }> =
+  true;
 const _t3EnrichmentSkipped: Equals<
   Tier3EventMap["gameEventEnrichmentSkipped"],
   { name: string; eventId: number }

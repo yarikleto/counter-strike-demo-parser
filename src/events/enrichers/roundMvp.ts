@@ -38,8 +38,7 @@ export interface RoundMvpEvent extends EnrichedEvent {
 
 export const enrichRoundMvp: Enricher<RoundMvpEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const reason = typeof raw.data.reason === "number" ? raw.data.reason : 0;

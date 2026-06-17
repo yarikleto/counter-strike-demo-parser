@@ -25,12 +25,10 @@ export interface BombDroppedEvent extends EnrichedEvent {
 
 export const enrichBombDropped: Enricher<BombDroppedEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
-  const entityIndex =
-    typeof raw.data.entindex === "number" ? raw.data.entindex : 0;
+  const entityIndex = typeof raw.data.entindex === "number" ? raw.data.entindex : 0;
 
   return freezeEvent<BombDroppedEvent>({
     eventName: raw.name,

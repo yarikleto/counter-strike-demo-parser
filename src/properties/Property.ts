@@ -47,16 +47,7 @@ export interface Vector2 {
  * - ARRAY           → PropertyValue[]
  * - DATATABLE       → never appears in flattened output (decoder throws)
  */
-export type PropertyValue =
-  | number
-  | bigint
-  | string
-  | Vector3
-  | Vector2
-  | PropertyValue[];
+export type PropertyValue = number | bigint | string | Vector3 | Vector2 | PropertyValue[];
 
 /** Per-type sub-decoder signature. Pure function over the BitReader. */
-export type DecodeProp = (
-  reader: BitReader,
-  prop: FlattenedSendProp,
-) => PropertyValue;
+export type DecodeProp = (reader: BitReader, prop: FlattenedSendProp) => PropertyValue;

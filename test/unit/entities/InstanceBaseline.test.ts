@@ -32,27 +32,38 @@ class TestBitWriter {
     let lookup: number;
     let extBits: number;
     if (ext === 0) {
-      lookup = 0; extBits = 0;
+      lookup = 0;
+      extBits = 0;
     } else if (ext < 1 << 4) {
-      lookup = 1; extBits = 4;
+      lookup = 1;
+      extBits = 4;
     } else if (ext < 1 << 8) {
-      lookup = 2; extBits = 8;
+      lookup = 2;
+      extBits = 8;
     } else {
-      lookup = 3; extBits = 28;
+      lookup = 3;
+      extBits = 28;
     }
     this.writeBits(low6, 6);
     this.writeBits(lookup, 2);
     if (extBits > 0) this.writeBits(ext, extBits);
   }
-  toBytes(): Uint8Array { return new Uint8Array(this.bytes); }
+  toBytes(): Uint8Array {
+    return new Uint8Array(this.bytes);
+  }
 }
 
 function makeProp(varName: string, type: number, numBits = 16, flags = 0): FlattenedSendProp {
   return {
     prop: {
       type: type as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
-      varName, flags, priority: 0, numElements: 0,
-      lowValue: 0, highValue: 0, numBits,
+      varName,
+      flags,
+      priority: 0,
+      numElements: 0,
+      lowValue: 0,
+      highValue: 0,
+      numBits,
     },
     sourceTableName: "DT_T",
   };
@@ -66,10 +77,14 @@ describe("InstanceBaseline", () => {
       makeProp("p2", SendPropType.INT, 8, SPropFlags.UNSIGNED),
     ];
     const sc: ServerClass = {
-      classId: 42, className: "CTest", dtName: "DT_T",
+      classId: 42,
+      className: "CTest",
+      dtName: "DT_T",
       sendTable: undefined,
       flattenedProps: props,
-      entityStore: null, propColumnLayout: null, cachedBaseline: undefined,
+      entityStore: null,
+      propColumnLayout: null,
+      cachedBaseline: undefined,
     };
     // Encode: changed-prop-list = [0, 2], with values 0xAB and 0xCD.
     // Wire format matches `markus-wa/demoinfocs-golang`'s `ApplyUpdate`:
@@ -80,10 +95,13 @@ describe("InstanceBaseline", () => {
     // index 0 (lastIndex=-1 -> 0): newWay-A fast path, readBit()=1.
     w.writeBit(1);
     // index 2 (lastIndex=0 -> 2, delta=1): newWay-A=0, newWay-B=1, readBits(3)=1.
-    w.writeBit(0); w.writeBit(1); w.writeBits(1, 3);
+    w.writeBit(0);
+    w.writeBit(1);
+    w.writeBits(1, 3);
     // terminator (return -1): newWay-A=0, newWay-B=0, readBits(7) tag=0x60 path.
     // Final res = 0xFFF = (31) | (127 << 5). 7-bit ret = 0x7F (tag=0x60, low5=31).
-    w.writeBit(0); w.writeBit(0);
+    w.writeBit(0);
+    w.writeBit(0);
     w.writeBits(0x7f, 7);
     w.writeBits(0x7f, 7);
     // value at idx 0: readBits(8) of 0xAB
@@ -97,7 +115,9 @@ describe("InstanceBaseline", () => {
       name: "instancebaseline",
       maxEntries: 1024,
       userDataFixedSize: false,
-      userDataSize: 0, userDataSizeBits: 0, flags: 0,
+      userDataSize: 0,
+      userDataSizeBits: 0,
+      flags: 0,
     });
     baselineTable.setEntry(0, "42", blob);
     tables.register(baselineTable);
@@ -112,10 +132,14 @@ describe("InstanceBaseline", () => {
 
   it("returns undefined when the baseline table is missing", () => {
     const sc: ServerClass = {
-      classId: 1, className: "C", dtName: "D",
+      classId: 1,
+      className: "C",
+      dtName: "D",
       sendTable: undefined,
       flattenedProps: [makeProp("p", SendPropType.INT, 8)],
-      entityStore: null, propColumnLayout: null, cachedBaseline: undefined,
+      entityStore: null,
+      propColumnLayout: null,
+      cachedBaseline: undefined,
     };
     const tables = new StringTableManager();
     expect(getOrDecodeBaseline(sc, tables)).toBeUndefined();
@@ -123,15 +147,23 @@ describe("InstanceBaseline", () => {
 
   it("returns undefined when the baseline table has no entry for the class", () => {
     const sc: ServerClass = {
-      classId: 99, className: "C", dtName: "D",
+      classId: 99,
+      className: "C",
+      dtName: "D",
       sendTable: undefined,
       flattenedProps: [makeProp("p", SendPropType.INT, 8)],
-      entityStore: null, propColumnLayout: null, cachedBaseline: undefined,
+      entityStore: null,
+      propColumnLayout: null,
+      cachedBaseline: undefined,
     };
     const tables = new StringTableManager();
     const t = new StringTable({
-      name: "instancebaseline", maxEntries: 16,
-      userDataFixedSize: false, userDataSize: 0, userDataSizeBits: 0, flags: 0,
+      name: "instancebaseline",
+      maxEntries: 16,
+      userDataFixedSize: false,
+      userDataSize: 0,
+      userDataSizeBits: 0,
+      flags: 0,
     });
     tables.register(t);
     expect(getOrDecodeBaseline(sc, tables)).toBeUndefined();

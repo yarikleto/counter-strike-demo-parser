@@ -172,21 +172,18 @@ describe("GameRules overlay — boolean getters", () => {
     ["isBombPlanted", 9],
     ["isBombDropped", 10],
     ["hasMatchStarted", 11],
-  ] as const)(
-    "%s reads %i and maps non-zero to true, zero/undefined to false",
-    (name, idx) => {
-      const valuesTrue = new Map<number, unknown>([[idx, 1]]);
-      const grTrue = new GameRules(makeFakeEntity(REQUIRED_PROPS, valuesTrue));
-      expect(grTrue[name]).toBe(true);
+  ] as const)("%s reads %i and maps non-zero to true, zero/undefined to false", (name, idx) => {
+    const valuesTrue = new Map<number, unknown>([[idx, 1]]);
+    const grTrue = new GameRules(makeFakeEntity(REQUIRED_PROPS, valuesTrue));
+    expect(grTrue[name]).toBe(true);
 
-      const valuesFalse = new Map<number, unknown>([[idx, 0]]);
-      const grFalse = new GameRules(makeFakeEntity(REQUIRED_PROPS, valuesFalse));
-      expect(grFalse[name]).toBe(false);
+    const valuesFalse = new Map<number, unknown>([[idx, 0]]);
+    const grFalse = new GameRules(makeFakeEntity(REQUIRED_PROPS, valuesFalse));
+    expect(grFalse[name]).toBe(false);
 
-      const grAbsent = new GameRules(makeFakeEntity(REQUIRED_PROPS, new Map()));
-      expect(grAbsent[name]).toBe(false);
-    },
-  );
+    const grAbsent = new GameRules(makeFakeEntity(REQUIRED_PROPS, new Map()));
+    expect(grAbsent[name]).toBe(false);
+  });
 });
 
 describe("GameRules overlay — snapshot()", () => {

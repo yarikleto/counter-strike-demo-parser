@@ -43,14 +43,14 @@ import { ByteReader } from "../reader/ByteReader.js";
  * see TASK-058 spec for the format reference.
  */
 export interface DecodedStringTableSnapshot {
-  readonly tables: ReadonlyArray<DecodedSnapshotTable>;
+  readonly tables: readonly DecodedSnapshotTable[];
 }
 
 /** A single decoded table inside a snapshot. */
 export interface DecodedSnapshotTable {
   readonly name: string;
-  readonly entries: ReadonlyArray<DecodedSnapshotEntry>;
-  readonly clientEntries: ReadonlyArray<DecodedSnapshotEntry>;
+  readonly entries: readonly DecodedSnapshotEntry[];
+  readonly clientEntries: readonly DecodedSnapshotEntry[];
 }
 
 /** A single decoded entry — a string key plus an optional userdata blob. */

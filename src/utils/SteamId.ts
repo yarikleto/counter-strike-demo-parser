@@ -109,14 +109,10 @@ export class SteamId {
    */
   static fromAccountId(accountId: number): SteamId {
     if (!Number.isInteger(accountId)) {
-      throw new SteamIdParseError(
-        `accountId must be an integer, got ${accountId}`,
-      );
+      throw new SteamIdParseError(`accountId must be an integer, got ${accountId}`);
     }
     if (accountId < 0 || accountId >= ACCOUNT_ID_LIMIT) {
-      throw new SteamIdParseError(
-        `accountId out of 32-bit unsigned range [0, 2^32): ${accountId}`,
-      );
+      throw new SteamIdParseError(`accountId out of 32-bit unsigned range [0, 2^32): ${accountId}`);
     }
     return new SteamId(accountId);
   }

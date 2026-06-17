@@ -21,8 +21,7 @@ export interface PlayerGivenC4Event extends EnrichedEvent {
 
 export const enrichPlayerGivenC4: Enricher<PlayerGivenC4Event> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   return freezeEvent<PlayerGivenC4Event>({

@@ -73,10 +73,7 @@ import { enrichWeaponFire } from "./weaponFire.js";
 import { enrichWeaponReload } from "./weaponReload.js";
 import { enrichWeaponZoom } from "./weaponZoom.js";
 
-export const enricherTable: ReadonlyMap<string, Enricher> = new Map<
-  string,
-  Enricher
->([
+export const enricherTable: ReadonlyMap<string, Enricher> = new Map<string, Enricher>([
   // Alphabetical by raw CS:GO event name.
   // TASK-039: bomb lifecycle events.
   ["bomb_abortdefuse", enrichBombAbortDefuse as Enricher],

@@ -117,12 +117,7 @@ function findIdx(entity: Entity, name: string, sourceTable?: string): number {
  * POV-only edge case) we fall back to the local pair. Throws if neither
  * table carries the prop, which would be a real schema break.
  */
-function findIdxFallback(
-  entity: Entity,
-  name: string,
-  primary: string,
-  fallback: string,
-): number {
+function findIdxFallback(entity: Entity, name: string, primary: string, fallback: string): number {
   try {
     return findIdx(entity, name, primary);
   } catch {
@@ -168,11 +163,7 @@ export class Player {
    * `undefined` — useful for unit tests that don't need the userinfo
    * resolution path.
    */
-  constructor(
-    slot: number,
-    entity: Entity,
-    userInfoIndex?: UserInfoIndex,
-  ) {
+  constructor(slot: number, entity: Entity, userInfoIndex?: UserInfoIndex) {
     this.slot = slot;
     this.entity = entity;
     this.userInfoIndex = userInfoIndex;
@@ -230,19 +221,10 @@ export class Player {
    * the call but mutations throw.
    */
   get position(): Vector3 {
-    const xy = this.entity.store.read(
-      this.entity.storageSlot,
-      this.originXyIdx,
-    );
+    const xy = this.entity.store.read(this.entity.storageSlot, this.originXyIdx);
     const z = this.readNum(this.originZIdx);
-    const x =
-      xy !== undefined && typeof xy === "object" && "x" in xy
-        ? (xy as { x: number }).x
-        : 0;
-    const y =
-      xy !== undefined && typeof xy === "object" && "y" in xy
-        ? (xy as { y: number }).y
-        : 0;
+    const x = xy !== undefined && typeof xy === "object" && "x" in xy ? (xy as { x: number }).x : 0;
+    const y = xy !== undefined && typeof xy === "object" && "y" in xy ? (xy as { y: number }).y : 0;
     return Object.freeze({ x, y, z });
   }
 

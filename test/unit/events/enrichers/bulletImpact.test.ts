@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "bullet_impact",
     eventId: 90,
@@ -30,10 +28,7 @@ describe("enrichBulletImpact", () => {
     const player = { slot: 2 } as Player;
     const ctx = makeCtx(new Map([[22, player]]));
 
-    const result = enrichBulletImpact(
-      makeRaw({ userid: 22, x: 100.5, y: -200.25, z: 64 }),
-      ctx,
-    );
+    const result = enrichBulletImpact(makeRaw({ userid: 22, x: 100.5, y: -200.25, z: 64 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("bullet_impact");
@@ -46,10 +41,7 @@ describe("enrichBulletImpact", () => {
   it("player unresolved: still emits with player undefined", () => {
     const ctx = makeCtx(new Map());
 
-    const result = enrichBulletImpact(
-      makeRaw({ userid: 0, x: 1, y: 2, z: 3 }),
-      ctx,
-    );
+    const result = enrichBulletImpact(makeRaw({ userid: 0, x: 1, y: 2, z: 3 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.player).toBeUndefined();

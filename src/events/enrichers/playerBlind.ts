@@ -30,18 +30,14 @@ export interface PlayerBlindEvent extends EnrichedEvent {
 
 export const enrichPlayerBlind: Enricher<PlayerBlindEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const attackerId = raw.data.attacker;
   const attacker =
-    typeof attackerId === "number" && attackerId !== 0
-      ? ctx.resolvePlayer(attackerId)
-      : undefined;
+    typeof attackerId === "number" && attackerId !== 0 ? ctx.resolvePlayer(attackerId) : undefined;
 
-  const blindDuration =
-    typeof raw.data.blind_duration === "number" ? raw.data.blind_duration : 0;
+  const blindDuration = typeof raw.data.blind_duration === "number" ? raw.data.blind_duration : 0;
 
   return freezeEvent<PlayerBlindEvent>({
     eventName: raw.name,

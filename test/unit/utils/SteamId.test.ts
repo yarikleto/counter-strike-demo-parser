@@ -71,24 +71,18 @@ describe("SteamId.fromSteam64 — string input", () => {
     expect(() => SteamId.fromSteam64("0x123")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam64("123abc")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam64("-1")).toThrow(SteamIdParseError);
-    expect(() => SteamId.fromSteam64(" 76561198000000001")).toThrow(
-      SteamIdParseError,
-    );
+    expect(() => SteamId.fromSteam64(" 76561198000000001")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam64("")).toThrow(SteamIdParseError);
   });
 
   it("rejects values below the individual-account base", () => {
     expect(() => SteamId.fromSteam64(0n)).toThrow(SteamIdParseError);
-    expect(() => SteamId.fromSteam64(76561197960265727n)).toThrow(
-      SteamIdParseError,
-    );
+    expect(() => SteamId.fromSteam64(76561197960265727n)).toThrow(SteamIdParseError);
   });
 
   it("rejects values whose accountId would overflow 32 bits", () => {
     // STEAM64_BASE + 2^32
-    expect(() =>
-      SteamId.fromSteam64(76561197960265728n + 0x100000000n),
-    ).toThrow(SteamIdParseError);
+    expect(() => SteamId.fromSteam64(76561197960265728n + 0x100000000n)).toThrow(SteamIdParseError);
   });
 });
 
@@ -115,15 +109,9 @@ describe("SteamId.fromSteam2 — universe acceptance", () => {
     expect(() => SteamId.fromSteam2("STEAM_0:1")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam2("STEAM_0:2:0")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam2("steam_0:1:0")).toThrow(SteamIdParseError);
-    expect(() => SteamId.fromSteam2("STEAM_0:1:0:0")).toThrow(
-      SteamIdParseError,
-    );
-    expect(() => SteamId.fromSteam2("STEAM_0:1:abc")).toThrow(
-      SteamIdParseError,
-    );
-    expect(() => SteamId.fromSteam2(" STEAM_0:1:0")).toThrow(
-      SteamIdParseError,
-    );
+    expect(() => SteamId.fromSteam2("STEAM_0:1:0:0")).toThrow(SteamIdParseError);
+    expect(() => SteamId.fromSteam2("STEAM_0:1:abc")).toThrow(SteamIdParseError);
+    expect(() => SteamId.fromSteam2(" STEAM_0:1:0")).toThrow(SteamIdParseError);
     expect(() => SteamId.fromSteam2("[U:1:1]")).toThrow(SteamIdParseError);
   });
 });
@@ -145,9 +133,7 @@ describe("SteamId.fromSteam3 — strict shape", () => {
 
   it("rejects accountId values that overflow 32 bits", () => {
     // 2^32 = 4294967296 — one past the max valid accountId.
-    expect(() => SteamId.fromSteam3("[U:1:4294967296]")).toThrow(
-      SteamIdParseError,
-    );
+    expect(() => SteamId.fromSteam3("[U:1:4294967296]")).toThrow(SteamIdParseError);
   });
 });
 
@@ -161,12 +147,8 @@ describe("SteamId.fromAccountId — bounds", () => {
     expect(() => SteamId.fromAccountId(-1)).toThrow(SteamIdParseError);
     expect(() => SteamId.fromAccountId(1.5)).toThrow(SteamIdParseError);
     expect(() => SteamId.fromAccountId(Number.NaN)).toThrow(SteamIdParseError);
-    expect(() => SteamId.fromAccountId(0x100000000)).toThrow(
-      SteamIdParseError,
-    );
-    expect(() => SteamId.fromAccountId(Number.POSITIVE_INFINITY)).toThrow(
-      SteamIdParseError,
-    );
+    expect(() => SteamId.fromAccountId(0x100000000)).toThrow(SteamIdParseError);
+    expect(() => SteamId.fromAccountId(Number.POSITIVE_INFINITY)).toThrow(SteamIdParseError);
   });
 });
 

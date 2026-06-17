@@ -160,11 +160,7 @@ describe("IntDecoder — decodeInt64", () => {
     // bit set => 0xAC. High 7 bits = 0b00010 = 0x02 (no continuation).
     const buf = new Uint8Array([0xac, 0x02]);
     const reader = new BitReader(buf);
-    const p = intProp(
-      SPropFlags.VARINT | SPropFlags.UNSIGNED,
-      64,
-      SendPropType.INT64,
-    );
+    const p = intProp(SPropFlags.VARINT | SPropFlags.UNSIGNED, 64, SendPropType.INT64);
     expect(decodeInt64(reader, p)).toBe(300n);
   });
 

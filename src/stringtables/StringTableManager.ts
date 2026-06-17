@@ -23,9 +23,7 @@ export class StringTableManager {
    */
   register(table: StringTable): number {
     if (this.byName.has(table.name)) {
-      throw new Error(
-        `StringTableManager: duplicate table name "${table.name}"`,
-      );
+      throw new Error(`StringTableManager: duplicate table name "${table.name}"`);
     }
     const id = this.byId.length;
     this.byId.push(table);
@@ -42,16 +40,12 @@ export class StringTableManager {
   replaceTable(table: StringTable): void {
     const existing = this.byName.get(table.name);
     if (existing === undefined) {
-      throw new Error(
-        `StringTableManager: cannot replace unknown table "${table.name}"`,
-      );
+      throw new Error(`StringTableManager: cannot replace unknown table "${table.name}"`);
     }
     const id = this.byId.indexOf(existing);
     if (id < 0) {
       // Should be impossible — byName and byId are kept in sync by register.
-      throw new Error(
-        `StringTableManager: table "${table.name}" missing from id index`,
-      );
+      throw new Error(`StringTableManager: table "${table.name}" missing from id index`);
     }
     this.byId[id] = table;
     this.byName.set(table.name, table);

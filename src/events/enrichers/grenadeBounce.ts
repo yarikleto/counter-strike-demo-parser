@@ -21,9 +21,7 @@ export interface GrenadeBounceEvent extends EnrichedEvent {
 export const enrichGrenadeBounce: Enricher<GrenadeBounceEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
   const thrower =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+    typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
   if (thrower === undefined) return null;
 
   return freezeEvent<GrenadeBounceEvent>({

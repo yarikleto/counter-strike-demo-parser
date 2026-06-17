@@ -34,10 +34,7 @@ function maxElementsBitWidth(numElements: number): number {
   return Math.ceil(Math.log2(numElements + 1));
 }
 
-export function decodeArray(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): PropertyValue[] {
+export function decodeArray(reader: BitReader, prop: FlattenedSendProp): PropertyValue[] {
   const elementTemplate = prop.arrayElement;
   if (elementTemplate === undefined) {
     throw new Error(

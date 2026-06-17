@@ -101,12 +101,12 @@ describe("DemoParser parserError event (TASK-059)", () => {
     const buffer = Buffer.concat([buildHeader(), partialPrefix]);
 
     const parser = new DemoParser(buffer);
-    const errors: Array<{
+    const errors: {
       kind: string;
       tick: number;
       byteOffset: number;
       message: string;
-    }> = [];
+    }[] = [];
     parser.on("parserError", (e) => {
       errors.push({
         kind: e.kind,
@@ -134,7 +134,7 @@ describe("DemoParser parserError event (TASK-059)", () => {
     const buffer = Buffer.concat([buildHeader(), badPrefix]);
 
     const parser = new DemoParser(buffer);
-    const errors: Array<{ kind: string; byteOffset: number; message: string }> = [];
+    const errors: { kind: string; byteOffset: number; message: string }[] = [];
     parser.on("parserError", (e) => {
       errors.push({ kind: e.kind, byteOffset: e.byteOffset, message: e.message });
     });
@@ -162,16 +162,11 @@ describe("DemoParser parserError event (TASK-059)", () => {
     // advance to 20 by the time we emit our verification listener.
     const synctick = buildFramePrefix(DemoCommands.DEM_SYNCTICK, 20);
 
-    const buffer = Buffer.concat([
-      buildHeader(),
-      corruptPacketFrame,
-      synctick,
-      STOP_FRAME,
-    ]);
+    const buffer = Buffer.concat([buildHeader(), corruptPacketFrame, synctick, STOP_FRAME]);
 
     const parser = new DemoParser(buffer);
 
-    const errors: Array<{ kind: string; tick: number; byteOffset: number }> = [];
+    const errors: { kind: string; tick: number; byteOffset: number }[] = [];
     parser.on("parserError", (e) => {
       errors.push({ kind: e.kind, tick: e.tick, byteOffset: e.byteOffset });
     });

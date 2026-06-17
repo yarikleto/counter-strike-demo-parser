@@ -7,10 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { BitReader } from "../../../src/reader/BitReader.js";
 import { decodeArray } from "../../../src/properties/ArrayDecoder.js";
-import {
-  SendPropType,
-  type SendProp,
-} from "../../../src/datatables/SendTable.js";
+import { SendPropType, type SendProp } from "../../../src/datatables/SendTable.js";
 import { SPropFlags } from "../../../src/datatables/SPropFlags.js";
 import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
@@ -30,10 +27,7 @@ function intElementTemplate(numBits = 8): FlattenedSendProp {
   };
 }
 
-function arrayProp(
-  numElements: number,
-  element: FlattenedSendProp,
-): FlattenedSendProp {
+function arrayProp(numElements: number, element: FlattenedSendProp): FlattenedSendProp {
   return {
     prop: {
       type: SendPropType.ARRAY,
@@ -115,8 +109,6 @@ describe("ArrayDecoder", () => {
       sourceTableName: "DT_Bad",
     };
     const reader = new BitReader(new Uint8Array(2));
-    expect(() => decodeArray(reader, propMissingTemplate)).toThrow(
-      /no element template/,
-    );
+    expect(() => decodeArray(reader, propMissingTemplate)).toThrow(/no element template/);
   });
 });

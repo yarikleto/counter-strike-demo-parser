@@ -30,16 +30,12 @@ export interface PlayerDisconnectEvent extends EnrichedEvent {
   readonly reason: string;
 }
 
-export const enrichPlayerDisconnect: Enricher<PlayerDisconnectEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichPlayerDisconnect: Enricher<PlayerDisconnectEvent> = (raw, ctx) => {
   const userId = typeof raw.data.userid === "number" ? raw.data.userid : 0;
   const player = ctx.resolvePlayer(userId);
 
   const rawName = typeof raw.data.name === "string" ? raw.data.name : "";
-  const fallbackName =
-    rawName === "" ? ctx.userInfoIndex?.infoForUserId(userId)?.name : undefined;
+  const fallbackName = rawName === "" ? ctx.userInfoIndex?.infoForUserId(userId)?.name : undefined;
   const name = rawName !== "" ? rawName : (fallbackName ?? "");
 
   const reason = typeof raw.data.reason === "string" ? raw.data.reason : "";

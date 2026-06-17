@@ -145,12 +145,7 @@ function findIdx(entity: Entity, name: string, sourceTable?: string): number {
  * even when the second is dormant for this class.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function findIdxFallback(
-  entity: Entity,
-  name: string,
-  primary: string,
-  fallback: string,
-): number {
+function findIdxFallback(entity: Entity, name: string, primary: string, fallback: string): number {
   try {
     return findIdx(entity, name, primary);
   } catch {
@@ -193,59 +188,19 @@ export class GameRules {
     this.entity = entity;
 
     this.roundTimeIdx = findIdx(entity, "m_iRoundTime", "DT_CSGameRules");
-    this.totalRoundsPlayedIdx = findIdx(
-      entity,
-      "m_totalRoundsPlayed",
-      "DT_CSGameRules",
-    );
+    this.totalRoundsPlayedIdx = findIdx(entity, "m_totalRoundsPlayed", "DT_CSGameRules");
     this.gamePhaseIdx = findIdx(entity, "m_gamePhase", "DT_CSGameRules");
-    this.overtimePlayingIdx = findIdx(
-      entity,
-      "m_nOvertimePlaying",
-      "DT_CSGameRules",
-    );
-    this.roundStartTimeIdx = findIdx(
-      entity,
-      "m_fRoundStartTime",
-      "DT_CSGameRules",
-    );
-    this.restartRoundTimeIdx = findIdx(
-      entity,
-      "m_flRestartRoundTime",
-      "DT_CSGameRules",
-    );
-    this.matchStartTimeIdx = findIdx(
-      entity,
-      "m_fMatchStartTime",
-      "DT_CSGameRules",
-    );
-    this.warmupPeriodIdx = findIdx(
-      entity,
-      "m_bWarmupPeriod",
-      "DT_CSGameRules",
-    );
-    this.freezePeriodIdx = findIdx(
-      entity,
-      "m_bFreezePeriod",
-      "DT_CSGameRules",
-    );
+    this.overtimePlayingIdx = findIdx(entity, "m_nOvertimePlaying", "DT_CSGameRules");
+    this.roundStartTimeIdx = findIdx(entity, "m_fRoundStartTime", "DT_CSGameRules");
+    this.restartRoundTimeIdx = findIdx(entity, "m_flRestartRoundTime", "DT_CSGameRules");
+    this.matchStartTimeIdx = findIdx(entity, "m_fMatchStartTime", "DT_CSGameRules");
+    this.warmupPeriodIdx = findIdx(entity, "m_bWarmupPeriod", "DT_CSGameRules");
+    this.freezePeriodIdx = findIdx(entity, "m_bFreezePeriod", "DT_CSGameRules");
     this.bombPlantedIdx = findIdx(entity, "m_bBombPlanted", "DT_CSGameRules");
     this.bombDroppedIdx = findIdx(entity, "m_bBombDropped", "DT_CSGameRules");
-    this.hasMatchStartedIdx = findIdx(
-      entity,
-      "m_bHasMatchStarted",
-      "DT_CSGameRules",
-    );
-    this.roundWinStatusIdx = findIdx(
-      entity,
-      "m_iRoundWinStatus",
-      "DT_CSGameRules",
-    );
-    this.roundWinReasonIdx = findIdx(
-      entity,
-      "m_eRoundWinReason",
-      "DT_CSGameRules",
-    );
+    this.hasMatchStartedIdx = findIdx(entity, "m_bHasMatchStarted", "DT_CSGameRules");
+    this.roundWinStatusIdx = findIdx(entity, "m_iRoundWinStatus", "DT_CSGameRules");
+    this.roundWinReasonIdx = findIdx(entity, "m_eRoundWinReason", "DT_CSGameRules");
     // m_iBombSite lives on DT_RetakeGameRules, the lone exception.
     this.bombSiteIdx = findIdx(entity, "m_iBombSite", "DT_RetakeGameRules");
   }

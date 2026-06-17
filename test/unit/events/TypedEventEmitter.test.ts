@@ -17,11 +17,11 @@ interface RoundEndEvent {
   winningTeam: "T" | "CT";
 }
 
-type TestEvents = {
+interface TestEvents {
   playerDeath: PlayerDeathEvent;
   serverInfo: ServerInfoEvent;
   roundEnd: RoundEndEvent;
-};
+}
 
 describe("TypedEventEmitter", () => {
   describe("runtime behavior", () => {
@@ -125,23 +125,25 @@ describe("TypedEventEmitter", () => {
     it("emit returns true when listeners are present, false otherwise", () => {
       const emitter = new TypedEventEmitter<TestEvents>();
 
-      expect(
-        emitter.emit("roundEnd", { winningTeam: "T" }),
-      ).toBe(false);
+      expect(emitter.emit("roundEnd", { winningTeam: "T" })).toBe(false);
 
-      emitter.on("roundEnd", () => {});
+      emitter.on("roundEnd", () => {
+        // no-op
+      });
 
-      expect(
-        emitter.emit("roundEnd", { winningTeam: "T" }),
-      ).toBe(true);
+      expect(emitter.emit("roundEnd", { winningTeam: "T" })).toBe(true);
     });
 
     it("listenerCount reflects the number of registered listeners", () => {
       const emitter = new TypedEventEmitter<TestEvents>();
       expect(emitter.listenerCount("playerDeath")).toBe(0);
 
-      const a: Listener<PlayerDeathEvent> = () => {};
-      const b: Listener<PlayerDeathEvent> = () => {};
+      const a: Listener<PlayerDeathEvent> = () => {
+        // no-op
+      };
+      const b: Listener<PlayerDeathEvent> = () => {
+        // no-op
+      };
       emitter.on("playerDeath", a);
       emitter.on("playerDeath", b);
       expect(emitter.listenerCount("playerDeath")).toBe(2);
@@ -152,8 +154,12 @@ describe("TypedEventEmitter", () => {
 
     it("removeAllListeners clears every listener for the event", () => {
       const emitter = new TypedEventEmitter<TestEvents>();
-      emitter.on("roundEnd", () => {});
-      emitter.on("roundEnd", () => {});
+      emitter.on("roundEnd", () => {
+        // no-op
+      });
+      emitter.on("roundEnd", () => {
+        // no-op
+      });
       emitter.removeAllListeners("roundEnd");
 
       expect(emitter.listenerCount("roundEnd")).toBe(0);
@@ -170,9 +176,7 @@ describe("TypedEventEmitter", () => {
       });
       emitter.on("roundEnd", after);
 
-      expect(() =>
-        emitter.emit("roundEnd", { winningTeam: "CT" }),
-      ).toThrow("boom");
+      expect(() => emitter.emit("roundEnd", { winningTeam: "CT" })).toThrow("boom");
       expect(after).not.toHaveBeenCalled();
     });
   });
@@ -201,7 +205,9 @@ describe("TypedEventEmitter", () => {
     it("rejects unknown event names on on()", () => {
       const emitter = new TypedEventEmitter<TestEvents>();
       // @ts-expect-error — "typo" is not a key of TestEvents
-      emitter.on("typo", () => {});
+      emitter.on("typo", () => {
+        // no-op
+      });
       expect(emitter.listenerCount("playerDeath")).toBe(0);
     });
 
@@ -238,9 +244,13 @@ describe("TypedEventEmitter", () => {
     it("rejects unknown event name on off() and once()", () => {
       const emitter = new TypedEventEmitter<TestEvents>();
       // @ts-expect-error — "typo" is not a key of TestEvents
-      emitter.off("typo", () => {});
+      emitter.off("typo", () => {
+        // no-op
+      });
       // @ts-expect-error — "typo" is not a key of TestEvents
-      emitter.once("typo", () => {});
+      emitter.once("typo", () => {
+        // no-op
+      });
       expect(true).toBe(true);
     });
 

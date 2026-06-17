@@ -16,8 +16,7 @@ export interface WeaponZoomEvent extends EnrichedEvent {
 
 export const enrichWeaponZoom: Enricher<WeaponZoomEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   return freezeEvent<WeaponZoomEvent>({

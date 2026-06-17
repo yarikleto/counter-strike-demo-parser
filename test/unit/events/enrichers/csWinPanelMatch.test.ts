@@ -27,10 +27,7 @@ function makeRaw(): DecodedGameEvent {
 
 describe("enrichCsWinPanelMatch", () => {
   it("emits frozen no-payload event with eventName/eventId carried over", () => {
-    const result = enrichCsWinPanelMatch(
-      makeRaw(),
-      makeCtx(),
-    ) as Readonly<CsWinPanelMatchEvent>;
+    const result = enrichCsWinPanelMatch(makeRaw(), makeCtx()) as Readonly<CsWinPanelMatchEvent>;
 
     expect(result).not.toBeNull();
     expect(result.eventName).toBe("cs_win_panel_match");

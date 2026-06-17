@@ -82,11 +82,7 @@ export class PlayerResource {
         // emits a 65th `"064"` entry which we ignore — it's an unused
         // tail slot, not a real player.
         const slot = Number.parseInt(varName, 10);
-        if (
-          !Number.isFinite(slot) ||
-          slot < 0 ||
-          slot >= MAX_PLAYER_SLOTS
-        ) {
+        if (!Number.isFinite(slot) || slot < 0 || slot >= MAX_PLAYER_SLOTS) {
           continue;
         }
         arr[slot] = i;

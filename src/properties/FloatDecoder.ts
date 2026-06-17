@@ -36,14 +36,11 @@
  * implementation matches Source's exact formula. The TASK-026 integration
  * test against demoinfocs will be the ground truth.
  */
-import { BitReader } from "../reader/BitReader.js";
+import type { BitReader } from "../reader/BitReader.js";
 import type { FlattenedSendProp } from "../datatables/ServerClass.js";
 import { SPropFlags } from "../datatables/SPropFlags.js";
 
-export function decodeFloat(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): number {
+export function decodeFloat(reader: BitReader, prop: FlattenedSendProp): number {
   const flags = prop.prop.flags;
 
   if ((flags & SPropFlags.COORD) !== 0) {
@@ -78,10 +75,7 @@ export function decodeFloat(
   return decodeQuantizedFloat(reader, prop);
 }
 
-function decodeQuantizedFloat(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): number {
+function decodeQuantizedFloat(reader: BitReader, prop: FlattenedSendProp): number {
   const { numBits, lowValue, highValue, flags } = prop.prop;
 
   const denom = (1 << numBits) - 1;

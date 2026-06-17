@@ -28,10 +28,7 @@
  */
 import type { BitReader } from "../reader/BitReader.js";
 
-export function readChangedPropIndices(
-  reader: BitReader,
-  totalProps: number,
-): number[] {
+export function readChangedPropIndices(reader: BitReader, totalProps: number): number[] {
   const out: number[] = [];
   let lastIndex = -1;
   while (reader.readBit() === 1) {

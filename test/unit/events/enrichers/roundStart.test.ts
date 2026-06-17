@@ -9,9 +9,7 @@ import type { GameRules } from "../../../../src/state/GameRules.js";
 
 function makeCtx(totalRoundsPlayed: number | undefined): EnricherContext {
   const gameRules =
-    totalRoundsPlayed === undefined
-      ? undefined
-      : ({ totalRoundsPlayed } as unknown as GameRules);
+    totalRoundsPlayed === undefined ? undefined : ({ totalRoundsPlayed } as unknown as GameRules);
   return {
     players: [],
     teams: [],
@@ -22,9 +20,7 @@ function makeCtx(totalRoundsPlayed: number | undefined): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "round_start",
     eventId: 9,
@@ -59,10 +55,7 @@ describe("enrichRoundStart", () => {
   });
 
   it("coerces missing fields to safe defaults rather than throwing", () => {
-    const result = enrichRoundStart(
-      makeRaw({}),
-      makeCtx(0),
-    ) as Readonly<RoundStartEvent>;
+    const result = enrichRoundStart(makeRaw({}), makeCtx(0)) as Readonly<RoundStartEvent>;
 
     expect(result.timeLimit).toBe(0);
     expect(result.fragLimit).toBe(0);

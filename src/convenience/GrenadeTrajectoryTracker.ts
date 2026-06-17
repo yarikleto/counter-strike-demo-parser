@@ -91,13 +91,7 @@ import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import { resolveHandle } from "../state/EntityHandle.js";
 
 /** The five distinguishable in-flight grenade types. */
-export type GrenadeType =
-  | "smoke"
-  | "flash"
-  | "he"
-  | "molotov"
-  | "incendiary"
-  | "decoy";
+export type GrenadeType = "smoke" | "flash" | "he" | "molotov" | "incendiary" | "decoy";
 
 /** A single trajectory sample: world-space position at a frame tick. */
 export interface TrajectoryPoint {
@@ -349,11 +343,7 @@ export class GrenadeTrajectoryTracker {
    * lacks `m_vecOrigin` is impossible in practice but the guard avoids
    * a hot-path crash.
    */
-  private sampleOrigin(
-    entity: Entity,
-    record: MutableTrajectory,
-    tick: number,
-  ): void {
+  private sampleOrigin(entity: Entity, record: MutableTrajectory, tick: number): void {
     if (record.originIdx === -1) {
       const idx = entity.serverClass.flattenedProps.findIndex(
         (p) => p.prop.varName === "m_vecOrigin",
@@ -379,12 +369,7 @@ export class GrenadeTrajectoryTracker {
     // Suppress duplicate consecutive samples — the server occasionally
     // re-emits an unchanged origin in the same prop bundle as another
     // changed prop on the entity.
-    if (
-      record.hasSample &&
-      v.x === record.lastX &&
-      v.y === record.lastY &&
-      v.z === record.lastZ
-    ) {
+    if (record.hasSample && v.x === record.lastX && v.y === record.lastY && v.z === record.lastZ) {
       return;
     }
 

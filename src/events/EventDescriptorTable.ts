@@ -78,9 +78,7 @@ export class EventDescriptorTable {
  * the table useful even on a forward-compat server that ships a brand-new
  * type code we don't yet understand.
  */
-export function buildDescriptorTable(
-  msg: CSVCMsg_GameEventList,
-): EventDescriptorTable {
+export function buildDescriptorTable(msg: CSVCMsg_GameEventList): EventDescriptorTable {
   const table = new EventDescriptorTable();
   for (const raw of msg.descriptors ?? []) {
     const eventId = raw.eventid ?? 0;
@@ -91,8 +89,13 @@ export function buildDescriptorTable(
         if (type === undefined) return undefined;
         return { name: k.name ?? "", type } as const;
       })
-      .filter((k): k is { readonly name: string; readonly type: NonNullable<ReturnType<typeof eventKeyTypeFromWire>> } =>
-        k !== undefined,
+      .filter(
+        (
+          k,
+        ): k is {
+          readonly name: string;
+          readonly type: NonNullable<ReturnType<typeof eventKeyTypeFromWire>>;
+        } => k !== undefined,
       );
     table.add({ eventId, name, keys });
   }

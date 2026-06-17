@@ -25,9 +25,7 @@ import { SVCMessages } from "../../../src/generated/netmessages.js";
  * Helper: encode a sequence of (cmd_id, payload) entries as a flat
  * varint-cmd / varint-size / payload stream.
  */
-function buildFramedStream(
-  messages: Array<{ cmd: number; bytes: Uint8Array }>,
-): Buffer {
+function buildFramedStream(messages: { cmd: number; bytes: Uint8Array }[]): Buffer {
   return Buffer.concat(
     messages.map(({ cmd, bytes }) => {
       const w = _m0.Writer.create();
@@ -52,16 +50,10 @@ function cstring(s: string): Buffer {
 }
 
 /** Build a class-info section matching Source's writer. */
-function buildClassInfo(
-  classes: Array<{ classId: number; className: string; dtName: string }>,
-): Buffer {
+function buildClassInfo(classes: { classId: number; className: string; dtName: string }[]): Buffer {
   return Buffer.concat([
     int16LE(classes.length),
-    ...classes.flatMap((c) => [
-      int16LE(c.classId),
-      cstring(c.className),
-      cstring(c.dtName),
-    ]),
+    ...classes.flatMap((c) => [int16LE(c.classId), cstring(c.className), cstring(c.dtName)]),
   ]);
 }
 
@@ -213,18 +205,14 @@ describe("parseDataTables", () => {
       CSVCMsg_SendTable.fromPartial({ netTableName: "DT_Lonely" }),
     ).finish();
 
-    const stream = buildFramedStream([
-      { cmd: SVCMessages.svc_SendTable, bytes: lone },
-    ]);
+    const stream = buildFramedStream([{ cmd: SVCMessages.svc_SendTable, bytes: lone }]);
 
     expect(() => parseDataTables(stream)).toThrow(/terminator/i);
   });
 
   it("throws when a non-SendTable message appears before the terminator", () => {
     // Use cmd 10 (svc_ClassInfo) — anything other than svc_SendTable.
-    const stream = buildFramedStream([
-      { cmd: 10, bytes: new Uint8Array([0x08, 0x00]) },
-    ]);
+    const stream = buildFramedStream([{ cmd: 10, bytes: new Uint8Array([0x08, 0x00]) }]);
 
     expect(() => parseDataTables(stream)).toThrow(/svc_SendTable/);
   });

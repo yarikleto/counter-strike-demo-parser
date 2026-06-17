@@ -31,7 +31,6 @@ import { GrenadeTrajectoryTracker } from "../../../src/convenience/GrenadeTrajec
 import type { Player } from "../../../src/state/Player.js";
 import type { Entity } from "../../../src/entities/Entity.js";
 import type { DemoParser } from "../../../src/DemoParser.js";
-import type { EntityList } from "../../../src/entities/EntityList.js";
 import type { ServerClass, FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
 // ---------------------------------------------------------------------------
@@ -48,14 +47,14 @@ interface FakeEntity {
   };
 }
 
-function makeServerClass(
-  className: string,
-  varNames: string[],
-): ServerClass {
-  const flattenedProps: FlattenedSendProp[] = varNames.map((name) => ({
-    prop: { varName: name } as FlattenedSendProp["prop"],
-    sourceTableName: "DT_Test",
-  } as unknown as FlattenedSendProp));
+function makeServerClass(className: string, varNames: string[]): ServerClass {
+  const flattenedProps: FlattenedSendProp[] = varNames.map(
+    (name) =>
+      ({
+        prop: { varName: name } as FlattenedSendProp["prop"],
+        sourceTableName: "DT_Test",
+      }) as unknown as FlattenedSendProp,
+  );
   return { className, flattenedProps } as unknown as ServerClass;
 }
 
@@ -89,13 +88,10 @@ function makeEntity(opts: {
 /** Update an existing entity's m_vecOrigin without changing identity. */
 function setOrigin(entity: FakeEntity, origin: { x: number; y: number; z: number }): void {
   // Replace the value the store returns for the m_vecOrigin index.
-  const idx = entity.serverClass.flattenedProps.findIndex(
-    (p) => p.prop.varName === "m_vecOrigin",
-  );
+  const idx = entity.serverClass.flattenedProps.findIndex((p) => p.prop.varName === "m_vecOrigin");
   if (idx < 0) return;
   const original = entity.store.read.bind(entity.store);
-  entity.store.read = (slot: number, i: number) =>
-    i === idx ? origin : original(slot, i);
+  entity.store.read = (slot: number, i: number) => (i === idx ? origin : original(slot, i));
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +113,7 @@ function makeFakeParser(): FakeParser {
   const emitter = new EventEmitter();
   let tick = 0;
   let players: Player[] = [];
-  let entityMap: Map<number, FakeEntity> = new Map();
+  let entityMap = new Map<number, FakeEntity>();
 
   // Resolve handles by treating them as raw entity ids — our tests pass
   // in synthetic 21-bit-form handles where serial=1 (matching makeEntity's

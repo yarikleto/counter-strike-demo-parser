@@ -114,7 +114,13 @@ function normalizeWinner(raw: number | string): string {
   // calls out "Terrorists Win" vs "terrorists_win"; same shape covers it.
   const lower = raw.toLowerCase().replace(/\s+/g, "_");
   if (lower === "t" || lower === "terrorists" || lower === "terrorists_win") return "t";
-  if (lower === "ct" || lower === "counter-terrorists" || lower === "counter_terrorists" || lower === "ct_win") return "ct";
+  if (
+    lower === "ct" ||
+    lower === "counter-terrorists" ||
+    lower === "counter_terrorists" ||
+    lower === "ct_win"
+  )
+    return "ct";
   if (lower === "spectators" || lower === "spectator") return "spectators";
   if (lower === "unassigned") return "unassigned";
   return lower;
@@ -134,8 +140,12 @@ function compareHeader(ours: OurHeader, theirs: OurHeader): SectionResult {
   const mapMatch = ours.mapName === theirs.mapName;
   const ticksMatch = ours.playbackTicks === theirs.playbackTicks;
 
-  lines.push(`mapName:       ours="${ours.mapName}" theirs="${theirs.mapName}" ${mapMatch ? "OK" : "MISMATCH"}`);
-  lines.push(`playbackTicks: ours=${ours.playbackTicks} theirs=${theirs.playbackTicks} ${ticksMatch ? "OK" : "MISMATCH"}`);
+  lines.push(
+    `mapName:       ours="${ours.mapName}" theirs="${theirs.mapName}" ${mapMatch ? "OK" : "MISMATCH"}`,
+  );
+  lines.push(
+    `playbackTicks: ours=${ours.playbackTicks} theirs=${theirs.playbackTicks} ${ticksMatch ? "OK" : "MISMATCH"}`,
+  );
 
   return {
     section: "Header",
@@ -152,10 +162,7 @@ function countByVictim(kills: readonly OurKill[]): Map<string, number> {
   return m;
 }
 
-function compareKills(
-  ours: readonly OurKill[],
-  theirs: readonly OurKill[],
-): SectionResult {
+function compareKills(ours: readonly OurKill[], theirs: readonly OurKill[]): SectionResult {
   const lines: string[] = [];
   const oursTotal = ours.length;
   const theirsTotal = theirs.length;
@@ -165,7 +172,9 @@ function compareKills(
   const ratio = Math.min(oursTotal, theirsTotal) / denom;
   const withinTolerance = ratio >= 1 - KILL_COUNT_TOLERANCE;
 
-  lines.push(`total kills:   ours=${oursTotal} theirs=${theirsTotal} delta=${delta >= 0 ? "+" : ""}${delta}`);
+  lines.push(
+    `total kills:   ours=${oursTotal} theirs=${theirsTotal} delta=${delta >= 0 ? "+" : ""}${delta}`,
+  );
   lines.push(
     `tolerance:     ratio=${ratio.toFixed(3)} threshold>=${(1 - KILL_COUNT_TOLERANCE).toFixed(2)} ${withinTolerance ? "OK" : "OUT_OF_BAND"}`,
   );
@@ -188,7 +197,9 @@ function compareKills(
     const t = theirsByVictim.get(v) ?? 0;
     if (o !== t) {
       mismatches++;
-      mismatchLines.push(`  - "${v}": ours=${o} theirs=${t} delta=${o - t >= 0 ? "+" : ""}${o - t}`);
+      mismatchLines.push(
+        `  - "${v}": ours=${o} theirs=${t} delta=${o - t >= 0 ? "+" : ""}${o - t}`,
+      );
     }
   }
   lines.push(`per-victim:    shared=${shared.length} mismatches=${mismatches}`);
@@ -205,16 +216,15 @@ function compareKills(
   };
 }
 
-function compareRounds(
-  ours: readonly OurRound[],
-  theirs: readonly TheirRound[],
-): SectionResult {
+function compareRounds(ours: readonly OurRound[], theirs: readonly TheirRound[]): SectionResult {
   const lines: string[] = [];
   const oursTotal = ours.length;
   const theirsTotal = theirs.length;
   const delta = oursTotal - theirsTotal;
 
-  lines.push(`total rounds:  ours=${oursTotal} theirs=${theirsTotal} delta=${delta >= 0 ? "+" : ""}${delta}`);
+  lines.push(
+    `total rounds:  ours=${oursTotal} theirs=${theirsTotal} delta=${delta >= 0 ? "+" : ""}${delta}`,
+  );
 
   // demoinfocs frequently emits a leading "warmup" round whose winner is
   // Spectators/Unassigned (no real team won). Our RoundTracker drops it.
@@ -244,15 +254,16 @@ function compareRounds(
       winnerMismatchLines.push(`  - round ${i}: ours="${ow}" theirs="${tw}"`);
     }
   }
-  lines.push(`winners:       overlap=${overlap} matches=${winnerMatches} mismatches=${overlap - winnerMatches}`);
+  lines.push(
+    `winners:       overlap=${overlap} matches=${winnerMatches} mismatches=${overlap - winnerMatches}`,
+  );
   for (const ln of winnerMismatchLines.slice(0, 10)) lines.push(ln);
   if (winnerMismatchLines.length > 10) {
     lines.push(`  ... ${winnerMismatchLines.length - 10} more`);
   }
 
   // PASS iff every round in the aligned overlap window has a matching winner.
-  const status: SectionStatus =
-    overlap > 0 && winnerMatches === overlap ? "PASS" : "FAIL";
+  const status: SectionStatus = overlap > 0 && winnerMatches === overlap ? "PASS" : "FAIL";
   return { section: "Rounds", status, lines };
 }
 

@@ -98,7 +98,7 @@ function buildBlob(fields: Partial<PlayerInfoFields>): Buffer {
 
 /** Construct a StringTableManager with a populated `userinfo` table. */
 function makeRegistryWithUserinfo(
-  entries: Array<{ slot: number; blob: Buffer | undefined }>,
+  entries: { slot: number; blob: Buffer | undefined }[],
 ): StringTableManager {
   const manager = new StringTableManager();
   const table = new StringTable({

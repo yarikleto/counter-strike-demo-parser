@@ -105,7 +105,7 @@ describe("readChangedPropIndices", () => {
     // Compute expected cursor position by re-encoding and counting.
     const w = new TestBitWriter();
     let prev = -1;
-    let totalBits = 0;
+    const totalBits = 0;
     for (const idx of [10, 20, 30]) {
       w.writeBit(1);
       const delta = idx - prev - 1;

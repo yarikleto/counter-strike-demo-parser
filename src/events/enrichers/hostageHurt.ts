@@ -25,8 +25,7 @@ export interface HostageHurtEvent extends EnrichedEvent {
 
 export const enrichHostageHurt: Enricher<HostageHurtEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const hostage = typeof raw.data.hostage === "number" ? raw.data.hostage : 0;

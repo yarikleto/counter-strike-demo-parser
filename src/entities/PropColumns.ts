@@ -91,9 +91,7 @@ function kindFor(prop: FlattenedSendProp): PropColumnKind {
  * Pure function: same input -> same output, no side effects. Cached by the
  * caller on the ServerClass.
  */
-export function computePropColumns(
-  flattenedProps: readonly FlattenedSendProp[],
-): PropColumnLayout {
+export function computePropColumns(flattenedProps: readonly FlattenedSendProp[]): PropColumnLayout {
   const columns: PropColumn[] = new Array(flattenedProps.length);
   let numIntProps = 0;
   let numFloatProps = 0;

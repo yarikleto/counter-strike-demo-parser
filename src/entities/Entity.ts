@@ -136,10 +136,7 @@ export class Entity {
  */
 const nameIndexCache = new WeakMap<ServerClass, Map<string, number>>();
 
-function lookupIndex(
-  serverClass: ServerClass,
-  name: string,
-): number | undefined {
+function lookupIndex(serverClass: ServerClass, name: string): number | undefined {
   let cache = nameIndexCache.get(serverClass);
   if (cache === undefined) {
     cache = new Map<string, number>();

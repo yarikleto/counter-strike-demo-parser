@@ -79,9 +79,7 @@ export function handleToSerial(handle: number): number {
   if (isPacked21BitForm(handle)) {
     return (handle >>> ENTITY_INDEX_BITS) & ((1 << ENTITY_SERIAL_BITS_21) - 1);
   }
-  return (
-    (handle >>> ENTITY_INDEX_BITS) & ((1 << ENTITY_SERIAL_BITS_32) - 1)
-  );
+  return (handle >>> ENTITY_INDEX_BITS) & ((1 << ENTITY_SERIAL_BITS_32) - 1);
 }
 
 /**
@@ -92,7 +90,7 @@ export function handleToSerial(handle: number): number {
  * only filters the "explicit none" sentinel.
  */
 export function isValidHandle(handle: number): boolean {
-  return (handle >>> 0) !== INVALID_HANDLE;
+  return handle >>> 0 !== INVALID_HANDLE;
 }
 
 /**
@@ -108,10 +106,7 @@ export function isValidHandle(handle: number): boolean {
  * Accepts both 32-bit and 21-bit handle forms — see the file-level comment
  * for the wire formats and detection rules.
  */
-export function resolveHandle(
-  list: EntityList,
-  handle: number,
-): Entity | undefined {
+export function resolveHandle(list: EntityList, handle: number): Entity | undefined {
   if (!isValidHandle(handle)) return undefined;
   const index = handleToIndex(handle);
   const entity = list.get(index);
@@ -131,6 +126,6 @@ export function resolveHandle(
  * `INVALID_HANDLE` sentinel — i.e., it was packed from a SendProp.
  */
 function isPacked21BitForm(handle: number): boolean {
-  if ((handle >>> 0) === INVALID_HANDLE) return false;
+  if (handle >>> 0 === INVALID_HANDLE) return false;
   return ((handle >>> 0) & ~PACKED_HANDLE_MASK) === 0;
 }

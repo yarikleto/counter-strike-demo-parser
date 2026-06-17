@@ -8,10 +8,7 @@
  * delegated typed-array reads.
  */
 import { describe, it, expect } from "vitest";
-import {
-  MAX_PLAYER_SLOTS,
-  PlayerResource,
-} from "../../../src/state/PlayerResource.js";
+import { MAX_PLAYER_SLOTS, PlayerResource } from "../../../src/state/PlayerResource.js";
 import type { Entity } from "../../../src/entities/Entity.js";
 import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
@@ -89,8 +86,7 @@ describe("PlayerResource", () => {
     const props = buildPlayerResourceProps();
     // Encode (statIndex, slot) into the returned value so every read is verifiable.
     // Layout: stats are blocks of 64 props in STAT_NAMES order.
-    const encode = (statIdx: number, slot: number): number =>
-      statIdx * 1000 + slot;
+    const encode = (statIdx: number, slot: number): number => statIdx * 1000 + slot;
     const entity = fakeEntity(props, (_storageSlot, propIdx) => {
       const statIdx = Math.floor(propIdx / MAX_PLAYER_SLOTS);
       const slot = propIdx % MAX_PLAYER_SLOTS;
