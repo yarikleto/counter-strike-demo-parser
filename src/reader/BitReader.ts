@@ -56,11 +56,7 @@ export class BitReader {
   constructor(buffer: Uint8Array, byteOffset = 0, byteLength?: number) {
     const length = byteLength ?? buffer.length - byteOffset;
     // Subarray shares memory — no copy. byteOffset+length validation:
-    if (
-      byteOffset < 0 ||
-      length < 0 ||
-      byteOffset + length > buffer.length
-    ) {
+    if (byteOffset < 0 || length < 0 || byteOffset + length > buffer.length) {
       throw new RangeError(
         `BitReader: invalid range byteOffset=${byteOffset} ` +
           `byteLength=${length} (buffer length: ${buffer.length})`,
@@ -90,8 +86,7 @@ export class BitReader {
   seek(bitPosition: number): void {
     if (bitPosition < 0 || bitPosition > this.totalBits) {
       throw new RangeError(
-        `BitReader: cannot seek to bit ${bitPosition} ` +
-          `(total bits: ${this.totalBits})`,
+        `BitReader: cannot seek to bit ${bitPosition} ` + `(total bits: ${this.totalBits})`,
       );
     }
     this.bitCursor = bitPosition;
@@ -102,8 +97,7 @@ export class BitReader {
     const cursor = this.bitCursor;
     if (cursor + 1 > this.totalBits) {
       throw new RangeError(
-        `BitReader: cannot read 1 bit at position ${cursor} ` +
-          `(total bits: ${this.totalBits})`,
+        `BitReader: cannot read 1 bit at position ${cursor} ` + `(total bits: ${this.totalBits})`,
       );
     }
     this.bitCursor = cursor + 1;
@@ -124,15 +118,12 @@ export class BitReader {
     const cursor = this.bitCursor;
     const totalBits = this.totalBits;
     if (n < 0 || n > 32) {
-      throw new RangeError(
-        `BitReader: readBits(n) requires 0 <= n <= 32, got ${n}`,
-      );
+      throw new RangeError(`BitReader: readBits(n) requires 0 <= n <= 32, got ${n}`);
     }
     if (n === 0) return 0;
     if (cursor + n > totalBits) {
       throw new RangeError(
-        `BitReader: cannot read ${n} bits at position ${cursor} ` +
-          `(total bits: ${totalBits})`,
+        `BitReader: cannot read ${n} bits at position ${cursor} ` + `(total bits: ${totalBits})`,
       );
     }
 
@@ -159,9 +150,8 @@ export class BitReader {
     // and combine with a multiplication (avoids signed-shift quirks).
     const lowBits = 16;
     const lowMask = 0xffff;
-    const low = (view[byteIndex] |
-      (view[byteIndex + 1] << 8) |
-      (view[byteIndex + 2] << 16)) >>> bitIndex;
+    const low =
+      (view[byteIndex] | (view[byteIndex + 1] << 8) | (view[byteIndex + 2] << 16)) >>> bitIndex;
     const lowResult = low & lowMask; // first 16 bits
     const highBitsToTake = n - lowBits;
     // High part: starts (lowBits) bits later than `cursor`.
@@ -182,9 +172,7 @@ export class BitReader {
    */
   readSignedBits(n: number): number {
     if (n < 1 || n > 32) {
-      throw new RangeError(
-        `BitReader: readSignedBits(n) requires 1 <= n <= 32, got ${n}`,
-      );
+      throw new RangeError(`BitReader: readSignedBits(n) requires 1 <= n <= 32, got ${n}`);
     }
     const value = this.readBits(n);
     if (n === 32) {
@@ -253,8 +241,7 @@ export class BitReader {
     for (let i = 0; i < 5; i++) {
       if (cursor + 8 > totalBits) {
         throw new RangeError(
-          `BitReader: cannot read 8 bits at position ${cursor} ` +
-            `(total bits: ${totalBits})`,
+          `BitReader: cannot read 8 bits at position ${cursor} ` + `(total bits: ${totalBits})`,
         );
       }
       const byteIndex = cursor >>> 3;
@@ -307,9 +294,7 @@ export class BitReader {
     if (hasInt === 0 && hasFrac === 0) return 0;
     const sign = this.readBit();
     const intVal = hasInt ? this.readBits(BitReader.COORD_INTEGER_BITS) + 1 : 0;
-    const fracVal = hasFrac
-      ? this.readBits(BitReader.COORD_FRACTIONAL_BITS)
-      : 0;
+    const fracVal = hasFrac ? this.readBits(BitReader.COORD_FRACTIONAL_BITS) : 0;
     const value = intVal + fracVal * BitReader.COORD_RESOLUTION;
     return sign ? -value : value;
   }
@@ -339,17 +324,13 @@ export class BitReader {
       const hasIntVal = this.readBit();
       if (!hasIntVal) return 0;
       const sign = this.readBit();
-      const intBits = inBounds
-        ? BitReader.COORD_INTEGER_BITS_MP
-        : BitReader.COORD_INTEGER_BITS;
+      const intBits = inBounds ? BitReader.COORD_INTEGER_BITS_MP : BitReader.COORD_INTEGER_BITS;
       const intVal = this.readBits(intBits) + 1;
       return sign ? -intVal : intVal;
     }
     const hasInt = this.readBit();
     const sign = this.readBit();
-    const intBits = inBounds
-      ? BitReader.COORD_INTEGER_BITS_MP
-      : BitReader.COORD_INTEGER_BITS;
+    const intBits = inBounds ? BitReader.COORD_INTEGER_BITS_MP : BitReader.COORD_INTEGER_BITS;
     const intVal = hasInt ? this.readBits(intBits) + 1 : 0;
     const fracBits = lowPrecision
       ? BitReader.COORD_FRACTIONAL_BITS_MP_LOWPRECISION
@@ -420,9 +401,7 @@ export class BitReader {
    */
   readBitAngle(bits: number): number {
     if (bits < 1 || bits > 32) {
-      throw new RangeError(
-        `BitReader: readBitAngle(bits) requires 1 <= bits <= 32, got ${bits}`,
-      );
+      throw new RangeError(`BitReader: readBitAngle(bits) requires 1 <= bits <= 32, got ${bits}`);
     }
     const raw = this.readBits(bits);
     return (raw * 360) / Math.pow(2, bits);
@@ -435,7 +414,7 @@ export class BitReader {
    * NUL is encountered, in which case an error is also thrown if we hit
    * the end of the buffer first).
    */
-  readString(maxLength: number = 512): string {
+  readString(maxLength = 512): string {
     if (maxLength < 0) {
       throw new RangeError(
         `BitReader: readString(maxLength) requires maxLength >= 0, got ${maxLength}`,

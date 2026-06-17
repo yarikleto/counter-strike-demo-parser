@@ -63,19 +63,11 @@ export class EntityList {
    * (PacketEntitiesDecoder) is responsible for applying the baseline and
    * the create-delta props after.
    */
-  create(
-    id: number,
-    serverClass: ServerClass,
-    serialNumber: number,
-  ): Entity {
+  create(id: number, serverClass: ServerClass, serialNumber: number): Entity {
     const existing = this.slots[id];
     if (existing !== undefined) {
       if (existing.serverClass.classId !== serverClass.classId) {
-        throw new EntityClassMismatchError(
-          id,
-          existing.serverClass.classId,
-          serverClass.classId,
-        );
+        throw new EntityClassMismatchError(id, existing.serverClass.classId, serverClass.classId);
       }
       // Same class: free old slot to that class's freelist, then allocate
       // fresh. The Entity view's slot version captures the fresh version.

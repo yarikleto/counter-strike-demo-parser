@@ -130,7 +130,7 @@ function sortKeys<T>(record: Record<string, T>): Record<string, T> {
 function writeGolden(name: string, value: unknown): void {
   const path = join(GOLDEN_DIR, `${name}.json`);
   writeFileSync(path, toStableJson(value));
-  // eslint-disable-next-line no-console
+
   console.log(`wrote ${path}`);
 }
 
@@ -303,7 +303,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

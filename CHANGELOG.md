@@ -39,14 +39,14 @@ public surface stabilises.
 - Optional N-API native addon scaffolding (opt-in via `npm run build:native`).
 
 ### Performance
-- BitReader hot path tuned for V8 (TASK-072): ~58% parse-time reduction on
-  the de_nuke fixture (~1810 ms → 765 ms median, ~105 MB/s throughput,
-  ~230 MB peak RSS on Apple M4 Pro / Node 22).
+- BitReader hot path tuned for V8: ~58% parse-time reduction on the de_nuke
+  fixture (~1810 ms → 765 ms median, ~105 MB/s throughput, ~230 MB peak
+  RSS on Apple M4 Pro / Node 22).
 
 ### Known limitations
-- The bundled native addon (TASK-082) is a toolchain-validation spike only;
-  meaningful native acceleration is deferred to TASK-086 (batched native
-  pipeline). Pure-TS is the supported install path.
+- The bundled native addon is a toolchain-validation spike only; meaningful
+  native acceleration via a batched native pipeline is on the roadmap, not
+  in this release. Pure TypeScript is the supported install path.
 - CS2 (Source 2) demo format is not supported — CS:GO/Source 1 only.
 - Parsed-corpus validation has so far run on the bundled `de_nuke` fixture;
   broader corpus testing is planned post-0.1.

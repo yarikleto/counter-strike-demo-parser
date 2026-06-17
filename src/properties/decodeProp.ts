@@ -22,10 +22,7 @@ import { decodeVector, decodeVectorXY } from "./VectorDecoder.js";
 import { decodeString } from "./StringDecoder.js";
 import { decodeArray } from "./ArrayDecoder.js";
 
-export function decodeProp(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): PropertyValue {
+export function decodeProp(reader: BitReader, prop: FlattenedSendProp): PropertyValue {
   switch (prop.prop.type) {
     case SendPropType.INT:
       return decodeInt(reader, prop);

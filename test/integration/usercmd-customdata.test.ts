@@ -15,64 +15,68 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("DemoParser userCommand / customData events — integration on de_nuke.dem", () => {
-  it("collects every usercmd / customdata emission with valid shapes", () => {
-    const buffer = readFileSync(FIXTURE);
-    const parser = new DemoParser(buffer);
+describe.skipIf(!fixtureAvailable)(
+  "DemoParser userCommand / customData events — integration on de_nuke.dem",
+  () => {
+    it("collects every usercmd / customdata emission with valid shapes", () => {
+      const buffer = readFileSync(FIXTURE);
+      const parser = new DemoParser(buffer);
 
-    const userCommands: Array<{
-      tick: number;
-      playerSlot: number;
-      sequence: number;
-      data: Uint8Array;
-    }> = [];
-    const customData: Array<{ tick: number; type: number; data: Uint8Array }> = [];
+      const userCommands: {
+        tick: number;
+        playerSlot: number;
+        sequence: number;
+        data: Uint8Array;
+      }[] = [];
+      const customData: { tick: number; type: number; data: Uint8Array }[] = [];
 
-    parser.on("userCommand", (e) => {
-      userCommands.push({
-        tick: e.tick,
-        playerSlot: e.playerSlot,
-        sequence: e.sequence,
-        data: e.data,
+      parser.on("userCommand", (e) => {
+        userCommands.push({
+          tick: e.tick,
+          playerSlot: e.playerSlot,
+          sequence: e.sequence,
+          data: e.data,
+        });
       });
+      parser.on("customData", (e) => {
+        customData.push({ tick: e.tick, type: e.type, data: e.data });
+      });
+
+      parser.parseAll();
+
+      // Document the empirical counts for the fixture — useful when a CSGO
+      // build update changes which frames are recorded. Not asserted as a
+      // hard floor: a server-side competitive recording can legitimately
+      // yield 0 of either.
+
+      console.log(
+        `[TASK-050/057] de_nuke userCommand events: ${userCommands.length}, customData events: ${customData.length}`,
+      );
+
+      expect(Array.isArray(userCommands)).toBe(true);
+      expect(Array.isArray(customData)).toBe(true);
+      expect(userCommands.length).toBeGreaterThanOrEqual(0);
+      expect(customData.length).toBeGreaterThanOrEqual(0);
+
+      // Every emitted userCommand must carry a finite tick / sequence /
+      // playerSlot and a Uint8Array data view. No assertion on tick sign:
+      // signon-phase frames can carry negative tick sentinels in CSGO demos.
+      for (const e of userCommands) {
+        expect(Number.isFinite(e.tick)).toBe(true);
+        expect(Number.isInteger(e.sequence)).toBe(true);
+        expect(Number.isInteger(e.playerSlot)).toBe(true);
+        expect(e.data).toBeInstanceOf(Uint8Array);
+      }
+
+      for (const e of customData) {
+        expect(Number.isFinite(e.tick)).toBe(true);
+        expect(Number.isInteger(e.type)).toBe(true);
+        expect(e.data).toBeInstanceOf(Uint8Array);
+      }
     });
-    parser.on("customData", (e) => {
-      customData.push({ tick: e.tick, type: e.type, data: e.data });
-    });
-
-    parser.parseAll();
-
-    // Document the empirical counts for the fixture — useful when a CSGO
-    // build update changes which frames are recorded. Not asserted as a
-    // hard floor: a server-side competitive recording can legitimately
-    // yield 0 of either.
-    // eslint-disable-next-line no-console
-    console.log(
-      `[TASK-050/057] de_nuke userCommand events: ${userCommands.length}, customData events: ${customData.length}`,
-    );
-
-    expect(Array.isArray(userCommands)).toBe(true);
-    expect(Array.isArray(customData)).toBe(true);
-    expect(userCommands.length).toBeGreaterThanOrEqual(0);
-    expect(customData.length).toBeGreaterThanOrEqual(0);
-
-    // Every emitted userCommand must carry a finite tick / sequence /
-    // playerSlot and a Uint8Array data view. No assertion on tick sign:
-    // signon-phase frames can carry negative tick sentinels in CSGO demos.
-    for (const e of userCommands) {
-      expect(Number.isFinite(e.tick)).toBe(true);
-      expect(Number.isInteger(e.sequence)).toBe(true);
-      expect(Number.isInteger(e.playerSlot)).toBe(true);
-      expect(e.data).toBeInstanceOf(Uint8Array);
-    }
-
-    for (const e of customData) {
-      expect(Number.isFinite(e.tick)).toBe(true);
-      expect(Number.isInteger(e.type)).toBe(true);
-      expect(e.data).toBeInstanceOf(Uint8Array);
-    }
-  });
-});
+  },
+);

@@ -36,12 +36,9 @@ export interface RoundStartEvent extends EnrichedEvent {
 }
 
 export const enrichRoundStart: Enricher<RoundStartEvent> = (raw, ctx) => {
-  const timeLimit =
-    typeof raw.data.timelimit === "number" ? raw.data.timelimit : 0;
-  const fragLimit =
-    typeof raw.data.fraglimit === "number" ? raw.data.fraglimit : 0;
-  const objective =
-    typeof raw.data.objective === "string" ? raw.data.objective : "";
+  const timeLimit = typeof raw.data.timelimit === "number" ? raw.data.timelimit : 0;
+  const fragLimit = typeof raw.data.fraglimit === "number" ? raw.data.fraglimit : 0;
+  const objective = typeof raw.data.objective === "string" ? raw.data.objective : "";
   const roundNumber = ctx.gameRules?.totalRoundsPlayed ?? 0;
 
   return freezeEvent<RoundStartEvent>({

@@ -30,9 +30,7 @@ export class SendTableRegistry {
    */
   register(table: SendTable): void {
     if (this.tables.has(table.netTableName)) {
-      throw new Error(
-        `SendTableRegistry: duplicate SendTable for "${table.netTableName}"`,
-      );
+      throw new Error(`SendTableRegistry: duplicate SendTable for "${table.netTableName}"`);
     }
     this.tables.set(table.netTableName, table);
   }

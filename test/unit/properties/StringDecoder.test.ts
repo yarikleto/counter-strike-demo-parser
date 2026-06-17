@@ -7,10 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { BitReader } from "../../../src/reader/BitReader.js";
 import { decodeString } from "../../../src/properties/StringDecoder.js";
-import {
-  SendPropType,
-  type SendProp,
-} from "../../../src/datatables/SendTable.js";
+import { SendPropType, type SendProp } from "../../../src/datatables/SendTable.js";
 import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
 const stringProp: FlattenedSendProp = {

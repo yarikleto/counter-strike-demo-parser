@@ -27,10 +27,7 @@ function makeRaw(): DecodedGameEvent {
 
 describe("enrichAnnouncePhaseEnd", () => {
   it("emits frozen no-payload event with eventName/eventId carried over", () => {
-    const result = enrichAnnouncePhaseEnd(
-      makeRaw(),
-      makeCtx(),
-    ) as Readonly<AnnouncePhaseEndEvent>;
+    const result = enrichAnnouncePhaseEnd(makeRaw(), makeCtx()) as Readonly<AnnouncePhaseEndEvent>;
 
     expect(result).not.toBeNull();
     expect(result.eventName).toBe("announce_phase_end");

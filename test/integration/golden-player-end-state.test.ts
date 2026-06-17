@@ -9,6 +9,7 @@ import { describe, it } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -18,7 +19,7 @@ function round(n: number, decimals: number): number {
   return Math.round(n * factor) / factor;
 }
 
-describe("golden: playerEndState", () => {
+describe.skipIf(!fixtureAvailable)("golden: playerEndState", () => {
   it("matches the committed snapshot", () => {
     // Streaming parse — `userInfoIndex` lookup requires the live parser; the
     // async `DemoParser.parse()` API exposes only `PlayerSnapshot[]`, which

@@ -32,10 +32,7 @@ import type { BitReader } from "../reader/BitReader.js";
 import type { FlattenedSendProp } from "../datatables/ServerClass.js";
 import { SPropFlags } from "../datatables/SPropFlags.js";
 
-export function decodeInt(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): number {
+export function decodeInt(reader: BitReader, prop: FlattenedSendProp): number {
   const flags = prop.prop.flags;
   const unsigned = (flags & SPropFlags.UNSIGNED) !== 0;
 
@@ -76,10 +73,7 @@ function zigzagDecode64(n: bigint): bigint {
   return (n >> 1n) ^ -(n & 1n);
 }
 
-export function decodeInt64(
-  reader: BitReader,
-  prop: FlattenedSendProp,
-): bigint {
+export function decodeInt64(reader: BitReader, prop: FlattenedSendProp): bigint {
   const flags = prop.prop.flags;
   const unsigned = (flags & SPropFlags.UNSIGNED) !== 0;
 

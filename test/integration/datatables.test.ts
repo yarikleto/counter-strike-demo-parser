@@ -15,10 +15,11 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("dem_datatables parsing — integration with de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("dem_datatables parsing — integration with de_nuke.dem", () => {
   it("populates the SendTable registry with the expected core tables", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     parser.parseAll();

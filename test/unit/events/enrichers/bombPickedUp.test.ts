@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "bomb_pickup",
     eventId: 112,

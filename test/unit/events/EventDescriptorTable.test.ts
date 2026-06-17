@@ -130,15 +130,7 @@ describe("EventDescriptorTable", () => {
         "bool",
         "uint64",
       ]);
-      expect(desc!.keys.map((k) => k.name)).toEqual([
-        "s",
-        "f",
-        "l",
-        "sh",
-        "b",
-        "bo",
-        "u",
-      ]);
+      expect(desc!.keys.map((k) => k.name)).toEqual(["s", "f", "l", "sh", "b", "bo", "u"]);
     });
 
     it("preserves eventId, name, and keys array on a realistic descriptor", () => {

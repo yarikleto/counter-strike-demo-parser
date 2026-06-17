@@ -52,7 +52,7 @@ function makeRoundEnd(
   return Object.freeze({
     eventName: "round_end",
     eventId: 2,
-    winner: winner as import("../../../src/enums/TeamSide.js").TeamSide,
+    winner: winner as TeamSide,
     reason,
     message: "#SFUI_Notice_Target_Bombed",
     roundNumber,
@@ -64,11 +64,7 @@ function makePlayer(slot: number): Player {
   return { slot } as unknown as Player;
 }
 
-function makePlayerDeath(
-  victim: Player,
-  attacker?: Player,
-  assister?: Player,
-): PlayerDeathEvent {
+function makePlayerDeath(victim: Player, attacker?: Player, assister?: Player): PlayerDeathEvent {
   return Object.freeze({
     eventName: "player_death",
     eventId: 3,

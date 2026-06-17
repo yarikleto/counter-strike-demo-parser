@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  enrichRoundEnd,
-  type RoundEndEvent,
-} from "../../../../src/events/enrichers/roundEnd.js";
+import { enrichRoundEnd, type RoundEndEvent } from "../../../../src/events/enrichers/roundEnd.js";
 import { RoundEndReason } from "../../../../src/enums/RoundEndReason.js";
 import { TeamSide } from "../../../../src/enums/TeamSide.js";
 import type { DecodedGameEvent } from "../../../../src/events/GameEventDecoder.js";
@@ -11,9 +8,7 @@ import type { GameRules } from "../../../../src/state/GameRules.js";
 
 function makeCtx(totalRoundsPlayed: number | undefined): EnricherContext {
   const gameRules =
-    totalRoundsPlayed === undefined
-      ? undefined
-      : ({ totalRoundsPlayed } as unknown as GameRules);
+    totalRoundsPlayed === undefined ? undefined : ({ totalRoundsPlayed } as unknown as GameRules);
   return {
     players: [],
     teams: [],
@@ -24,9 +19,7 @@ function makeCtx(totalRoundsPlayed: number | undefined): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "round_end",
     eventId: 10,
@@ -64,10 +57,7 @@ describe("enrichRoundEnd", () => {
   });
 
   it("defaults missing fields rather than throwing", () => {
-    const result = enrichRoundEnd(
-      makeRaw({}),
-      makeCtx(0),
-    ) as Readonly<RoundEndEvent>;
+    const result = enrichRoundEnd(makeRaw({}), makeCtx(0)) as Readonly<RoundEndEvent>;
 
     expect(result.winner).toBe(TeamSide.Unassigned);
     expect(result.reason).toBe(0);

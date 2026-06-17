@@ -39,8 +39,7 @@ export interface PlayerConnectEvent extends EnrichedEvent {
 
 export const enrichPlayerConnect: Enricher<PlayerConnectEvent> = (raw) => {
   const name = typeof raw.data.name === "string" ? raw.data.name : "";
-  const steamId =
-    typeof raw.data.networkid === "string" ? raw.data.networkid : "";
+  const steamId = typeof raw.data.networkid === "string" ? raw.data.networkid : "";
   const userId = typeof raw.data.userid === "number" ? raw.data.userid : 0;
   const explicitBot = raw.data.bot === true;
   const isBot = explicitBot || steamId === "BOT";

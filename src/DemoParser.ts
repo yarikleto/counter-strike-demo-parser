@@ -670,8 +670,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       }
     }
 
-    const playerPositions: readonly PositionSnapshot[] | undefined =
-      positionTracker?.snapshot();
+    const playerPositions: readonly PositionSnapshot[] | undefined = positionTracker?.snapshot();
 
     return Object.freeze({
       header: parser.header as DemoHeader,
@@ -854,12 +853,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
         next = frames.next();
       } catch (err) {
         const classified = classifyFrameError(err);
-        this.emitParserError(
-          classified.kind,
-          err,
-          classified.message,
-          this._lastFrameOffset,
-        );
+        this.emitParserError(classified.kind, err, classified.message, this._lastFrameOffset);
         // A frame-header desync cannot be re-synced (we'd be guessing where
         // the next valid header begins). Both `truncated` and `invalid-frame`
         // terminate the parse cleanly.
@@ -1152,7 +1146,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    * read would suppress every subsequent `resolvePlayer` lookup. Cheap: the
    * subsequent rebuild is one filtered scan over the entity list.
    */
-  private invalidateOverlayCache(entity: { serverClass: { className: string; flattenedProps: ReadonlyArray<{ prop: { varName: string } }> } }): void {
+  private invalidateOverlayCache(entity: {
+    serverClass: { className: string; flattenedProps: readonly { prop: { varName: string } }[] };
+  }): void {
     const className = entity.serverClass.className;
     if (className === "CCSPlayer") {
       this._playersCache = null;

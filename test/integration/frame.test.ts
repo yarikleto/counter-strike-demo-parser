@@ -4,10 +4,11 @@ import { join } from "node:path";
 import { ByteReader } from "../../src/reader/ByteReader.js";
 import { parseHeader } from "../../src/frame/header.js";
 import { iterateFrames } from "../../src/frame/FrameParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("frame iteration — integration with real demo file", () => {
+describe.skipIf(!fixtureAvailable)("frame iteration — integration with real demo file", () => {
   it("should yield frames from de_nuke.dem after the header", () => {
     const buffer = readFileSync(FIXTURE_PATH);
     const reader = new ByteReader(buffer);

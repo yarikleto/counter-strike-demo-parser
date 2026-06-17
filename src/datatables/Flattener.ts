@@ -210,9 +210,7 @@ function effectivePriority(prop: FlattenedSendProp["prop"]): number {
  * common case in CS:GO (the de_nuke fixture has 0 props with raw
  * priority 64).
  */
-export function prioritySort(
-  flattenedProps: readonly FlattenedSendProp[],
-): FlattenedSendProp[] {
+export function prioritySort(flattenedProps: readonly FlattenedSendProp[]): FlattenedSendProp[] {
   const props = flattenedProps.slice(); // mutable copy
 
   // Build the unique priority bucket list. Use a Set for dedup, then sort.

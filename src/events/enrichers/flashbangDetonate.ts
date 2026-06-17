@@ -38,15 +38,10 @@ function readNum(value: unknown): number {
 
 const EMPTY_FLASHED: readonly Player[] = Object.freeze([]);
 
-export const enrichFlashbangDetonate: Enricher<FlashbangDetonateEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichFlashbangDetonate: Enricher<FlashbangDetonateEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
   const thrower =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+    typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
 
   const position = Object.freeze({
     x: readNum(raw.data.x),

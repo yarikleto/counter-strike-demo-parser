@@ -34,14 +34,10 @@ export interface MatchEndConditionsEvent extends EnrichedEvent {
   readonly time: number;
 }
 
-export const enrichMatchEndConditions: Enricher<MatchEndConditionsEvent> = (
-  raw,
-) => {
+export const enrichMatchEndConditions: Enricher<MatchEndConditionsEvent> = (raw) => {
   const frags = typeof raw.data.frags === "number" ? raw.data.frags : 0;
-  const maxRounds =
-    typeof raw.data.max_rounds === "number" ? raw.data.max_rounds : 0;
-  const winRounds =
-    typeof raw.data.win_rounds === "number" ? raw.data.win_rounds : 0;
+  const maxRounds = typeof raw.data.max_rounds === "number" ? raw.data.max_rounds : 0;
+  const winRounds = typeof raw.data.win_rounds === "number" ? raw.data.win_rounds : 0;
   const time = typeof raw.data.time === "number" ? raw.data.time : 0;
 
   return freezeEvent<MatchEndConditionsEvent>({

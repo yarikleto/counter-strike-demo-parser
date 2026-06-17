@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ByteReader } from "../../src/reader/ByteReader.js";
 import { parseHeader } from "../../src/frame/header.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("header — integration with real demo file", () => {
+describe.skipIf(!fixtureAvailable)("header — integration with real demo file", () => {
   it("should parse the header from de_nuke.dem", () => {
     const buffer = readFileSync(FIXTURE_PATH);
     const reader = new ByteReader(buffer);

@@ -3,13 +3,14 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { DemoResult } from "../../src/convenience/DemoResult.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
 // TASK-062: end-to-end verification of the `DemoParser.parse()` async API
 // against the de_nuke.dem fixture. Covers path input, buffer input,
 // `includeRawEvents` opt-in, and missing-file rejection.
-describe("DemoParser.parse() — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("DemoParser.parse() — integration on de_nuke.dem", () => {
   it("returns a fully-typed DemoResult when given a file path", async () => {
     const result: DemoResult = await DemoParser.parse(FIXTURE);
 
@@ -56,8 +57,6 @@ describe("DemoParser.parse() — integration on de_nuke.dem", () => {
   });
 
   it("rejects with an error when the file does not exist", async () => {
-    await expect(
-      DemoParser.parse("./does-not-exist.dem"),
-    ).rejects.toThrow();
+    await expect(DemoParser.parse("./does-not-exist.dem")).rejects.toThrow();
   });
 });

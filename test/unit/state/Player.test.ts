@@ -85,9 +85,7 @@ describe("Player overlay — construction", () => {
   // For the no-fallback-needed props, drop each one in turn and expect a
   // throw naming it. The `m_vecOrigin*` props have non-local/local fallback
   // semantics, so they need their own targeted misses (below).
-  const ALWAYS_REQUIRED = REQUIRED_PROPS.filter(
-    (p) => !p.varName.startsWith("m_vecOrigin"),
-  );
+  const ALWAYS_REQUIRED = REQUIRED_PROPS.filter((p) => !p.varName.startsWith("m_vecOrigin"));
 
   it.each(ALWAYS_REQUIRED.map((p) => p.varName))(
     'throws a clear error when prop "%s" is missing from the schema',
@@ -108,17 +106,13 @@ describe("Player overlay — construction", () => {
   it("throws when BOTH non-local and local m_vecOrigin are absent", () => {
     const present = REQUIRED_PROPS.filter((p) => p.varName !== "m_vecOrigin");
     const entity = makeFakeEntity(present, new Map());
-    expect(() => new Player(0, entity)).toThrow(
-      /m_vecOrigin.* not in CCSPlayer schema/,
-    );
+    expect(() => new Player(0, entity)).toThrow(/m_vecOrigin.* not in CCSPlayer schema/);
   });
 
   it("throws when BOTH non-local and local m_vecOrigin[2] are absent", () => {
     const present = REQUIRED_PROPS.filter((p) => p.varName !== "m_vecOrigin[2]");
     const entity = makeFakeEntity(present, new Map());
-    expect(() => new Player(0, entity)).toThrow(
-      /m_vecOrigin\[2\].* not in CCSPlayer schema/,
-    );
+    expect(() => new Player(0, entity)).toThrow(/m_vecOrigin\[2\].* not in CCSPlayer schema/);
   });
 
   it("falls back to local origin when only the local pair is present", () => {
@@ -349,9 +343,7 @@ describe("Player overlay — name / steamId (userinfo resolution)", () => {
   it("resolves name from userinfo via slot - 1 → userId → info.name", () => {
     // CSGO convention: Player.slot is 1-based entity id, userinfo table is
     // 0-indexed by entity slot. Slot 1 must therefore look up table index 0.
-    const index = makeFakeUserInfoIndex(
-      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
-    );
+    const index = makeFakeUserInfoIndex(new Map([[0, { userId: 7, info: HUMAN_INFO }]]));
     const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
     const player = new Player(1, entity, index);
     expect(player.name).toBe("Brian");
@@ -375,9 +367,7 @@ describe("Player overlay — name / steamId (userinfo resolution)", () => {
   });
 
   it("steamId.toSteam64() round-trips through the wire xuid string", () => {
-    const index = makeFakeUserInfoIndex(
-      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
-    );
+    const index = makeFakeUserInfoIndex(new Map([[0, { userId: 7, info: HUMAN_INFO }]]));
     const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
     const player = new Player(1, entity, index);
     const steamId = player.steamId;
@@ -386,9 +376,7 @@ describe("Player overlay — name / steamId (userinfo resolution)", () => {
   });
 
   it("snapshot() captures resolved name and steamId at call time", () => {
-    const index = makeFakeUserInfoIndex(
-      new Map([[0, { userId: 7, info: HUMAN_INFO }]]),
-    );
+    const index = makeFakeUserInfoIndex(new Map([[0, { userId: 7, info: HUMAN_INFO }]]));
     const entity = makeFakeEntity(REQUIRED_PROPS, new Map());
     const player = new Player(1, entity, index);
     const snap = player.snapshot();

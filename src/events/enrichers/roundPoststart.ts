@@ -19,10 +19,7 @@ export interface RoundPoststartEvent extends EnrichedEvent {
   readonly roundNumber: number;
 }
 
-export const enrichRoundPoststart: Enricher<RoundPoststartEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichRoundPoststart: Enricher<RoundPoststartEvent> = (raw, ctx) => {
   const roundNumber = ctx.gameRules?.totalRoundsPlayed ?? 0;
 
   return freezeEvent<RoundPoststartEvent>({

@@ -26,15 +26,10 @@ function readNum(value: unknown): number {
   return typeof value === "number" ? value : 0;
 }
 
-export const enrichSmokeGrenadeExpired: Enricher<SmokeGrenadeExpiredEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichSmokeGrenadeExpired: Enricher<SmokeGrenadeExpiredEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
   const thrower =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+    typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
 
   const position = Object.freeze({
     x: readNum(raw.data.x),

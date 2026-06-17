@@ -1,20 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 
 import {
   CNETMsg_Tick,
   CSVCMsg_ServerInfo,
   CSVCMsg_GameEventList,
-} from '../../../src/proto/index.js';
+} from "../../../src/proto/index.js";
 
-describe('proto re-exports (smoke)', () => {
-  it('exposes ts-proto codec objects with encode/decode', () => {
+describe("proto re-exports (smoke)", () => {
+  it("exposes ts-proto codec objects with encode/decode", () => {
     for (const codec of [CNETMsg_Tick, CSVCMsg_ServerInfo, CSVCMsg_GameEventList]) {
-      expect(typeof codec.encode).toBe('function');
-      expect(typeof codec.decode).toBe('function');
+      expect(typeof codec.encode).toBe("function");
+      expect(typeof codec.decode).toBe("function");
     }
   });
 
-  it('round-trips an empty CSVCMsg_ServerInfo through encode/decode', () => {
+  it("round-trips an empty CSVCMsg_ServerInfo through encode/decode", () => {
     // Default-constructed messages should encode to a buffer the same codec
     // can decode back into a structurally-equal value. This proves the
     // generated runtime is wired up correctly.
@@ -24,7 +24,7 @@ describe('proto re-exports (smoke)', () => {
     expect(round).toEqual(original);
   });
 
-  it('decodes a CNETMsg_Tick with a known field value', () => {
+  it("decodes a CNETMsg_Tick with a known field value", () => {
     const bytes = CNETMsg_Tick.encode(CNETMsg_Tick.fromPartial({ tick: 12345 })).finish();
     const decoded = CNETMsg_Tick.decode(bytes);
     expect(decoded.tick).toBe(12345);

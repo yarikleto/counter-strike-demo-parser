@@ -27,7 +27,5 @@ const result = await DemoParser.parse(demoPath, {
 
 console.log("tick,slot,x,y,z");
 for (const sample of result.playerPositions ?? []) {
-  console.log(
-    `${sample.tick},${sample.player.slot},${sample.x},${sample.y},${sample.z}`,
-  );
+  console.log(`${sample.tick},${sample.player.slot},${sample.x},${sample.y},${sample.z}`);
 }

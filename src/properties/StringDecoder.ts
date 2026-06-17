@@ -22,10 +22,7 @@ import type { FlattenedSendProp } from "../datatables/ServerClass.js";
 const DT_MAX_STRING_BITS = 9;
 const utf8Decoder = new TextDecoder("utf-8");
 
-export function decodeString(
-  reader: BitReader,
-  _prop: FlattenedSendProp,
-): string {
+export function decodeString(reader: BitReader, _prop: FlattenedSendProp): string {
   const length = reader.readBits(DT_MAX_STRING_BITS);
   if (length === 0) return "";
   const bytes = reader.readBytes(length);

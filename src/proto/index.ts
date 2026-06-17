@@ -31,13 +31,13 @@ import {
   CSVCMsgUserMessage,
   CSVCMsgVoiceData,
   VoiceDataFormatT,
-} from '../generated/netmessages.js';
+} from "../generated/netmessages.js";
 import {
   CCSUsrMsgSayText,
   CCSUsrMsgSayText2,
   CCSUsrMsgTextMsg,
   ECstrike15UserMessages,
-} from '../generated/cstrike15_usermessages.js';
+} from "../generated/cstrike15_usermessages.js";
 
 // --- net_* messages ---------------------------------------------------------
 

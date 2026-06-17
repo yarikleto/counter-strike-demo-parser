@@ -12,6 +12,7 @@ import type {
   InfernoExpiredEvent,
   DecoyDetonateEvent,
 } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -32,7 +33,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 //   grenade_thrown        = 0
 //   grenade_bounce        = 0
 //   molotov_detonate      = 0
-describe("Grenade events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Grenade events (Tier-1) — integration on de_nuke.dem", () => {
   it("emits typed grenade lifecycle events with resolved players", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 
@@ -48,24 +49,12 @@ describe("Grenade events (Tier-1) — integration on de_nuke.dem", () => {
 
     parser.on("grenade_thrown", (e: GrenadeThrownEvent) => thrown.push(e));
     parser.on("grenade_bounce", (e: GrenadeBounceEvent) => bounces.push(e));
-    parser.on("hegrenade_detonate", (e: HeGrenadeDetonateEvent) =>
-      heDetonations.push(e),
-    );
-    parser.on("flashbang_detonate", (e: FlashbangDetonateEvent) =>
-      flashes.push(e),
-    );
-    parser.on("smokegrenade_detonate", (e: SmokeGrenadeDetonateEvent) =>
-      smokesDetonated.push(e),
-    );
-    parser.on("smokegrenade_expired", (e: SmokeGrenadeExpiredEvent) =>
-      smokesExpired.push(e),
-    );
-    parser.on("molotov_detonate", (e: MolotovDetonateEvent) =>
-      molotovs.push(e),
-    );
-    parser.on("inferno_expire", (e: InfernoExpiredEvent) =>
-      infernosExpired.push(e),
-    );
+    parser.on("hegrenade_detonate", (e: HeGrenadeDetonateEvent) => heDetonations.push(e));
+    parser.on("flashbang_detonate", (e: FlashbangDetonateEvent) => flashes.push(e));
+    parser.on("smokegrenade_detonate", (e: SmokeGrenadeDetonateEvent) => smokesDetonated.push(e));
+    parser.on("smokegrenade_expired", (e: SmokeGrenadeExpiredEvent) => smokesExpired.push(e));
+    parser.on("molotov_detonate", (e: MolotovDetonateEvent) => molotovs.push(e));
+    parser.on("inferno_expire", (e: InfernoExpiredEvent) => infernosExpired.push(e));
     parser.on("decoy_detonate", (e: DecoyDetonateEvent) => decoys.push(e));
 
     parser.parseAll();

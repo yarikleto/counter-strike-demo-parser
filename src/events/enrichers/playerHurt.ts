@@ -56,15 +56,12 @@ function readNum(value: unknown): number {
 
 export const enrichPlayerHurt: Enricher<PlayerHurtEvent> = (raw, ctx) => {
   const victimId = raw.data.userid;
-  const victim =
-    typeof victimId === "number" ? ctx.resolvePlayer(victimId) : undefined;
+  const victim = typeof victimId === "number" ? ctx.resolvePlayer(victimId) : undefined;
   if (victim === undefined) return null;
 
   const attackerId = raw.data.attacker;
   const attacker =
-    typeof attackerId === "number" && attackerId !== 0
-      ? ctx.resolvePlayer(attackerId)
-      : undefined;
+    typeof attackerId === "number" && attackerId !== 0 ? ctx.resolvePlayer(attackerId) : undefined;
 
   const weapon = typeof raw.data.weapon === "string" ? raw.data.weapon : "";
   const damage = readNum(raw.data.dmg_health);

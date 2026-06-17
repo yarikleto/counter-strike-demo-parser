@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -18,7 +19,7 @@ function round(n: number, decimals: number): number {
   return Math.round(n * factor) / factor;
 }
 
-describe("golden: header", () => {
+describe.skipIf(!fixtureAvailable)("golden: header", () => {
   it("matches the committed snapshot", () => {
     // Streaming API — `serverInfoState` carries tickInterval / maxClasses,
     // which `DemoResult` doesn't surface. One parse covers both fields.

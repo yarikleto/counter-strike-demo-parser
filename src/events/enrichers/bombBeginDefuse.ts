@@ -27,13 +27,9 @@ export interface BombBeginDefuseEvent extends EnrichedEvent {
   readonly hasKit: boolean;
 }
 
-export const enrichBombBeginDefuse: Enricher<BombBeginDefuseEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichBombBeginDefuse: Enricher<BombBeginDefuseEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const hasKit = raw.data.haskit === true;

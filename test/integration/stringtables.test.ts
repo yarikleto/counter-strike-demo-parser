@@ -14,10 +14,11 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("string tables — integration with de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("string tables — integration with de_nuke.dem", () => {
   it("registers at least 16 tables after parseAll", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     parser.parseAll();
@@ -62,12 +63,9 @@ describe("string tables — integration with de_nuke.dem", () => {
   it("emits stringTableCreated for every registered table", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     const names: string[] = [];
-    parser.on(
-      "stringTableCreated",
-      (payload: { name: string }) => {
-        names.push(payload.name);
-      },
-    );
+    parser.on("stringTableCreated", (payload: { name: string }) => {
+      names.push(payload.name);
+    });
     parser.parseAll();
     expect(names.length).toBe(parser.stringTables!.size);
     expect(names).toContain("userinfo");

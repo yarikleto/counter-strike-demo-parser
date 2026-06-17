@@ -30,9 +30,7 @@ function buildMinimalDemoBuffer(): Buffer {
  * Each command is emitted as: command byte + tick(int32 LE) + playerSlot(u8)
  * + length(int32 LE) + ASCII bytes (verbatim, including any trailing nulls).
  */
-function buildConsoleCmdDemoBuffer(
-  cmds: ReadonlyArray<{ tick: number; ascii: Buffer }>,
-): Buffer {
+function buildConsoleCmdDemoBuffer(cmds: readonly { tick: number; ascii: Buffer }[]): Buffer {
   const parts: Buffer[] = [];
   const header = Buffer.alloc(HEADER_SIZE);
   header.write("HL2DEMO\0", 0, 8, "utf8");
@@ -117,7 +115,7 @@ describe("DemoParser", () => {
       ]);
 
       const parser = new DemoParser(buffer);
-      const events: Array<{ tick: number; command: string }> = [];
+      const events: { tick: number; command: string }[] = [];
       parser.on("consoleCommand", (e) => {
         events.push({ tick: e.tick, command: e.command });
       });
@@ -139,7 +137,7 @@ describe("DemoParser", () => {
       ]);
 
       const parser = new DemoParser(buffer);
-      const events: Array<{ tick: number; command: string }> = [];
+      const events: { tick: number; command: string }[] = [];
       parser.on("consoleCommand", (e) => {
         events.push({ tick: e.tick, command: e.command });
       });

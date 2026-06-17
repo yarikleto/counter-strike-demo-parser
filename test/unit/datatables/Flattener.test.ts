@@ -10,18 +10,9 @@
  * `test/integration/flattening.test.ts`.
  */
 import { describe, it, expect } from "vitest";
-import {
-  flattenSendTable,
-  prioritySort,
-} from "../../../src/datatables/Flattener.js";
-import {
-  exclusionKey,
-} from "../../../src/datatables/Exclusions.js";
-import {
-  SendPropType,
-  type SendProp,
-  type SendTable,
-} from "../../../src/datatables/SendTable.js";
+import { flattenSendTable, prioritySort } from "../../../src/datatables/Flattener.js";
+import { exclusionKey } from "../../../src/datatables/Exclusions.js";
+import { SendPropType, type SendProp, type SendTable } from "../../../src/datatables/SendTable.js";
 import { SendTableRegistry } from "../../../src/datatables/SendTableRegistry.js";
 import { SPropFlags } from "../../../src/datatables/SPropFlags.js";
 
@@ -39,11 +30,7 @@ function intProp(varName: string, opts: Partial<SendProp> = {}): SendProp {
   };
 }
 
-function dtProp(
-  varName: string,
-  dtName: string,
-  opts: Partial<SendProp> = {},
-): SendProp {
+function dtProp(varName: string, dtName: string, opts: Partial<SendProp> = {}): SendProp {
   return {
     type: SendPropType.DATATABLE,
     varName,
@@ -84,11 +71,7 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     // `.claude/research/per-prop-bit-trace.md` for the divergence
     // diagnosis that prompted this design.
     const child = table("DT_Child", [intProp("c1"), intProp("c2")]);
-    const root = table("DT_Root", [
-      intProp("r1"),
-      dtProp("childRef", "DT_Child"),
-      intProp("r2"),
-    ]);
+    const root = table("DT_Root", [intProp("r1"), dtProp("childRef", "DT_Child"), intProp("r2")]);
     const reg = new SendTableRegistry();
     reg.register(root);
     reg.register(child);
@@ -119,15 +102,8 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
 
   it("recurses depth-first across multiple non-COLLAPSIBLE levels (eager-flush per gatherProps)", () => {
     const grand = table("DT_Grand", [intProp("g1")]);
-    const child = table("DT_Child", [
-      intProp("c1"),
-      dtProp("g", "DT_Grand"),
-      intProp("c2"),
-    ]);
-    const root = table("DT_Root", [
-      dtProp("ch", "DT_Child"),
-      intProp("r1"),
-    ]);
+    const child = table("DT_Child", [intProp("c1"), dtProp("g", "DT_Grand"), intProp("c2")]);
+    const root = table("DT_Root", [dtProp("ch", "DT_Child"), intProp("r1")]);
     const reg = new SendTableRegistry();
     reg.register(root);
     reg.register(child);
@@ -188,10 +164,7 @@ describe("flattenSendTable — TASK-016 prop collection + DT recursion", () => {
     // Root references DT_Shared twice (different parent prop names).
     // Flattening must produce 2 copies of Shared's props.
     const shared = table("DT_Shared", [intProp("s1")]);
-    const root = table("DT_Root", [
-      dtProp("first", "DT_Shared"),
-      dtProp("second", "DT_Shared"),
-    ]);
+    const root = table("DT_Root", [dtProp("first", "DT_Shared"), dtProp("second", "DT_Shared")]);
     const reg = new SendTableRegistry();
     reg.register(root);
     reg.register(shared);
@@ -209,20 +182,14 @@ describe("flattenSendTable — TASK-017 collapsible vs non-collapsible", () => {
     const rootCollapsible = table("DT_Root", [
       dtProp("ref", "DT_Child", { flags: SPropFlags.COLLAPSIBLE }),
     ]);
-    const rootNotCollapsible = table("DT_RootNC", [
-      dtProp("ref", "DT_Child"),
-    ]);
+    const rootNotCollapsible = table("DT_RootNC", [dtProp("ref", "DT_Child")]);
     reg.register(rootCollapsible);
     reg.register(rootNotCollapsible);
 
     const flatA = flattenSendTable(rootCollapsible, reg, new Set());
     const flatB = flattenSendTable(rootNotCollapsible, reg, new Set());
-    expect(flatA.map((f) => f.prop.varName)).toEqual(
-      flatB.map((f) => f.prop.varName),
-    );
-    expect(flatA.map((f) => f.sourceTableName)).toEqual(
-      flatB.map((f) => f.sourceTableName),
-    );
+    expect(flatA.map((f) => f.prop.varName)).toEqual(flatB.map((f) => f.prop.varName));
+    expect(flatA.map((f) => f.sourceTableName)).toEqual(flatB.map((f) => f.sourceTableName));
   });
 });
 
@@ -261,8 +228,7 @@ describe("prioritySort — TASK-018 bucket-sweep priority sort", () => {
     const flat = flattenSendTable(root, reg, new Set());
     const sorted = prioritySort(flat);
     // Group by priority and assert bucket membership + ordering across buckets.
-    const priorityOf = (n: string) =>
-      n.startsWith("p0") ? 0 : n.startsWith("p64") ? 64 : 128;
+    const priorityOf = (n: string) => (n.startsWith("p0") ? 0 : n.startsWith("p64") ? 64 : 128);
     const priosInOrder = sorted.map((f) => priorityOf(f.prop.varName));
     // Each bucket's priorities are non-decreasing across the array.
     for (let i = 1; i < priosInOrder.length; i++) {
@@ -325,21 +291,11 @@ describe("prioritySort — TASK-018 bucket-sweep priority sort", () => {
     // output): b, d (bucket 1); c, a, f (bucket 5 — note c is first
     // because the swap during bucket-1 didn't move c, then bucket-5
     // pass picks c first); e (bucket 200).
-    expect(sorted.map((f) => f.prop.varName)).toEqual([
-      "b",
-      "d",
-      "c",
-      "a",
-      "f",
-      "e",
-    ]);
+    expect(sorted.map((f) => f.prop.varName)).toEqual(["b", "d", "c", "a", "f", "e"]);
   });
 
   it("does not mutate the input array", () => {
-    const root = table("DT_Root", [
-      intProp("z", { priority: 100 }),
-      intProp("a", { priority: 0 }),
-    ]);
+    const root = table("DT_Root", [intProp("z", { priority: 100 }), intProp("a", { priority: 0 })]);
     const reg = new SendTableRegistry();
     reg.register(root);
     const flat = flattenSendTable(root, reg, new Set());

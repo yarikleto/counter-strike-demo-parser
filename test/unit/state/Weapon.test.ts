@@ -19,11 +19,6 @@ const WEAPON_PROPS = [
   "m_iItemDefinitionIndex",
 ] as const;
 
-interface FakeStoreOpts {
-  values: Record<string, unknown>; // varName -> value
-  index: Map<string, number>;
-}
-
 function fakeEntity(
   className: string,
   varNames: readonly string[],
@@ -56,8 +51,7 @@ function ak47Entity(values: Partial<Record<string, number>> = {}): Entity {
     m_iClip1: values.m_iClip1 ?? 0,
     m_iClip2: values.m_iClip2 ?? 0,
     m_iPrimaryReserveAmmoCount: values.m_iPrimaryReserveAmmoCount ?? 0,
-    "m_iItemDefinitionIndex":
-      values["m_iItemDefinitionIndex"] ?? 0,
+    m_iItemDefinitionIndex: values["m_iItemDefinitionIndex"] ?? 0,
   });
 }
 
@@ -93,9 +87,7 @@ describe("Weapon constructor", () => {
       ["m_hOwnerEntity", "m_iClip1", "m_iClip2", "m_iPrimaryReserveAmmoCount"],
       {},
     );
-    expect(() => new Weapon(e)).toThrow(
-      /m_iItemDefinitionIndex/,
-    );
+    expect(() => new Weapon(e)).toThrow(/m_iItemDefinitionIndex/);
   });
 });
 
@@ -110,7 +102,7 @@ describe("Weapon getters", () => {
       m_iClip1: 28,
       m_iClip2: 0,
       m_iPrimaryReserveAmmoCount: 60,
-      "m_iItemDefinitionIndex": 7, // AK-47
+      m_iItemDefinitionIndex: 7, // AK-47
       m_hOwnerEntity: 0xdeadbeef,
     });
     const w = new Weapon(e);
@@ -139,7 +131,7 @@ describe("Weapon getters", () => {
       m_iClip1: 30,
       m_iClip2: 0,
       m_iPrimaryReserveAmmoCount: 90,
-      "m_iItemDefinitionIndex": 7,
+      m_iItemDefinitionIndex: 7,
     };
     const flattenedProps = WEAPON_PROPS.map((vn) => ({ prop: { varName: vn } }));
     const e = {
@@ -163,7 +155,7 @@ describe("Weapon.snapshot", () => {
       m_iClip1: 30,
       m_iClip2: 0,
       m_iPrimaryReserveAmmoCount: 90,
-      "m_iItemDefinitionIndex": 7,
+      m_iItemDefinitionIndex: 7,
       m_hOwnerEntity: 42,
     });
     const snap = new Weapon(e).snapshot();
@@ -184,7 +176,7 @@ describe("Weapon.snapshot", () => {
       m_iClip1: 30,
       m_iClip2: 0,
       m_iPrimaryReserveAmmoCount: 90,
-      "m_iItemDefinitionIndex": 7,
+      m_iItemDefinitionIndex: 7,
     };
     const flattenedProps = WEAPON_PROPS.map((vn) => ({ prop: { varName: vn } }));
     const e = {

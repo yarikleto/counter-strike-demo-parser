@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "bomb_dropped",
     eventId: 111,
@@ -30,10 +28,7 @@ describe("enrichBombDropped", () => {
     const dropper = { slot: 4 } as Player;
     const ctx = makeCtx(new Map([[34, dropper]]));
 
-    const result = enrichBombDropped(
-      makeRaw({ userid: 34, entindex: 927 }),
-      ctx,
-    );
+    const result = enrichBombDropped(makeRaw({ userid: 34, entindex: 927 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("bomb_dropped");
@@ -45,10 +40,7 @@ describe("enrichBombDropped", () => {
 
   it("returns null when player doesn't resolve", () => {
     const ctx = makeCtx(new Map());
-    const result = enrichBombDropped(
-      makeRaw({ userid: 999, entindex: 927 }),
-      ctx,
-    );
+    const result = enrichBombDropped(makeRaw({ userid: 999, entindex: 927 }), ctx);
     expect(result).toBeNull();
   });
 });

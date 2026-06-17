@@ -18,9 +18,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "bot_takeover",
     eventId: 19,
@@ -48,20 +46,14 @@ describe("enrichBotTakeover", () => {
 
   it("returns null when player doesn't resolve", () => {
     const ctx = makeCtx(new Map());
-    const result = enrichBotTakeover(
-      makeRaw({ userid: 999, botid: 5, index: 5 }),
-      ctx,
-    );
+    const result = enrichBotTakeover(makeRaw({ userid: 999, botid: 5, index: 5 }), ctx);
     expect(result).toBeNull();
   });
 
   it("coerces missing botid to 0", () => {
     const player = { slot: 7 } as Player;
     const ctx = makeCtx(new Map([[12, player]]));
-    const result = enrichBotTakeover(
-      makeRaw({ userid: 12 }),
-      ctx,
-    ) as Readonly<BotTakeoverEvent>;
+    const result = enrichBotTakeover(makeRaw({ userid: 12 }), ctx) as Readonly<BotTakeoverEvent>;
     expect(result.botId).toBe(0);
   });
 });

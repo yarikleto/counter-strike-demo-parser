@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "molotov_detonate",
     eventId: 164,
@@ -30,10 +28,7 @@ describe("enrichMolotovDetonate", () => {
     const thrower = { slot: 5 } as Player;
     const ctx = makeCtx(new Map([[55, thrower]]));
 
-    const result = enrichMolotovDetonate(
-      makeRaw({ userid: 55, x: 100, y: 200, z: 300 }),
-      ctx,
-    );
+    const result = enrichMolotovDetonate(makeRaw({ userid: 55, x: 100, y: 200, z: 300 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("molotov_detonate");
@@ -45,10 +40,7 @@ describe("enrichMolotovDetonate", () => {
   it("thrower unresolved: still emits with thrower undefined", () => {
     const ctx = makeCtx(new Map());
 
-    const result = enrichMolotovDetonate(
-      makeRaw({ userid: 999, x: 1, y: 2, z: 3 }),
-      ctx,
-    );
+    const result = enrichMolotovDetonate(makeRaw({ userid: 999, x: 1, y: 2, z: 3 }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.thrower).toBeUndefined();

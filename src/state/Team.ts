@@ -123,12 +123,7 @@ function findIdx(entity: Entity, name: string, sourceTable?: string): number {
  * `findIdxFallback`, even when the second is dormant for this class.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function findIdxFallback(
-  entity: Entity,
-  name: string,
-  primary: string,
-  fallback: string,
-): number {
+function findIdxFallback(entity: Entity, name: string, primary: string, fallback: string): number {
   try {
     return findIdx(entity, name, primary);
   } catch {
@@ -199,9 +194,7 @@ export class Team {
   }
 
   private readString(idx: number): string {
-    return readStringOrEmpty(
-      this.entity.store.read(this.entity.storageSlot, idx),
-    );
+    return readStringOrEmpty(this.entity.store.read(this.entity.storageSlot, idx));
   }
 
   /** Source's `m_iTeamNum` — `{0:Unassigned, 1:Spectator, 2:T, 3:CT}`. */
@@ -278,10 +271,7 @@ export class Team {
    * no `EntityList` reference by design (ADR-004 alternatives §4).
    */
   get playerSlots(): readonly number[] {
-    const v = this.entity.store.read(
-      this.entity.storageSlot,
-      this.playerArrayIdx,
-    );
+    const v = this.entity.store.read(this.entity.storageSlot, this.playerArrayIdx);
     if (!Array.isArray(v)) return Object.freeze<number[]>([]);
     const out: number[] = new Array<number>(v.length);
     for (let i = 0; i < v.length; i++) {

@@ -28,9 +28,7 @@ for (const round of result.rounds) {
   console.log(`Round ${round.number}`);
 
   // Sort by slot for deterministic output.
-  const sorted = Array.from(round.players.values()).sort(
-    (a, b) => a.player.slot - b.player.slot,
-  );
+  const sorted = Array.from(round.players.values()).sort((a, b) => a.player.slot - b.player.slot);
 
   for (const stats of sorted) {
     const econ = stats.economy;

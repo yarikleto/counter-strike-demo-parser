@@ -30,14 +30,10 @@ export class ServerClassRegistry {
    */
   register(serverClass: ServerClass): void {
     if (this.byClassId.has(serverClass.classId)) {
-      throw new Error(
-        `ServerClassRegistry: duplicate classId ${serverClass.classId}`,
-      );
+      throw new Error(`ServerClassRegistry: duplicate classId ${serverClass.classId}`);
     }
     if (this.byClassName.has(serverClass.className)) {
-      throw new Error(
-        `ServerClassRegistry: duplicate className "${serverClass.className}"`,
-      );
+      throw new Error(`ServerClassRegistry: duplicate className "${serverClass.className}"`);
     }
     this.byClassId.set(serverClass.classId, serverClass);
     this.byClassName.set(serverClass.className, serverClass);

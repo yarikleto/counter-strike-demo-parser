@@ -6,11 +6,7 @@
  * everything datatables-related from here; internal modules import directly
  * from the sibling files.
  */
-export type {
-  SendTable,
-  SendProp,
-  SendPropTypeValue,
-} from "./SendTable.js";
+export type { SendTable, SendProp, SendPropTypeValue } from "./SendTable.js";
 export { SendPropType } from "./SendTable.js";
 export { SendTableRegistry } from "./SendTableRegistry.js";
 export type { ServerClass, FlattenedSendProp } from "./ServerClass.js";

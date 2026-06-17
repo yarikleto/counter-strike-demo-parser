@@ -13,9 +13,7 @@ import type { Player } from "../../../../src/state/Player.js";
 // expose all three under the public field name `item: string` regardless,
 // so this enricher reads `raw.data.weapon` and surfaces it as `item`. The
 // enricher returns null when the player does not resolve.
-function makeCtx(
-  resolvePlayer: (uid: number) => Player | undefined,
-): EnricherContext {
+function makeCtx(resolvePlayer: (uid: number) => Player | undefined): EnricherContext {
   return {
     players: [],
     entities: undefined,
@@ -31,9 +29,7 @@ function makeCtx(
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "item_purchase",
     eventId: 61,

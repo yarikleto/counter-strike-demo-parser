@@ -40,8 +40,7 @@ export interface ItemPurchaseEvent extends EnrichedEvent {
 
 export const enrichItemPurchase: Enricher<ItemPurchaseEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   // Wire field is `weapon`, not `item` — see header comment.

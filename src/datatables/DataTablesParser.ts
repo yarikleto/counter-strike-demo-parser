@@ -68,11 +68,7 @@ export function parseDataTables(data: Buffer): DataTablesParseResult {
       );
     }
 
-    const view = new Uint8Array(
-      payload.buffer,
-      payload.byteOffset,
-      payload.byteLength,
-    );
+    const view = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
     const msg = CSVCMsg_SendTable.decode(view);
 
     if (msg.isEnd === true) {
@@ -89,9 +85,7 @@ export function parseDataTables(data: Buffer): DataTablesParseResult {
   }
 
   if (!sawTerminator) {
-    throw new Error(
-      "parseDataTables: stream ended before svc_SendTable terminator (is_end)",
-    );
+    throw new Error("parseDataTables: stream ended before svc_SendTable terminator (is_end)");
   }
 
   // 2. Read the trailing class-info section as raw bytes.
@@ -117,10 +111,7 @@ export function parseDataTables(data: Buffer): DataTablesParseResult {
  * Read the class-info section: int16 count followed by `count` records
  * of (int16 classId, cstring className, cstring dataTableName).
  */
-function readClassInfo(
-  reader: ByteReader,
-  sendTables: SendTableRegistry,
-): ServerClass[] {
+function readClassInfo(reader: ByteReader, sendTables: SendTableRegistry): ServerClass[] {
   const numClasses = readInt16LE(reader);
   const out: ServerClass[] = [];
   for (let i = 0; i < numClasses; i++) {
@@ -167,9 +158,7 @@ function readCString(reader: ByteReader): string {
     }
     bytes.push(byte);
   }
-  throw new Error(
-    "parseDataTables: unterminated cstring in class-info section",
-  );
+  throw new Error("parseDataTables: unterminated cstring in class-info section");
 }
 
 /**
@@ -179,7 +168,7 @@ function readCString(reader: ByteReader): string {
 function toSendTable(msg: {
   netTableName?: string | undefined;
   needsDecoder?: boolean | undefined;
-  props: Array<{
+  props: {
     type?: number | undefined;
     varName?: string | undefined;
     flags?: number | undefined;
@@ -189,7 +178,7 @@ function toSendTable(msg: {
     lowValue?: number | undefined;
     highValue?: number | undefined;
     numBits?: number | undefined;
-  }>;
+  }[];
 }): SendTable {
   const props: SendProp[] = msg.props.map((p) => {
     const base = {

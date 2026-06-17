@@ -10,6 +10,7 @@ import type {
   BulletImpactEvent,
   OtherDeathEvent,
 } from "../../src/events/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
@@ -18,7 +19,7 @@ const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 // player_given_c4, bullet_impact, other_death) on a real 30-round MM demo.
 // Asserts the dispatcher invokes each enricher and the typed payloads
 // resolve to live `Player` overlays.
-describe("Combat events (Tier-1) — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("Combat events (Tier-1) — integration on de_nuke.dem", () => {
   it("emits typed combat & player-action events with resolved players", () => {
     const parser = DemoParser.fromFile(FIXTURE);
 

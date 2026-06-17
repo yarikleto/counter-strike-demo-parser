@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "grenade_thrown",
     eventId: 132,
@@ -30,10 +28,7 @@ describe("enrichGrenadeThrown", () => {
     const thrower = { slot: 1 } as Player;
     const ctx = makeCtx(new Map([[42, thrower]]));
 
-    const result = enrichGrenadeThrown(
-      makeRaw({ userid: 42, weapon: "weapon_hegrenade" }),
-      ctx,
-    );
+    const result = enrichGrenadeThrown(makeRaw({ userid: 42, weapon: "weapon_hegrenade" }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("grenade_thrown");
@@ -46,10 +41,7 @@ describe("enrichGrenadeThrown", () => {
   it("returns null when thrower doesn't resolve", () => {
     const ctx = makeCtx(new Map());
 
-    const result = enrichGrenadeThrown(
-      makeRaw({ userid: 999, weapon: "weapon_flashbang" }),
-      ctx,
-    );
+    const result = enrichGrenadeThrown(makeRaw({ userid: 999, weapon: "weapon_flashbang" }), ctx);
 
     expect(result).toBeNull();
   });
@@ -57,10 +49,7 @@ describe("enrichGrenadeThrown", () => {
   it("returns null when userid is 0 (engine-emitted)", () => {
     const ctx = makeCtx(new Map());
 
-    const result = enrichGrenadeThrown(
-      makeRaw({ userid: 0, weapon: "weapon_smokegrenade" }),
-      ctx,
-    );
+    const result = enrichGrenadeThrown(makeRaw({ userid: 0, weapon: "weapon_smokegrenade" }), ctx);
 
     expect(result).toBeNull();
   });

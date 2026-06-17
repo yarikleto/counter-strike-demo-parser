@@ -83,7 +83,7 @@ export class EntityStore {
     this.arrays = new Array(layout.numArrayProps * initial);
     this.bigInts = new BigInt64Array(layout.numBigIntProps * initial);
     this.occupied = new Uint32Array((initial + 31) >>> 5);
-    this.written = new Uint32Array(((initial * this.propCount) + 31) >>> 5);
+    this.written = new Uint32Array((initial * this.propCount + 31) >>> 5);
     this.slotVersions = new Uint32Array(initial);
   }
 
@@ -196,16 +196,13 @@ export class EntityStore {
         return;
       }
       case "string":
-        this.strings[slot * this.layout.numStringProps + col.offset] =
-          value as string;
+        this.strings[slot * this.layout.numStringProps + col.offset] = value as string;
         return;
       case "array":
-        this.arrays[slot * this.layout.numArrayProps + col.offset] =
-          value as PropertyValue[];
+        this.arrays[slot * this.layout.numArrayProps + col.offset] = value as PropertyValue[];
         return;
       case "bigint":
-        this.bigInts[slot * this.layout.numBigIntProps + col.offset] =
-          value as bigint;
+        this.bigInts[slot * this.layout.numBigIntProps + col.offset] = value as bigint;
         return;
     }
   }
@@ -236,9 +233,7 @@ export class EntityStore {
       case "array":
         return this.arrays[slot * this.layout.numArrayProps + col.offset]!;
       case "bigint":
-        return this.bigInts[
-          slot * this.layout.numBigIntProps + col.offset
-        ]!;
+        return this.bigInts[slot * this.layout.numBigIntProps + col.offset]!;
     }
   }
 
@@ -250,21 +245,12 @@ export class EntityStore {
     this.capacity = newCap;
     this.ints = grow(this.ints, this.layout.numIntProps * newCap);
     this.floats = growF32(this.floats, this.layout.numFloatProps * newCap);
-    this.vectors = growF32(
-      this.vectors,
-      this.layout.numVectorProps * 3 * newCap,
-    );
-    this.vectorXYs = growF32(
-      this.vectorXYs,
-      this.layout.numVectorXYProps * 2 * newCap,
-    );
+    this.vectors = growF32(this.vectors, this.layout.numVectorProps * 3 * newCap);
+    this.vectorXYs = growF32(this.vectorXYs, this.layout.numVectorXYProps * 2 * newCap);
     // Plain arrays — extend length; old entries preserved.
     this.strings.length = this.layout.numStringProps * newCap;
     this.arrays.length = this.layout.numArrayProps * newCap;
-    this.bigInts = growI64(
-      this.bigInts,
-      this.layout.numBigIntProps * newCap,
-    );
+    this.bigInts = growI64(this.bigInts, this.layout.numBigIntProps * newCap);
     this.occupied = growU32(this.occupied, (newCap + 31) >>> 5);
     this.written = growU32(this.written, (newCap * this.propCount + 31) >>> 5);
     this.slotVersions = growU32(this.slotVersions, newCap);

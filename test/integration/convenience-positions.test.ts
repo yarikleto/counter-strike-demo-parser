@@ -15,11 +15,12 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, "../fixtures/de_nuke.dem");
 
-describe("PositionTracker integration (de_nuke)", () => {
+describe.skipIf(!fixtureAvailable)("PositionTracker integration (de_nuke)", () => {
   it("omits playerPositions by default (opt-in via collectPlayerPositions)", async () => {
     const result = await DemoParser.parse(FIXTURE);
     expect(result.playerPositions).toBeUndefined();
@@ -44,18 +45,13 @@ describe("PositionTracker integration (de_nuke)", () => {
     // Spot-check: at least one snapshot has a non-zero coordinate. A demo
     // that only ever read 0/0/0 would indicate the position prop hookup is
     // broken.
-    const anyNonZero = snaps.some(
-      (s) => s.x !== 0 || s.y !== 0 || s.z !== 0,
-    );
+    const anyNonZero = snaps.some((s) => s.x !== 0 || s.y !== 0 || s.z !== 0);
     expect(anyNonZero).toBe(true);
 
     // Plausibility bound: CSGO maps fit inside roughly ±16384 world units.
     // A wildly-out-of-range scalar would indicate a units / decoding bug.
     const allInRange = snaps.every(
-      (s) =>
-        Math.abs(s.x) < 32_768 &&
-        Math.abs(s.y) < 32_768 &&
-        Math.abs(s.z) < 32_768,
+      (s) => Math.abs(s.x) < 32_768 && Math.abs(s.y) < 32_768 && Math.abs(s.z) < 32_768,
     );
     expect(allInRange).toBe(true);
 
@@ -81,8 +77,6 @@ describe("PositionTracker integration (de_nuke)", () => {
     // 8x coarser rate => roughly 8x fewer samples. Use a loose bound (>2x)
     // since the exact ratio depends on entityUpdated cadence near tick
     // boundaries.
-    expect(fine.playerPositions!.length).toBeGreaterThan(
-      coarse.playerPositions!.length * 2,
-    );
+    expect(fine.playerPositions!.length).toBeGreaterThan(coarse.playerPositions!.length * 2);
   });
 });

@@ -61,14 +61,16 @@ class BitWriter {
   }
 }
 
-function makeTable(opts: Partial<{
-  name: string;
-  maxEntries: number;
-  userDataFixedSize: boolean;
-  userDataSize: number;
-  userDataSizeBits: number;
-  flags: number;
-}> = {}): StringTable {
+function makeTable(
+  opts: Partial<{
+    name: string;
+    maxEntries: number;
+    userDataFixedSize: boolean;
+    userDataSize: number;
+    userDataSizeBits: number;
+    flags: number;
+  }> = {},
+): StringTable {
   return new StringTable({
     name: opts.name ?? "test",
     maxEntries: opts.maxEntries ?? 64,

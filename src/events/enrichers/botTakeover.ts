@@ -28,8 +28,7 @@ export interface BotTakeoverEvent extends EnrichedEvent {
 
 export const enrichBotTakeover: Enricher<BotTakeoverEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const botId = typeof raw.data.botid === "number" ? raw.data.botid : 0;

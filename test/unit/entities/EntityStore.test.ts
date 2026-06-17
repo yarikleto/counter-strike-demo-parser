@@ -12,12 +12,7 @@ import { computePropColumns } from "../../../src/entities/PropColumns.js";
 import { SendPropType } from "../../../src/datatables/SendTable.js";
 import type { ServerClass, FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
-function makeProp(
-  varName: string,
-  type: number,
-  numBits = 32,
-  flags = 0,
-): FlattenedSendProp {
+function makeProp(varName: string, type: number, numBits = 32, flags = 0): FlattenedSendProp {
   return {
     prop: {
       type: type as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
@@ -74,10 +69,7 @@ describe("EntityStore", () => {
   });
 
   it("returns undefined for a never-written prop on an occupied slot", () => {
-    const props = [
-      makeProp("intA", SendPropType.INT, 16),
-      makeProp("intB", SendPropType.INT, 16),
-    ];
+    const props = [makeProp("intA", SendPropType.INT, 16), makeProp("intB", SendPropType.INT, 16)];
     const sc = makeClass(props);
     const store = new EntityStore(sc, computePropColumns(props));
 
@@ -154,10 +146,7 @@ describe("EntityStore", () => {
   });
 
   it("supports VectorXY and INT64 (bigint) columns", () => {
-    const props = [
-      makeProp("v", SendPropType.VECTORXY),
-      makeProp("big", SendPropType.INT64, 64),
-    ];
+    const props = [makeProp("v", SendPropType.VECTORXY), makeProp("big", SendPropType.INT64, 64)];
     const sc = makeClass(props);
     const store = new EntityStore(sc, computePropColumns(props));
     const s = store.allocate();

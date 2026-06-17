@@ -118,10 +118,7 @@ function listCorpus(dir: string): CorpusFile[] {
  * first unseen map each pass until `limit` files are accumulated. This gives
  * the broadest map coverage for a small `limit`.
  */
-function selectDiverseSample(
-  files: readonly CorpusFile[],
-  limit: number,
-): CorpusFile[] {
+function selectDiverseSample(files: readonly CorpusFile[], limit: number): CorpusFile[] {
   const byMap = new Map<string, CorpusFile[]>();
   for (const f of files) {
     const bucket = byMap.get(f.map);
@@ -160,10 +157,10 @@ interface FileResult {
   readonly throwMessage: string | undefined;
   readonly timedOut: boolean;
   readonly parserErrorCount: number;
-  readonly parserErrorKinds: ReadonlyArray<{
+  readonly parserErrorKinds: readonly {
     readonly kind: ParserErrorKind;
     readonly message: string;
-  }>;
+  }[];
   readonly killsCount: number;
   readonly roundsCount: number;
   readonly playersCount: number;
@@ -356,10 +353,7 @@ function summarise(results: readonly FileResult[]): string {
   const median = percentile(durations, 50);
   const p99 = percentile(durations, 99);
 
-  const totalParserEvents = results.reduce(
-    (sum, r) => sum + r.parserErrorCount,
-    0,
-  );
+  const totalParserEvents = results.reduce((sum, r) => sum + r.parserErrorCount, 0);
 
   const kindCounts = new Map<ParserErrorKind, number>();
   for (const r of results) {
@@ -412,17 +406,12 @@ async function main(): Promise<void> {
   const all = listCorpus(dir);
   process.stdout.write(`found ${all.length} .dem.gz files\n`);
 
-  const filtered =
-    args.map === undefined ? all : all.filter((f) => f.map === args.map);
+  const filtered = args.map === undefined ? all : all.filter((f) => f.map === args.map);
   if (args.map !== undefined) {
-    process.stdout.write(
-      `filtered to map=${args.map}: ${filtered.length} files\n`,
-    );
+    process.stdout.write(`filtered to map=${args.map}: ${filtered.length} files\n`);
   }
 
-  const picked = args.all
-    ? filtered
-    : selectDiverseSample(filtered, args.limit);
+  const picked = args.all ? filtered : selectDiverseSample(filtered, args.limit);
   process.stdout.write(`parsing ${picked.length} files\n\n`);
   for (const f of picked) process.stdout.write(`  - ${basename(f.name)}\n`);
   process.stdout.write("\n");
@@ -431,11 +420,7 @@ async function main(): Promise<void> {
   for (const f of picked) {
     process.stdout.write(`[parse] ${f.name} ... `);
     const result = await parseOne(f);
-    const status = result.threw
-      ? "THREW"
-      : result.timedOut
-        ? "TIMEOUT"
-        : "ok";
+    const status = result.threw ? "THREW" : result.timedOut ? "TIMEOUT" : "ok";
     process.stdout.write(
       `${status} ${result.parseDurationMs.toFixed(0)}ms parserErrors=${result.parserErrorCount}\n`,
     );
@@ -450,6 +435,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  process.stderr.write(`fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.stderr.write(
+    `fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
   process.exit(1);
 });

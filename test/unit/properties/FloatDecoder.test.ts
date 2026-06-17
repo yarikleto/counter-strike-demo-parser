@@ -9,10 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { BitReader } from "../../../src/reader/BitReader.js";
 import { decodeFloat } from "../../../src/properties/FloatDecoder.js";
-import {
-  SendPropType,
-  type SendProp,
-} from "../../../src/datatables/SendTable.js";
+import { SendPropType, type SendProp } from "../../../src/datatables/SendTable.js";
 import { SPropFlags } from "../../../src/datatables/SPropFlags.js";
 import type { FlattenedSendProp } from "../../../src/datatables/ServerClass.js";
 
@@ -80,11 +77,7 @@ describe("FloatDecoder — branch dispatch", () => {
     // For all-zero input the MP coord decoders read in_bounds=0, then for
     // non-integral they read has_int=0 and sign=0 plus a fractional 0,
     // returning 0. We just verify no throw + finite numeric.
-    const cases = [
-      SPropFlags.COORD_MP,
-      SPropFlags.COORD_MP_LP,
-      SPropFlags.COORD_MP_INT,
-    ];
+    const cases = [SPropFlags.COORD_MP, SPropFlags.COORD_MP_LP, SPropFlags.COORD_MP_INT];
     for (const flag of cases) {
       const reader = new BitReader(new Uint8Array(4));
       const v = decodeFloat(reader, floatProp({ flags: flag }));
@@ -95,34 +88,23 @@ describe("FloatDecoder — branch dispatch", () => {
   it("dispatches SPROP_CELL_COORD using prop.numBits as integer width", () => {
     // CELL_COORD reads `numBits` int bits + 5 frac bits. Input = 0 → 0.
     const reader = new BitReader(new Uint8Array(4));
-    expect(
-      decodeFloat(
-        reader,
-        floatProp({ flags: SPropFlags.CELL_COORD, numBits: 8 }),
-      ),
-    ).toBe(0);
+    expect(decodeFloat(reader, floatProp({ flags: SPropFlags.CELL_COORD, numBits: 8 }))).toBe(0);
     expect(reader.position).toBe(13);
   });
 
   it("dispatches SPROP_CELL_COORD_INT with numBits", () => {
     // input = 0xFF means cellInt = 0xFF (8 bits, integral).
     const reader = new BitReader(new Uint8Array([0xff]));
-    expect(
-      decodeFloat(
-        reader,
-        floatProp({ flags: SPropFlags.CELL_COORD_INT, numBits: 8 }),
-      ),
-    ).toBe(255);
+    expect(decodeFloat(reader, floatProp({ flags: SPropFlags.CELL_COORD_INT, numBits: 8 }))).toBe(
+      255,
+    );
   });
 });
 
 describe("FloatDecoder — quantized linear map", () => {
   it("returns lowValue when bits = 0", () => {
     const reader = new BitReader(new Uint8Array(2));
-    const v = decodeFloat(
-      reader,
-      floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }),
-    );
+    const v = decodeFloat(reader, floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }));
     expect(v).toBe(0);
   });
 
@@ -130,10 +112,7 @@ describe("FloatDecoder — quantized linear map", () => {
     // 10 bits all set = 1023. Place 0x03FF (low 10 bits) at bit 0.
     const buf = new Uint8Array([0xff, 0x03]);
     const reader = new BitReader(buf);
-    const v = decodeFloat(
-      reader,
-      floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }),
-    );
+    const v = decodeFloat(reader, floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }));
     expect(v).toBeCloseTo(1024, 6);
   });
 
@@ -141,10 +120,7 @@ describe("FloatDecoder — quantized linear map", () => {
     // bits = 512 (out of 1023), low=0 high=1024 → 0 + (512/1023)*1024 ≈ 512.5
     const buf = new Uint8Array([0x00, 0x02]); // 0x0200 = 512
     const reader = new BitReader(buf);
-    const v = decodeFloat(
-      reader,
-      floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }),
-    );
+    const v = decodeFloat(reader, floatProp({ numBits: 10, lowValue: 0, highValue: 1024 }));
     expect(v).toBeCloseTo((512 / 1023) * 1024, 6);
   });
 

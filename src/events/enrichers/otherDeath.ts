@@ -28,12 +28,9 @@ export interface OtherDeathEvent extends EnrichedEvent {
 export const enrichOtherDeath: Enricher<OtherDeathEvent> = (raw, ctx) => {
   const attackerId = raw.data.attacker;
   const attacker =
-    typeof attackerId === "number" && attackerId !== 0
-      ? ctx.resolvePlayer(attackerId)
-      : undefined;
+    typeof attackerId === "number" && attackerId !== 0 ? ctx.resolvePlayer(attackerId) : undefined;
 
-  const entityType =
-    typeof raw.data.othertype === "string" ? raw.data.othertype : "";
+  const entityType = typeof raw.data.othertype === "string" ? raw.data.othertype : "";
   const weapon = typeof raw.data.weapon === "string" ? raw.data.weapon : "";
 
   return freezeEvent<OtherDeathEvent>({

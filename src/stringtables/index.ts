@@ -8,8 +8,5 @@
 export { StringTable } from "./StringTable.js";
 export type { StringTableEntry, StringTableOptions } from "./StringTable.js";
 export { StringTableManager } from "./StringTableManager.js";
-export {
-  parseStringTableEntries,
-  bitsForMaxEntries,
-} from "./StringTableParser.js";
+export { parseStringTableEntries, bitsForMaxEntries } from "./StringTableParser.js";
 export type { ParseStringTableResult } from "./StringTableParser.js";

@@ -20,13 +20,9 @@ export interface BombAbortDefuseEvent extends EnrichedEvent {
   readonly player: Player;
 }
 
-export const enrichBombAbortDefuse: Enricher<BombAbortDefuseEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichBombAbortDefuse: Enricher<BombAbortDefuseEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   return freezeEvent<BombAbortDefuseEvent>({

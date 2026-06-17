@@ -15,9 +15,7 @@ function makeCtx(players: Map<number, Player>): EnricherContext {
   } as unknown as EnricherContext;
 }
 
-function makeRaw(
-  data: Record<string, string | number | boolean>,
-): DecodedGameEvent {
+function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEvent {
   return {
     name: "player_spawn",
     eventId: 20,
@@ -30,10 +28,7 @@ describe("enrichPlayerSpawned", () => {
     const player = { slot: 2 } as Player;
     const ctx = makeCtx(new Map([[22, player]]));
 
-    const result = enrichPlayerSpawned(
-      makeRaw({ userid: 22, inrestart: true }),
-      ctx,
-    );
+    const result = enrichPlayerSpawned(makeRaw({ userid: 22, inrestart: true }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.eventName).toBe("player_spawn");
@@ -46,10 +41,7 @@ describe("enrichPlayerSpawned", () => {
     const player = { slot: 2 } as Player;
     const ctx = makeCtx(new Map([[22, player]]));
 
-    const result = enrichPlayerSpawned(
-      makeRaw({ userid: 22, inrestart: false }),
-      ctx,
-    );
+    const result = enrichPlayerSpawned(makeRaw({ userid: 22, inrestart: false }), ctx);
 
     expect(result).not.toBeNull();
     expect(result!.inRestart).toBe(false);
@@ -57,10 +49,7 @@ describe("enrichPlayerSpawned", () => {
 
   it("returns null when player doesn't resolve", () => {
     const ctx = makeCtx(new Map());
-    const result = enrichPlayerSpawned(
-      makeRaw({ userid: 999, inrestart: false }),
-      ctx,
-    );
+    const result = enrichPlayerSpawned(makeRaw({ userid: 999, inrestart: false }), ctx);
     expect(result).toBeNull();
   });
 });

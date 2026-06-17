@@ -56,18 +56,12 @@ export interface CsWinPanelRoundEvent extends EnrichedEvent {
 }
 
 export const enrichCsWinPanelRound: Enricher<CsWinPanelRoundEvent> = (raw) => {
-  const finalEvent =
-    typeof raw.data.final_event === "number" ? raw.data.final_event : 0;
-  const funFactToken =
-    typeof raw.data.funfact_token === "string" ? raw.data.funfact_token : "";
-  const funFactPlayer =
-    typeof raw.data.funfact_player === "number" ? raw.data.funfact_player : 0;
-  const funFactData1 =
-    typeof raw.data.funfact_data1 === "number" ? raw.data.funfact_data1 : 0;
-  const funFactData2 =
-    typeof raw.data.funfact_data2 === "number" ? raw.data.funfact_data2 : 0;
-  const funFactData3 =
-    typeof raw.data.funfact_data3 === "number" ? raw.data.funfact_data3 : 0;
+  const finalEvent = typeof raw.data.final_event === "number" ? raw.data.final_event : 0;
+  const funFactToken = typeof raw.data.funfact_token === "string" ? raw.data.funfact_token : "";
+  const funFactPlayer = typeof raw.data.funfact_player === "number" ? raw.data.funfact_player : 0;
+  const funFactData1 = typeof raw.data.funfact_data1 === "number" ? raw.data.funfact_data1 : 0;
+  const funFactData2 = typeof raw.data.funfact_data2 === "number" ? raw.data.funfact_data2 : 0;
+  const funFactData3 = typeof raw.data.funfact_data3 === "number" ? raw.data.funfact_data3 : 0;
 
   return freezeEvent<CsWinPanelRoundEvent>({
     eventName: raw.name,

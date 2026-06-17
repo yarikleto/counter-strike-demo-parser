@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
 import type { CSVCMsg_ServerInfo as ServerInfo } from "../../src/proto/index.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("serverInfo event — integration with real demo file", () => {
+describe.skipIf(!fixtureAvailable)("serverInfo event — integration with real demo file", () => {
   it("should emit serverInfo exactly once when parsing de_nuke.dem", () => {
     const parser = DemoParser.fromFile(FIXTURE_PATH);
     const events: ServerInfo[] = [];
@@ -43,20 +44,23 @@ describe("serverInfo event — integration with real demo file", () => {
   });
 });
 
-describe("DemoParser.serverInfo accessor — cached state from de_nuke.dem", () => {
-  it("should expose serverInfo as undefined before parseAll() is called", () => {
-    const parser = DemoParser.fromFile(FIXTURE_PATH);
-    // Snapshot before any parsing happens.
-    expect(parser.serverInfo).toBeUndefined();
-  });
+describe.skipIf(!fixtureAvailable)(
+  "DemoParser.serverInfo accessor — cached state from de_nuke.dem",
+  () => {
+    it("should expose serverInfo as undefined before parseAll() is called", () => {
+      const parser = DemoParser.fromFile(FIXTURE_PATH);
+      // Snapshot before any parsing happens.
+      expect(parser.serverInfo).toBeUndefined();
+    });
 
-  it("should populate serverInfo with map name and tick interval after parseAll()", () => {
-    const parser = DemoParser.fromFile(FIXTURE_PATH);
+    it("should populate serverInfo with map name and tick interval after parseAll()", () => {
+      const parser = DemoParser.fromFile(FIXTURE_PATH);
 
-    parser.parseAll();
+      parser.parseAll();
 
-    expect(parser.serverInfo).toBeDefined();
-    expect(parser.serverInfo!.mapName).toBe("de_nuke");
-    expect(parser.serverInfo!.tickInterval).toBe(1 / 128);
-  });
-});
+      expect(parser.serverInfo).toBeDefined();
+      expect(parser.serverInfo!.mapName).toBe("de_nuke");
+      expect(parser.serverInfo!.tickInterval).toBe(1 / 128);
+    });
+  },
+);

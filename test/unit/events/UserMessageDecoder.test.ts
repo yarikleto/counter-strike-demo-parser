@@ -102,10 +102,7 @@ function wrapSayText(body: {
   });
 }
 
-function wrapTextMsg(body: {
-  msgDst?: number;
-  params?: string[];
-}): CSVCMsg_UserMessage {
+function wrapTextMsg(body: { msgDst?: number; params?: string[] }): CSVCMsg_UserMessage {
   const inner = CCSUsrMsg_TextMsg.encode(
     CCSUsrMsg_TextMsg.fromPartial({
       msgDst: body.msgDst ?? 0,
@@ -216,13 +213,7 @@ describe("decodeChatMessage", () => {
       // template, params[1..] are the substitution values.
       const msg = wrapTextMsg({
         msgDst: 4,
-        params: [
-          "#SFUI_Notice_Game_will_restart_in",
-          "1",
-          "#SFUI_Second",
-          "",
-          "",
-        ],
+        params: ["#SFUI_Notice_Game_will_restart_in", "1", "#SFUI_Second", "", ""],
       });
 
       const decoded = decodeChatMessage(msg, ctx)!;

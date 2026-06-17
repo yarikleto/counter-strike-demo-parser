@@ -20,10 +20,7 @@ export interface RoundFreezeEndEvent extends EnrichedEvent {
   readonly roundNumber: number;
 }
 
-export const enrichRoundFreezeEnd: Enricher<RoundFreezeEndEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichRoundFreezeEnd: Enricher<RoundFreezeEndEvent> = (raw, ctx) => {
   const roundNumber = ctx.gameRules?.totalRoundsPlayed ?? 0;
 
   return freezeEvent<RoundFreezeEndEvent>({

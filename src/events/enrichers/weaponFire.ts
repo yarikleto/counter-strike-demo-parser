@@ -30,8 +30,7 @@ export interface WeaponFireEvent extends EnrichedEvent {
 
 export const enrichWeaponFire: Enricher<WeaponFireEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
-  const player =
-    typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
+  const player = typeof userid === "number" ? ctx.resolvePlayer(userid) : undefined;
   if (player === undefined) return null;
 
   const weapon = typeof raw.data.weapon === "string" ? raw.data.weapon : "";

@@ -9,9 +9,7 @@ import type { GameRules } from "../../../../src/state/GameRules.js";
 
 function makeCtx(totalRoundsPlayed: number | undefined): EnricherContext {
   const gameRules =
-    totalRoundsPlayed === undefined
-      ? undefined
-      : ({ totalRoundsPlayed } as unknown as GameRules);
+    totalRoundsPlayed === undefined ? undefined : ({ totalRoundsPlayed } as unknown as GameRules);
   return {
     players: [],
     teams: [],
@@ -32,10 +30,7 @@ function makeRaw(): DecodedGameEvent {
 
 describe("enrichRoundPoststart", () => {
   it("emits a frozen event with the current round number", () => {
-    const result = enrichRoundPoststart(
-      makeRaw(),
-      makeCtx(2),
-    ) as Readonly<RoundPoststartEvent>;
+    const result = enrichRoundPoststart(makeRaw(), makeCtx(2)) as Readonly<RoundPoststartEvent>;
 
     expect(result).not.toBeNull();
     expect(result.eventName).toBe("round_poststart");

@@ -25,9 +25,11 @@ Desktop.ini
 *.swo
 *~
 
-# Project management (internal)
-.claude/
-CLAUDE.md
+# Project management — commit the briefs and decision archive, but skip
+# machine-local + ephemeral state.
+.claude/worktrees/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Demo files (large binaries) — except test fixtures
 *.dem
@@ -49,6 +51,3 @@ bench/results-*.json
 
 # demoinfocs-golang cross-validation export (per-run output)
 bench/demoinfocs-export.json
-
-.claude/
-CLAUDE.md

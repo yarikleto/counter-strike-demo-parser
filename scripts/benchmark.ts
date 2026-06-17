@@ -134,10 +134,11 @@ function parseArgs(argv: readonly string[]): CliOptions {
   return {
     fixture: positional[0] ?? "test/fixtures/de_nuke.dem",
     iterations:
-      iterations ?? (envIterations !== undefined ? parseIntStrict(envIterations, "BENCH_ITERATIONS") : 10),
+      iterations ??
+      (envIterations !== undefined ? parseIntStrict(envIterations, "BENCH_ITERATIONS") : 10),
     warmup: smoke
       ? 0
-      : warmup ?? (envWarmup !== undefined ? parseIntStrict(envWarmup, "BENCH_WARMUP") : 2),
+      : (warmup ?? (envWarmup !== undefined ? parseIntStrict(envWarmup, "BENCH_WARMUP") : 2)),
     smoke,
   };
 }
@@ -235,7 +236,7 @@ function padLeft(s: string, n: number): string {
 }
 
 function printTable(record: ResultRecord): void {
-  const rows: Array<[string, MetricSummary, string]> = [
+  const rows: [string, MetricSummary, string][] = [
     ["parse time (ms)", record.summary.durationMs, "ms"],
     ["throughput (MB/s)", record.summary.throughputMbPerSec, "MB/s"],
     ["peak RSS (MB)", record.summary.peakRssMb, "MB"],
@@ -301,9 +302,7 @@ async function main(): Promise<void> {
   const iterations = opts.smoke ? 1 : opts.iterations;
   const warmup = opts.smoke ? 0 : opts.warmup;
 
-  console.log(
-    `Benchmarking DemoParser.parse() on ${fixturePath} (${fmt(fixtureSizeMb)} MB)`,
-  );
+  console.log(`Benchmarking DemoParser.parse() on ${fixturePath} (${fmt(fixtureSizeMb)} MB)`);
   console.log(
     `iterations=${iterations} warmup=${warmup} node=${process.version} arch=${arch()} cpu="${cpus()[0]?.model ?? "unknown"}"`,
   );
@@ -368,7 +367,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  process.stderr.write(`benchmark failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.stderr.write(
+    `benchmark failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
   process.exit(1);
 });
 

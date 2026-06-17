@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { DemoParser } from "../../src/DemoParser.js";
+import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
 
-describe("M3 player overlays — integration on de_nuke.dem", () => {
+describe.skipIf(!fixtureAvailable)("M3 player overlays — integration on de_nuke.dem", () => {
   it("parser.players returns at least one Player", () => {
     const parser = DemoParser.fromFile(FIXTURE);
     parser.parseAll();

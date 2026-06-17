@@ -81,10 +81,7 @@ function decodeKeyValue(
       // Coerce to `number` when safe; surface a decimal string when the
       // value would lose precision in JS's float64 representation. The
       // SteamID64 case (76561197960265728..) is always in the string path.
-      if (
-        big <= BigInt(Number.MAX_SAFE_INTEGER) &&
-        big >= -BigInt(Number.MAX_SAFE_INTEGER)
-      ) {
+      if (big <= BigInt(Number.MAX_SAFE_INTEGER) && big >= -BigInt(Number.MAX_SAFE_INTEGER)) {
         return Number(big);
       }
       return big.toString();

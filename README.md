@@ -1,11 +1,17 @@
+<p align="center">
+  <img src="./assets/logo.svg" alt="counter-strike-demo-parser" width="800">
+</p>
+
 # counter-strike-demo-parser
 
 > TypeScript CS:GO `.dem` parser. Type-safe, streaming, fast.
 
 [![CI](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/yarikleto/counter-strike-demo-parser/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/counter-strike-demo-parser.svg)](https://www.npmjs.com/package/counter-strike-demo-parser)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D22-417e38)](https://nodejs.org)
+
+> Note: not yet published to npm — install from source (see
+> [Contributing / development](#contributing--development)) for now.
 
 Parse CS:GO `.dem` files and extract everything: every kill, every entity,
 every event. Pure TypeScript, ESM-first with CJS dual export, zero native
@@ -20,7 +26,7 @@ dependencies in the default install path.
   on the cross-validated kill stream (337/337 kills match on the `de_nuke`
   fixture).
 - 105 MB/s parse throughput on Apple M4 Pro / Node 22 (765 ms median for an
-  80 MB demo, post-TASK-072 BitReader tuning).
+  80 MB demo).
 - Convenience trackers: economy, damage matrix, rounds, grenades, positions,
   chat.
 - Defensive parsing: malformed demos surface via the `parserError` event,
@@ -157,8 +163,8 @@ Pro / Node 22, 5 iterations after 2 warmup runs:
 | Throughput | 105 MB/s |
 | Peak RSS | 230 MB |
 
-The BitReader tuning in TASK-072 cut parse time roughly in half from the
-v0.0.x baseline (~1810 ms -> 765 ms median on the same fixture).
+A targeted pass on the BitReader hot path cut parse time roughly in half
+(~1810 ms -> 765 ms median on the same fixture).
 
 ## Native addon (optional)
 
@@ -173,16 +179,25 @@ npm install
 npm run build:native
 ```
 
-In `v0.1.0` the addon is a toolchain-validation spike only (TASK-082) — real
-acceleration via the batched native pipeline is tracked in TASK-086. Most
-consumers should ignore it; the pure-TS path delivers the throughput numbers
-above.
+In `v0.1.0` the addon is a toolchain-validation spike — real acceleration
+via a batched native pipeline is on the roadmap, not in this release. Most
+consumers should ignore the native path; pure TypeScript delivers the
+throughput numbers above.
 
 ## Contributing / development
 
+**Prerequisites:** Node.js >= 22 and [Git LFS](https://git-lfs.com). The
+integration and golden suites parse `test/fixtures/de_nuke.dem`, an ~80 MB demo
+tracked via Git LFS. Without it, those suites **skip** automatically (the unit
+suite, typecheck, lint, and build all work without it) — but to run the full
+suite you must pull the fixture:
+
 ```bash
+git lfs install           # one-time, enables LFS for your git
 git clone https://github.com/yarikleto/counter-strike-demo-parser.git
 cd counter-strike-demo-parser
+git lfs pull              # fetch test/fixtures/de_nuke.dem (skip and the
+                         # integration/golden suites simply report as skipped)
 npm install
 
 npm run typecheck          # tsc --noEmit (src + test projects)

@@ -151,9 +151,7 @@ describe("BitReader", () => {
     });
 
     it("reads 31 bits at offset 7", () => {
-      const reader = new BitReader(
-        new Uint8Array([0x80, 0xff, 0xff, 0xff, 0x7f]),
-      );
+      const reader = new BitReader(new Uint8Array([0x80, 0xff, 0xff, 0xff, 0x7f]));
       reader.seek(7);
       expect(reader.readBits(31)).toBe(0x7fffffff);
     });
@@ -167,17 +165,13 @@ describe("BitReader", () => {
       // 5 padding bits + 32 ones = 37 bits = needs 5 bytes
       // bits 0..4 anything, bits 5..36 all 1
       // simplest: every byte 0xFF, read 32 starting at bit 5
-      const reader = new BitReader(
-        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff]),
-      );
+      const reader = new BitReader(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff]));
       reader.seek(5);
       expect(reader.readBits(32)).toBe(0xffffffff);
     });
 
     it("reads 32 bits at offset 0 with arbitrary value (LE)", () => {
-      const reader = new BitReader(
-        new Uint8Array([0x78, 0x56, 0x34, 0x12]),
-      );
+      const reader = new BitReader(new Uint8Array([0x78, 0x56, 0x34, 0x12]));
       expect(reader.readBits(32)).toBe(0x12345678);
     });
 
@@ -234,9 +228,7 @@ describe("BitReader", () => {
 
   describe("readBytes", () => {
     it("reads bytes when byte-aligned", () => {
-      const reader = new BitReader(
-        new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05]),
-      );
+      const reader = new BitReader(new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05]));
       const out = reader.readBytes(3);
       expect(Array.from(out)).toEqual([0x01, 0x02, 0x03]);
       expect(reader.position).toBe(24);
@@ -338,9 +330,7 @@ describe("BitReader", () => {
     it("decodes 16384 (lookup=3)", () => {
       // ret=0, lookup=3, ext=256 (28 bits) -> byte0=0xC0, then ext LE in 28 bits
       // ext=256 = 0x100, low 8 bits = 0x00, next 8 = 0x01, rest 0
-      const reader = new BitReader(
-        new Uint8Array([0xc0, 0x00, 0x01, 0x00, 0x00]),
-      );
+      const reader = new BitReader(new Uint8Array([0xc0, 0x00, 0x01, 0x00, 0x00]));
       expect(reader.readUBitVar()).toBe(16384);
       expect(reader.position).toBe(36);
     });
@@ -350,9 +340,7 @@ describe("BitReader", () => {
       // ext = 0x12345678 >>> 6 = 0x48D159
       // byte0 = ret(6) | lookup=3(2) = 0b11_111000 = 0xF8
       // ext bytes LE: 0x59, 0xD1, 0x48, 0x00
-      const reader = new BitReader(
-        new Uint8Array([0xf8, 0x59, 0xd1, 0x48, 0x00]),
-      );
+      const reader = new BitReader(new Uint8Array([0xf8, 0x59, 0xd1, 0x48, 0x00]));
       expect(reader.readUBitVar()).toBe(0x12345678);
     });
 
@@ -360,9 +348,7 @@ describe("BitReader", () => {
       // value = 0xFFFFFFFF, ret = 63, ext = 0x3FFFFFF (26 bits set, top 2 of 28 zero)
       // byte0 = 0b11_111111 = 0xFF
       // ext LE bytes: 0xFF, 0xFF, 0xFF, 0x03
-      const reader = new BitReader(
-        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x03]),
-      );
+      const reader = new BitReader(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x03]));
       expect(reader.readUBitVar()).toBe(0xffffffff);
     });
 
@@ -435,18 +421,14 @@ describe("BitReader", () => {
 
     it("decodes max int32 2147483647", () => {
       // 0x7FFFFFFF -> 0xFF 0xFF 0xFF 0xFF 0x07
-      const reader = new BitReader(
-        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x07]),
-      );
+      const reader = new BitReader(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x07]));
       expect(reader.readVarInt32()).toBe(0x7fffffff);
       expect(reader.position).toBe(40);
     });
 
     it("decodes max uint32 4294967295", () => {
       // 0xFFFFFFFF -> 0xFF 0xFF 0xFF 0xFF 0x0F
-      const reader = new BitReader(
-        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]),
-      );
+      const reader = new BitReader(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]));
       expect(reader.readVarInt32()).toBe(0xffffffff);
     });
 
@@ -486,18 +468,14 @@ describe("BitReader", () => {
     it("zigzag: max int32 2147483647", () => {
       // zigzag-encoded value of 2147483647 is (2147483647 << 1) = 0xFFFFFFFE
       // varint of 0xFFFFFFFE: bytes 0xFE 0xFF 0xFF 0xFF 0x0F
-      const reader = new BitReader(
-        new Uint8Array([0xfe, 0xff, 0xff, 0xff, 0x0f]),
-      );
+      const reader = new BitReader(new Uint8Array([0xfe, 0xff, 0xff, 0xff, 0x0f]));
       expect(reader.readSignedVarInt32()).toBe(0x7fffffff);
     });
 
     it("zigzag: min int32 -2147483648", () => {
       // zigzag-encoded value of -2147483648 is 0xFFFFFFFF
       // varint of 0xFFFFFFFF: bytes 0xFF 0xFF 0xFF 0xFF 0x0F
-      const reader = new BitReader(
-        new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]),
-      );
+      const reader = new BitReader(new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x0f]));
       expect(reader.readSignedVarInt32()).toBe(-0x80000000);
     });
   });
@@ -709,9 +687,7 @@ describe("BitReader", () => {
       //   bit 32=1, bit 33=1, bit 34=0, bit 35=0
       //   bits 36..39 = 0
       //   byte4 = 0b00000011 = 0x03
-      const reader = new BitReader(
-        new Uint8Array([0x00, 0x00, 0x00, 0xf8, 0x03]),
-      );
+      const reader = new BitReader(new Uint8Array([0x00, 0x00, 0x00, 0xf8, 0x03]));
       reader.seek(4);
       expect(reader.readBitFloat()).toBe(1.0);
     });
@@ -767,9 +743,7 @@ describe("BitReader", () => {
 
     it("reads UTF-8 'héllo'", () => {
       // 'h' 0x68, 'é' 0xC3 0xA9, 'l' 'l' 'o', NUL
-      const reader = new BitReader(
-        new Uint8Array([0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f, 0x00]),
-      );
+      const reader = new BitReader(new Uint8Array([0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f, 0x00]));
       expect(reader.readString()).toBe("héllo");
     });
 
@@ -791,9 +765,7 @@ describe("BitReader", () => {
       // byte1 = (0x68 >> 5) | ((0x69 << 3) & 0xFF) = 3 | 0x48 = 0x4B
       // byte2 = (0x69 >> 5) | ((0x00 << 3) & 0xFF) = 3 | 0 = 0x03
       // byte3 = (0x00 >> 5) = 0
-      const reader = new BitReader(
-        new Uint8Array([0x40, 0x4b, 0x03, 0x00]),
-      );
+      const reader = new BitReader(new Uint8Array([0x40, 0x4b, 0x03, 0x00]));
       reader.seek(3);
       expect(reader.readString()).toBe("hi");
       expect(reader.position).toBe(3 + 24); // start + 3 bytes

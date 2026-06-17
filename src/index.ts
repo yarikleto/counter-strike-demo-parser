@@ -24,14 +24,8 @@ export { DemoCommands } from "./frame/DemoCommands.js";
 export type { DemoCommand } from "./frame/DemoCommands.js";
 export { iterateFrames } from "./frame/FrameParser.js";
 export type { Frame, FrameHeader } from "./frame/FrameParser.js";
-export {
-  MessageDispatcher,
-  iterateRawMessages,
-} from "./packet/MessageDispatch.js";
-export type {
-  MessageHandlers,
-  RawPacketMessage,
-} from "./packet/MessageDispatch.js";
+export { MessageDispatcher, iterateRawMessages } from "./packet/MessageDispatch.js";
+export type { MessageHandlers, RawPacketMessage } from "./packet/MessageDispatch.js";
 export type { CSVCMsg_ServerInfo, CNETMsg_Tick } from "./proto/index.js";
 export type {
   SendTable,
@@ -182,7 +176,11 @@ export { HitGroup, RoundEndReason } from "./enums/index.js";
 
 // Convenience async API (ADR-009).
 export type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
-export type { RoundSummary, RoundPlayerStats, RoundBombEvents } from "./convenience/RoundTracker.js";
+export type {
+  RoundSummary,
+  RoundPlayerStats,
+  RoundBombEvents,
+} from "./convenience/RoundTracker.js";
 export { DamageMatrix } from "./convenience/DamageMatrix.js";
 export type { DamageEntry } from "./convenience/DamageMatrix.js";
 export { EconomyTracker } from "./convenience/EconomyTracker.js";

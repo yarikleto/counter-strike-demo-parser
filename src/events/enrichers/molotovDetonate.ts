@@ -29,15 +29,10 @@ function readNum(value: unknown): number {
   return typeof value === "number" ? value : 0;
 }
 
-export const enrichMolotovDetonate: Enricher<MolotovDetonateEvent> = (
-  raw,
-  ctx,
-) => {
+export const enrichMolotovDetonate: Enricher<MolotovDetonateEvent> = (raw, ctx) => {
   const userid = raw.data.userid;
   const thrower =
-    typeof userid === "number" && userid !== 0
-      ? ctx.resolvePlayer(userid)
-      : undefined;
+    typeof userid === "number" && userid !== 0 ? ctx.resolvePlayer(userid) : undefined;
 
   const position = Object.freeze({
     x: readNum(raw.data.x),

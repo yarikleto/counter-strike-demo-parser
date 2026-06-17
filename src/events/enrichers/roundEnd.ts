@@ -59,8 +59,7 @@ export const enrichRoundEnd: Enricher<RoundEndEvent> = (raw, ctx) => {
         : reasonRaw
       : 0;
 
-  const message =
-    typeof raw.data.message === "string" ? raw.data.message : "";
+  const message = typeof raw.data.message === "string" ? raw.data.message : "";
   const roundNumber = ctx.gameRules?.totalRoundsPlayed ?? 0;
 
   return freezeEvent<RoundEndEvent>({

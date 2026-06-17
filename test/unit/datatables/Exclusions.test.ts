@@ -6,10 +6,7 @@
  * the real demo lives in `test/integration/flattening.test.ts`.
  */
 import { describe, it, expect } from "vitest";
-import {
-  gatherExclusions,
-  exclusionKey,
-} from "../../../src/datatables/Exclusions.js";
+import { gatherExclusions, exclusionKey } from "../../../src/datatables/Exclusions.js";
 import { SendPropType, type SendProp, type SendTable } from "../../../src/datatables/SendTable.js";
 import { SendTableRegistry } from "../../../src/datatables/SendTableRegistry.js";
 import { SPropFlags } from "../../../src/datatables/SPropFlags.js";
@@ -69,10 +66,7 @@ describe("gatherExclusions", () => {
   });
 
   it("collects an exclusion declared at the root", () => {
-    const root = table("DT_Root", [
-      intProp("m_iFoo"),
-      excludeProp("DT_Other", "m_iSomething"),
-    ]);
+    const root = table("DT_Root", [intProp("m_iFoo"), excludeProp("DT_Other", "m_iSomething")]);
     const reg = new SendTableRegistry();
     reg.register(root);
     const ex = gatherExclusions(root, reg);
@@ -81,14 +75,8 @@ describe("gatherExclusions", () => {
   });
 
   it("collects exclusions declared in recursively-reachable sub-tables", () => {
-    const child = table("DT_Child", [
-      intProp("m_iA"),
-      excludeProp("DT_Far", "m_iExcluded"),
-    ]);
-    const root = table("DT_Root", [
-      intProp("m_iRoot"),
-      dtProp("local", "DT_Child"),
-    ]);
+    const child = table("DT_Child", [intProp("m_iA"), excludeProp("DT_Far", "m_iExcluded")]);
+    const root = table("DT_Root", [intProp("m_iRoot"), dtProp("local", "DT_Child")]);
     const reg = new SendTableRegistry();
     reg.register(root);
     reg.register(child);
@@ -101,10 +89,7 @@ describe("gatherExclusions", () => {
     // DT_A -> DT_B -> DT_A. A malformed demo could produce this. The
     // visited-set in gatherExclusions must short-circuit re-entry.
     const a = table("DT_A", [dtProp("toB", "DT_B")]);
-    const b = table("DT_B", [
-      dtProp("toA", "DT_A"),
-      excludeProp("DT_X", "m_iZ"),
-    ]);
+    const b = table("DT_B", [dtProp("toA", "DT_A"), excludeProp("DT_X", "m_iZ")]);
     const reg = new SendTableRegistry();
     reg.register(a);
     reg.register(b);
@@ -115,9 +100,7 @@ describe("gatherExclusions", () => {
   it("does not recurse into the dtName of an EXCLUDE prop", () => {
     // If we mistakenly recursed into DT_Other, we'd pick up its inner
     // exclusion. The correct behavior is to treat EXCLUDE as a leaf marker.
-    const other = table("DT_Other", [
-      excludeProp("DT_ShouldNotBeFound", "m_bogus"),
-    ]);
+    const other = table("DT_Other", [excludeProp("DT_ShouldNotBeFound", "m_bogus")]);
     const root = table("DT_Root", [excludeProp("DT_Other", "m_iSomething")]);
     const reg = new SendTableRegistry();
     reg.register(root);
