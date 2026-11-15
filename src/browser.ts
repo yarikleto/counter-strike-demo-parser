@@ -198,6 +198,10 @@ export type {
 } from "./convenience/records.js";
 export { PositionFlags, positionBuffers } from "./convenience/PositionRecorder.js";
 export type { PlayerPositions } from "./convenience/PositionRecorder.js";
+export { ShotKind, ShotFlags, shotBuffers, shotKind } from "./convenience/ShotRecorder.js";
+export type { PlayerShots } from "./convenience/ShotRecorder.js";
+export { NO_PLAYER, hitBuffers } from "./convenience/HitRecorder.js";
+export type { PlayerHits } from "./convenience/HitRecorder.js";
 export { weaponNameForItemDefIndex } from "./enums/ItemDefinition.js";
 export { MAX_COORD_INTEGER, readEntityOrigin } from "./state/EntityOrigin.js";
 

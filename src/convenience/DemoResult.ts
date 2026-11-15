@@ -4,7 +4,7 @@
  *
  * `DemoResult` is the one-shot parsed representation of a demo file, made
  * of plain data only: numbers, strings, booleans, plain objects, arrays and
- * (for `positions`) typed arrays. It holds no references into the parser,
+ * (for `positions`, `shots` and `hits`) typed arrays. It holds no references into the parser,
  * so it can be `postMessage`d out of a Web Worker, stored in IndexedDB, or
  * `JSON.stringify`d (typed arrays serialize as index-keyed objects; convert
  * them with `Array.from` first if you need JSON arrays).
@@ -19,6 +19,8 @@ import type { ParseProgress } from "../DemoParser.js";
 import type { MatchScore, RoundSummary } from "./RoundTracker.js";
 import type { PlayerInfo } from "./PlayerRoster.js";
 import type { PlayerPositions } from "./PositionRecorder.js";
+import type { PlayerShots } from "./ShotRecorder.js";
+import type { PlayerHits } from "./HitRecorder.js";
 import type { GrenadeTrajectory } from "./GrenadeTrajectoryTracker.js";
 import type {
   BombRecord,
@@ -105,7 +107,22 @@ export interface DemoResult {
   readonly damage: DamageRecord[];
   /** Chat messages, in wire order. */
   readonly chatMessages: ChatRecord[];
-  /** Raw decoded game events; only with `includeRawEvents`. */
+  /**
+   * Every `weapon_fire` (gun shots, knife swings, grenade throws) as
+   * columnar typed arrays: tick, shooter, position, view angles, weapon,
+   * kind, silenced flag. Transfer with `shotBuffers()`.
+   */
+  readonly shots: PlayerShots;
+  /**
+   * Every `player_hurt` as columnar typed arrays: tick, attacker, victim,
+   * weapon, damage, armor damage, hit group, health/armor left, both
+   * positions. Transfer with `hitBuffers()`.
+   */
+  readonly hits: PlayerHits;
+  /**
+   * Raw decoded game events, in wire order, each with its frame `tick`;
+   * only with `includeRawEvents`.
+   */
   readonly events?: DecodedGameEvent[];
   /** Columnar player samples; only with `collectPlayerPositions`. */
   readonly positions?: PlayerPositions;

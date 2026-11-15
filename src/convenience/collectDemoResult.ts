@@ -12,6 +12,8 @@ import { ConvenienceRoundTracker } from "./RoundTracker.js";
 import { EventRecorder } from "./EventRecorder.js";
 import { GrenadeTrajectoryTracker } from "./GrenadeTrajectoryTracker.js";
 import { PositionRecorder } from "./PositionRecorder.js";
+import { ShotRecorder } from "./ShotRecorder.js";
+import { HitRecorder } from "./HitRecorder.js";
 import { PlayerRoster } from "./PlayerRoster.js";
 import type { GrenadeThrow } from "./records.js";
 import type { MatchScore } from "./RoundTracker.js";
@@ -37,6 +39,10 @@ export async function collectDemoResult(
 
   const trajectories = new GrenadeTrajectoryTracker();
   trajectories.attach(parser);
+  const shots = new ShotRecorder();
+  shots.attach(parser);
+  const hits = new HitRecorder();
+  hits.attach(parser);
 
   let positions: PositionRecorder | undefined;
   if (options.collectPlayerPositions === true) {
@@ -83,6 +89,8 @@ export async function collectDemoResult(
     hostageEvents: recorder.hostageEvents,
     damage: recorder.damageRecords(),
     chatMessages: recorder.chatMessages,
+    shots: shots.snapshot(),
+    hits: hits.snapshot(),
     events,
     positions: positions?.snapshot(),
   };

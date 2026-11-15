@@ -25,6 +25,8 @@ import type {
 import type { DecodedGameEvent } from "../../../src/events/GameEventDecoder.js";
 import type { GrenadeTrajectory } from "../../../src/convenience/GrenadeTrajectoryTracker.js";
 import type { PlayerPositions } from "../../../src/convenience/PositionRecorder.js";
+import type { PlayerShots } from "../../../src/convenience/ShotRecorder.js";
+import type { PlayerHits } from "../../../src/convenience/HitRecorder.js";
 
 function baseResult() {
   return {
@@ -41,6 +43,8 @@ function baseResult() {
     hostageEvents: [] as HostageRecord[],
     damage: [] as DamageRecord[],
     chatMessages: [] as ChatRecord[],
+    shots: {} as PlayerShots,
+    hits: {} as PlayerHits,
   };
 }
 

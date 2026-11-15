@@ -44,8 +44,8 @@ describe.skipIf(!fixtureAvailable)("DemoResult plain data (de_nuke)", () => {
     expect(structuredClone(result)).toEqual(result);
   });
 
-  it("survives a JSON round trip (positions aside)", () => {
-    const { positions: _positions, ...rest } = result;
+  it("survives a JSON round trip (typed-array columns aside)", () => {
+    const { positions: _positions, shots: _shots, hits: _hits, ...rest } = result;
     // toEqual treats `undefined` fields like absent ones, as JSON does.
     expect(JSON.parse(JSON.stringify(rest))).toEqual(rest);
   });
