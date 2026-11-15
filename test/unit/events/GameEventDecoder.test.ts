@@ -71,6 +71,21 @@ describe("decodeGameEvent", () => {
 
       expect(Object.isFrozen(decoded.data)).toBe(true);
     });
+
+    it("stamps the event with the given frame tick (0 when omitted)", () => {
+      const table = tableWith({
+        eventId: 1,
+        name: "weapon_fire",
+        keys: [{ name: "userid", type: "short" }],
+      });
+      const msg = CSVCMsg_GameEvent.fromPartial({
+        eventid: 1,
+        keys: [{ type: 4, valShort: 3 }],
+      });
+
+      expect(decodeGameEvent(msg, table, 4321)!.tick).toBe(4321);
+      expect(decodeGameEvent(msg, table)!.tick).toBe(0);
+    });
   });
 
   describe("type-by-type decoding", () => {

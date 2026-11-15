@@ -24,6 +24,7 @@ function makeRaw(): DecodedGameEvent {
   return {
     name: "round_prestart",
     eventId: 11,
+    tick: 0,
     data: Object.freeze({}),
   };
 }

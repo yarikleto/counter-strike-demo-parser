@@ -64,7 +64,7 @@ function setup() {
   const recorder = new EventRecorder();
   recorder.attach(parser);
   const game = (name: string, data: Record<string, number | boolean>) =>
-    emitter.emit("gameEvent", { name, eventId: 0, data });
+    emitter.emit("gameEvent", { name, eventId: 0, tick: 0, data });
   return {
     recorder,
     game,

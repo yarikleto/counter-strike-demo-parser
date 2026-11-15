@@ -21,6 +21,7 @@ function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEv
   return {
     name: "cs_win_panel_round",
     eventId: 121,
+    tick: 0,
     data: Object.freeze(data),
   };
 }

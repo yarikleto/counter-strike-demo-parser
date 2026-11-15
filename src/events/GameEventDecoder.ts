@@ -9,7 +9,7 @@
  * field and declares its wire-level type, and only the value field on the
  * proto's tagged-union `keyT` matching that declared type is populated.
  *
- * Output shape: `{ name, eventId, data }`. `data` is the public Tier-2
+ * Output shape: `{ name, eventId, tick, data }`. `data` is the public Tier-2
  * payload — a frozen `Record<string, string | number | boolean>`. Surfacing
  * the full record (rather than the heterogeneous proto blob) is what makes
  * `parser.on('gameEvent', e => e.data.userid)` legible without consumers
@@ -48,6 +48,11 @@ export interface DecodedGameEvent {
   readonly name: string;
   /** Numeric event id matching `CSVCMsg_GameEvent.eventid`. */
   readonly eventId: number;
+  /**
+   * Frame tick at which the event was decoded (`DemoParser.currentTick`).
+   * Events are emitted in wire order, so ticks never decrease.
+   */
+  readonly tick: number;
   /** Per-key values, indexed by the descriptor's key names. Frozen. */
   readonly data: Readonly<Record<string, string | number | boolean>>;
 }
@@ -99,6 +104,7 @@ function decodeKeyValue(
 export function decodeGameEvent(
   msg: CSVCMsg_GameEvent,
   descriptors: EventDescriptorTable,
+  tick = 0,
 ): DecodedGameEvent | undefined {
   const eventId = msg.eventid ?? 0;
   const descriptor = descriptors.getById(eventId);
@@ -123,6 +129,7 @@ export function decodeGameEvent(
   return {
     name: descriptor.name,
     eventId,
+    tick,
     data: Object.freeze(data),
   };
 }

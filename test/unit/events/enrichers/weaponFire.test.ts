@@ -28,6 +28,7 @@ function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEv
   return {
     name: "weapon_fire",
     eventId: 31,
+    tick: 0,
     data: Object.freeze(data),
   };
 }

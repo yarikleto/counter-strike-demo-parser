@@ -21,6 +21,7 @@ function makeRaw(): DecodedGameEvent {
   return {
     name: "begin_new_match",
     eventId: 41,
+    tick: 0,
     data: Object.freeze({}),
   };
 }

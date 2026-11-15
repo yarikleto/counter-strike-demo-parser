@@ -21,6 +21,7 @@ function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEv
   return {
     name: "match_end_conditions",
     eventId: 40,
+    tick: 0,
     data: Object.freeze(data),
   };
 }

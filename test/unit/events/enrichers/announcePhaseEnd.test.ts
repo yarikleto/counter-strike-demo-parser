@@ -21,6 +21,7 @@ function makeRaw(): DecodedGameEvent {
   return {
     name: "announce_phase_end",
     eventId: 75,
+    tick: 0,
     data: Object.freeze({}),
   };
 }

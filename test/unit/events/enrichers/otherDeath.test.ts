@@ -19,6 +19,7 @@ function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEv
   return {
     name: "other_death",
     eventId: 95,
+    tick: 0,
     data: Object.freeze(data),
   };
 }

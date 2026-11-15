@@ -21,6 +21,7 @@ function makeRaw(): DecodedGameEvent {
   return {
     name: "cs_win_panel_match",
     eventId: 122,
+    tick: 0,
     data: Object.freeze({}),
   };
 }

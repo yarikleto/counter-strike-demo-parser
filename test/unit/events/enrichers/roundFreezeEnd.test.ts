@@ -24,6 +24,7 @@ function makeRaw(): DecodedGameEvent {
   return {
     name: "round_freeze_end",
     eventId: 13,
+    tick: 0,
     data: Object.freeze({}),
   };
 }

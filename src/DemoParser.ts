@@ -1207,7 +1207,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    */
   private handleGameEvent(msg: CSVCMsg_GameEvent): void {
     if (this._eventDescriptors === undefined) return;
-    const decoded = decodeGameEvent(msg, this._eventDescriptors);
+    const decoded = decodeGameEvent(msg, this._eventDescriptors, this._currentTick);
     if (decoded === undefined) {
       this.emit("gameEventDecodeError", { eventId: msg.eventid ?? 0 });
       return;

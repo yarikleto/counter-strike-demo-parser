@@ -27,6 +27,7 @@ function makeRaw(data: Record<string, string | number | boolean>): DecodedGameEv
   return {
     name: "weapon_reload",
     eventId: 32,
+    tick: 0,
     data: Object.freeze(data),
   };
 }
