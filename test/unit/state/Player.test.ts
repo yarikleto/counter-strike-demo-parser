@@ -130,6 +130,31 @@ describe("Player overlay — construction", () => {
 });
 
 describe("Player overlay — primitive getters", () => {
+  it("reads armor, helmet and defuser when the schema has them", () => {
+    const props: FakeProp[] = [
+      ...REQUIRED_PROPS,
+      { varName: "m_ArmorValue", sourceTableName: "DT_CSPlayer" },
+      { varName: "m_bHasHelmet", sourceTableName: "DT_CSPlayer" },
+      { varName: "m_bHasDefuser", sourceTableName: "DT_CSPlayer" },
+    ];
+    const values = new Map<number, unknown>([
+      [11, 76],
+      [12, 1],
+      [13, 0],
+    ]);
+    const player = new Player(0, makeFakeEntity(props, values));
+    expect(player.armor).toBe(76);
+    expect(player.hasHelmet).toBe(true);
+    expect(player.hasDefuser).toBe(false);
+  });
+
+  it("defaults armor/helmet/defuser when the schema lacks them", () => {
+    const player = new Player(0, makeFakeEntity(REQUIRED_PROPS, new Map()));
+    expect(player.armor).toBe(0);
+    expect(player.hasHelmet).toBe(false);
+    expect(player.hasDefuser).toBe(false);
+  });
+
   it("returns team / health / money as numbers from the underlying store", () => {
     const values = new Map<number, unknown>([
       [0, 3], // m_iTeamNum → CT

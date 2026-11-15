@@ -125,6 +125,15 @@ function findIdxFallback(entity: Entity, name: string, primary: string, fallback
   }
 }
 
+/** Like {@link findIdx} but returns -1 instead of throwing on a miss. */
+function findIdxOptional(entity: Entity, name: string): number {
+  const props = entity.serverClass.flattenedProps;
+  for (let i = 0; i < props.length; i++) {
+    if (props[i]!.prop.varName === name) return i;
+  }
+  return -1;
+}
+
 /**
  * Coerce a `PropertyValue | undefined` read into a number, defaulting to 0
  * for never-written props. The CCSPlayer props this overlay reads are all
@@ -150,6 +159,10 @@ export class Player {
   private readonly yawIdx: number;
   private readonly lifeStateIdx: number;
   private readonly activeWeaponIdx: number;
+  // Optional props (-1 when absent from the schema).
+  private readonly armorIdx: number;
+  private readonly helmetIdx: number;
+  private readonly defuserIdx: number;
 
   /**
    * Build an overlay over an existing CCSPlayer `Entity`. Throws if any of
@@ -189,6 +202,9 @@ export class Player {
     this.yawIdx = findIdx(entity, "m_angEyeAngles[1]");
     this.lifeStateIdx = findIdx(entity, "m_lifeState");
     this.activeWeaponIdx = findIdx(entity, "m_hActiveWeapon");
+    this.armorIdx = findIdxOptional(entity, "m_ArmorValue");
+    this.helmetIdx = findIdxOptional(entity, "m_bHasHelmet");
+    this.defuserIdx = findIdxOptional(entity, "m_bHasDefuser");
   }
 
   private readNum(idx: number): number {
@@ -203,6 +219,21 @@ export class Player {
   /** Current health in HP. 0 when dead, can briefly read 0 before respawn. */
   get health(): number {
     return this.readNum(this.healthIdx);
+  }
+
+  /** Armor points (`m_ArmorValue`); 0 when the schema lacks the prop. */
+  get armor(): number {
+    return this.armorIdx < 0 ? 0 : this.readNum(this.armorIdx);
+  }
+
+  /** Whether the player wears a helmet (`m_bHasHelmet`). */
+  get hasHelmet(): boolean {
+    return this.helmetIdx >= 0 && this.readNum(this.helmetIdx) !== 0;
+  }
+
+  /** Whether the player carries a defuse kit (`m_bHasDefuser`). */
+  get hasDefuser(): boolean {
+    return this.defuserIdx >= 0 && this.readNum(this.defuserIdx) !== 0;
   }
 
   /** Current cash on hand (`m_iAccount`). */
