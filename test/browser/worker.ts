@@ -3,7 +3,7 @@
  * README's worker example. Imports the package by name, so resolution goes
  * through package.json "exports" with the "browser" condition.
  */
-import { parseDemo, positionBuffers } from "counter-strike-demo-parser";
+import { hitBuffers, parseDemo, positionBuffers, shotBuffers } from "counter-strike-demo-parser";
 
 let controller: AbortController | undefined;
 
@@ -25,10 +25,18 @@ self.onmessage = async (event: MessageEvent) => {
       onProgress: (p) => self.postMessage({ type: "progress", fraction: p.fraction }),
     });
     const parseMs = performance.now() - started - fetchedMs;
-    const transfer = positionBuffers(result.positions!);
+    const transfer = [
+      ...positionBuffers(result.positions!),
+      ...shotBuffers(result.shots),
+      ...hitBuffers(result.hits),
+    ];
     self.postMessage({ type: "done", result, fetchedMs, parseMs }, { transfer });
     // After a transfer the worker's copies are detached (zero-copy hand-off).
-    self.postMessage({ type: "detached", byteLength: result.positions!.x.byteLength });
+    self.postMessage({
+      type: "detached",
+      byteLength:
+        result.positions!.x.byteLength + result.shots.x.byteLength + result.hits.victimX.byteLength,
+    });
   } catch (err) {
     self.postMessage({ type: "error", name: (err as Error).name, message: String(err) });
   }

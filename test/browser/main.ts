@@ -18,6 +18,8 @@ interface Summary {
   kills?: number;
   grenades?: number;
   positionRows?: number;
+  shots?: number;
+  hits?: number;
   workerBytesAfterTransfer?: number;
   receivedTypedArray?: boolean;
 }
@@ -46,7 +48,13 @@ worker.onmessage = (event: MessageEvent) => {
       kills: result.kills.length,
       grenades: result.grenades.length,
       positionRows: result.positions!.length,
-      receivedTypedArray: result.positions!.x instanceof Float32Array,
+      shots: result.shots.length,
+      hits: result.hits.length,
+      receivedTypedArray:
+        result.positions!.x instanceof Float32Array &&
+        result.shots.x instanceof Float32Array &&
+        result.shots.x.length === result.shots.length &&
+        result.hits.victimX instanceof Float32Array,
     });
   } else if (msg.type === "detached") {
     summary.workerBytesAfterTransfer = msg.byteLength;

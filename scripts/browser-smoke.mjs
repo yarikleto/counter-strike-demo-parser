@@ -8,8 +8,9 @@
  *      "counter-strike-demo-parser" by name) with Vite.
  *   2. Serves it with `vite preview`, plus the demo file at /demo.dem.
  *   3. Runs installed Google Chrome (headless) through playwright-core.
- *   4. Checks the worker's rounds / kills / grenades against a Node parse of
- *      the same file, that positions arrived as transferred typed arrays,
+ *   4. Checks the worker's rounds / kills / grenades / shots / hits against a
+ *      Node parse of the same file, that positions, shots and hits arrived as
+ *      transferred typed arrays,
  *      and that cancelling mid-parse rejects with AbortError.
  *   5. Reports fetch + parse time and the peak RSS of the page's renderer
  *      process (which hosts the worker), sampled every 100 ms.
@@ -144,9 +145,11 @@ try {
     `grenades ${s.grenades} === ${expected.grenades.length}`,
     s.grenades === expected.grenades.length,
   );
+  check(`shots ${s.shots} === ${expected.shots.length}`, s.shots === expected.shots.length);
+  check(`hits ${s.hits} === ${expected.hits.length}`, s.hits === expected.hits.length);
   check("progress reported", s.progressMessages > 1);
-  check("positions arrived as Float32Array", s.receivedTypedArray === true);
-  check("positions transferred, not copied", s.workerBytesAfterTransfer === 0);
+  check("positions, shots and hits arrived as Float32Array", s.receivedTypedArray === true);
+  check("columns transferred, not copied", s.workerBytesAfterTransfer === 0);
 
   const cancelled = await run("?demo=/demo.dem&cancel=1");
   console.log("cancel after first progress:", cancelled.summary);
