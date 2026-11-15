@@ -14,6 +14,8 @@ import { GrenadeTrajectoryTracker } from "./GrenadeTrajectoryTracker.js";
 import { PositionRecorder } from "./PositionRecorder.js";
 import { PlayerRoster } from "./PlayerRoster.js";
 import type { GrenadeThrow } from "./records.js";
+import type { MatchScore } from "./RoundTracker.js";
+import { TeamSide } from "../enums/TeamSide.js";
 
 /** Default `positionSampleRateTicks`. */
 const DEFAULT_POSITION_SAMPLE_RATE = 32;
@@ -73,6 +75,7 @@ export async function collectDemoResult(
     players: PlayerRoster.for(parser).snapshot(),
     kills: recorder.kills,
     rounds: rounds.snapshot(),
+    score: finalScore(parser),
     bomb: recorder.bomb,
     grenades,
     grenadeTrajectories,
@@ -83,4 +86,15 @@ export async function collectDemoResult(
     events,
     positions: positions?.snapshot(),
   };
+}
+
+/** Scores held by the CT and T team entities at the end of the demo. */
+function finalScore(parser: DemoParser): MatchScore {
+  let ct = 0;
+  let t = 0;
+  for (const team of parser.teams) {
+    if (team.team === TeamSide.CT) ct = team.score;
+    else if (team.team === TeamSide.T) t = team.score;
+  }
+  return { ct, t };
 }

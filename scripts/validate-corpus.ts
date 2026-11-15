@@ -13,6 +13,7 @@
  * Per demo:
  *   - parse time and peak RSS (positions sampled every --rate ticks)
  *   - rounds vs `round_end` events (must match: a live round is never dropped)
+ *   - final scoreboard (CT:T), to compare with the server's match record
  *   - kills, grenade trajectories, derived throws, raw `grenade_thrown` events
  *   - grenade coordinate sanity: share of trajectory points inside the
  *     bounding box of all sampled player positions ± margin (XY and Z
@@ -46,6 +47,7 @@ interface Report {
   readonly parserErrors: number;
   readonly roundEndEvents: number;
   readonly rounds: number;
+  readonly score: string;
   readonly kills: number;
   readonly trajectories: number;
   readonly throws: number;
@@ -144,6 +146,7 @@ async function parseOne(path: string, rate: number): Promise<Report> {
     parserErrors,
     roundEndEvents,
     rounds: result.rounds.length,
+    score: `${result.score.ct}:${result.score.t}`,
     kills: result.kills.length,
     trajectories: result.grenadeTrajectories.length,
     throws: result.grenades.length,
@@ -174,6 +177,7 @@ function emptyReport(
     parserErrors: 0,
     roundEndEvents: 0,
     rounds: 0,
+    score: "?",
     kills: 0,
     trajectories: 0,
     throws: 0,
@@ -215,6 +219,7 @@ function table(reports: readonly Report[]): string {
     ["RSS MB", (r) => r.peakRssMb.toFixed(0)],
     ["round_end", (r) => String(r.roundEndEvents)],
     ["rounds", (r) => String(r.rounds) + (r.rounds === r.roundEndEvents ? "" : " (!)")],
+    ["CT:T", (r) => r.score],
     ["kills", (r) => String(r.kills)],
     ["traj", (r) => String(r.trajectories)],
     ["throws", (r) => String(r.throws)],

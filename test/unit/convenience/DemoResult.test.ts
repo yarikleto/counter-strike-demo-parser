@@ -33,6 +33,7 @@ function baseResult() {
     players: [] as PlayerInfo[],
     kills: [] as KillRecord[],
     rounds: [] as RoundSummary[],
+    score: { ct: 16, t: 12 },
     bomb: [] as BombRecord[],
     grenades: [] as GrenadeThrow[],
     grenadeTrajectories: [] as GrenadeTrajectory[],

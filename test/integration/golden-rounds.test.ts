@@ -21,23 +21,18 @@ describe.skipIf(!fixtureAvailable)("golden: rounds", () => {
     roundTracker.attach(parser);
     parser.parseAll();
 
-    const TEAM_T = 2;
-    const TEAM_CT = 3;
-    let scoreCT = 0;
-    let scoreT = 0;
-    const actual = roundTracker.snapshot().map((round, index) => {
-      if (round.winner === TEAM_T) scoreT += 1;
-      else if (round.winner === TEAM_CT) scoreCT += 1;
-      return {
-        index,
-        winner: round.winner,
-        endReason: round.endReason,
-        scoreCT,
-        scoreT,
-        // The MVP's name as captured when round_mvp fired.
-        mvp: round.mvp !== undefined ? round.mvp.name || `slot ${round.mvp.slot}` : undefined,
-      };
-    });
+    const actual = roundTracker.snapshot().map((round, index) => ({
+      index,
+      winner: round.winner,
+      endReason: round.endReason,
+      // Scoreboard after the round (team on CT / team on T this round).
+      scoreCT: round.score?.ct ?? -1,
+      scoreT: round.score?.t ?? -1,
+      // Only present on rounds a later match restart voided.
+      voided: round.voided ? true : undefined,
+      // The MVP's name as captured when round_mvp fired.
+      mvp: round.mvp !== undefined ? round.mvp.name || `slot ${round.mvp.slot}` : undefined,
+    }));
 
     expectMatchesGolden("rounds", actual);
   });

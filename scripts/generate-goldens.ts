@@ -87,6 +87,7 @@ interface RoundRow {
   readonly endReason: number | undefined;
   readonly scoreCT: number;
   readonly scoreT: number;
+  readonly voided: true | undefined;
   readonly mvp: string | undefined;
 }
 
@@ -274,28 +275,23 @@ async function main(): Promise<void> {
   writeGolden("kills", killRows);
 
   // -- Rounds golden --------------------------------------------------------
-  // Score reconstruction: the round summary doesn't carry a final scoreboard,
-  // so we accumulate CT / T wins as we walk the list. Each summary's `winner`
-  // is a TeamSide (T=2, CT=3); incrementing the right side at index `i`
-  // produces the score AFTER that round was played.
-  const TEAM_T = 2;
-  const TEAM_CT = 3;
-  let scoreCT = 0;
-  let scoreT = 0;
+  // Scores are the scoreboard after each round as the round tracker reads it
+  // from the team entities (sides swap at halftime, restarts reset them).
   const roundRows: RoundRow[] = roundTracker.snapshot().map((round, index): RoundRow => {
-    if (round.winner === TEAM_T) scoreT += 1;
-    else if (round.winner === TEAM_CT) scoreCT += 1;
     return {
       // 0-based index of the round in the emitted summaries array — stable
       // and independent of `round.number` (which is sourced from
-      // gameRules.totalRoundsPlayed and may have warmup quirks).
+      // gameRules.totalRoundsPlayed and restarts with the match).
       index,
       winner: round.winner,
       // RoundSummary.endReason is `RoundEndReason | number | undefined` —
       // both branches serialise as a number; passthrough.
       endReason: round.endReason,
-      scoreCT,
-      scoreT,
+      // Scoreboard after the round (team on CT / team on T this round).
+      scoreCT: round.score?.ct ?? -1,
+      scoreT: round.score?.t ?? -1,
+      // Only present on rounds a later match restart voided.
+      voided: round.voided ? true : undefined,
       // The MVP's name as captured when round_mvp fired.
       mvp: round.mvp !== undefined ? round.mvp.name || `slot ${round.mvp.slot}` : undefined,
     };

@@ -122,7 +122,9 @@ demo.header           // map, playback ticks/time, server name, ...
 demo.tickRate         // 64 / 128
 demo.players          // PlayerInfo[]: everyone seen, incl. leavers (index, name, steamId, isBot, team)
 demo.kills            // KillRecord[]: attacker/victim/assister + both positions
-demo.rounds           // RoundSummary[]: winner, reason, MVP, ticks, kills, per-player stats + economy, bomb
+demo.score            // { ct, t }: final scoreboard (team on CT / on T at the end)
+demo.rounds           // RoundSummary[]: winner, reason, MVP, ticks, kills, per-player stats + economy, bomb,
+                      //   scoreboard after the round, voided (played before a match restart)
 demo.bomb             // BombRecord[]: begin/abort plant, planted, defuse steps, exploded, dropped, picked up
 demo.grenades         // GrenadeThrow[]: thrower, type, tick, thrower + projectile position
 demo.grenadeTrajectories // per-projectile path from throw to detonation
@@ -211,6 +213,19 @@ parser.parseAll(); // or: await parser.parseAllAsync({ onProgress, signal })
 
 Standalone streaming helpers: `DamageMatrix`, `EconomyTracker` and
 `GrenadeTrajectoryTracker`. Attach one to a parser before `parseAll()`.
+Per-round indices of `DamageMatrix` and `EconomyTracker` match
+`DemoResult.rounds`.
+
+### Rounds and restarts
+
+A round opens on `round_start` or `begin_new_match` and ends on `round_end`.
+A `round_end` is never dropped, even when its round started before the
+recording (GOTV demos recorded from the live round often lack round 1's
+`round_start`); only warmup and the "Game Commencing" pseudo round end are
+skipped. When `begin_new_match` restarts the match (for example
+`mp_restartgame` after a first round), the engine resets the scoreboard;
+rounds played before it stay in `rounds` with `voided: true` and don't count
+toward `score`. Deciding which restart starts "the" match is up to you.
 
 ## Status
 

@@ -466,4 +466,23 @@ describe("ConvenienceRoundTracker", () => {
     expect(round.startTick).toBe(100);
     expect(round.endTick).toBe(250);
   });
+
+  it("marks rounds played before a later begin_new_match as voided", () => {
+    // de_nuke fixture: one round is played, then mp_restartgame fires
+    // begin_new_match and the engine resets the scoreboard.
+    const tracker = new ConvenienceRoundTracker();
+    const newMatch = { eventName: "begin_new_match", eventId: 10 };
+    tracker.onBeginNewMatch(newMatch);
+    tracker.onRoundEnd(makeRoundEnd(0));
+    tracker.onBeginNewMatch(newMatch);
+    tracker.onRoundEnd(makeRoundEnd(0));
+    tracker.onRoundStart(makeRoundStart(1));
+    tracker.onRoundEnd(makeRoundEnd(1));
+
+    expect(tracker.snapshot().map((r) => [r.number, r.voided])).toEqual([
+      [1, true],
+      [1, false],
+      [2, false],
+    ]);
+  });
 });

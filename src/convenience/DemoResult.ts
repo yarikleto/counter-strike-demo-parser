@@ -16,7 +16,7 @@
 import type { DemoHeader } from "../frame/header.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import type { ParseProgress } from "../DemoParser.js";
-import type { RoundSummary } from "./RoundTracker.js";
+import type { MatchScore, RoundSummary } from "./RoundTracker.js";
 import type { PlayerInfo } from "./PlayerRoster.js";
 import type { PlayerPositions } from "./PositionRecorder.js";
 import type { GrenadeTrajectory } from "./GrenadeTrajectoryTracker.js";
@@ -75,8 +75,16 @@ export interface DemoResult {
   readonly players: PlayerInfo[];
   /** All kills, in wire order. */
   readonly kills: KillRecord[];
-  /** Per-round summaries, one per `round_end` of the match (warmup excluded). */
+  /**
+   * Per-round summaries, one per `round_end` of the match (warmup excluded).
+   * Rounds voided by a later match restart are kept with `voided: true`.
+   */
   readonly rounds: RoundSummary[];
+  /**
+   * Final scoreboard: rounds won by the team on CT and on T when the demo
+   * ends, read from the team entities (what the in-game scoreboard shows).
+   */
+  readonly score: MatchScore;
   /** Bomb lifecycle events with positions and sites, in wire order. */
   readonly bomb: BombRecord[];
   /**

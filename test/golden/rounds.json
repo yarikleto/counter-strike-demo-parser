@@ -5,13 +5,14 @@
     "endReason": 7,
     "scoreCT": 1,
     "scoreT": 0,
+    "voided": true,
     "mvp": "nqstr"
   },
   {
     "index": 1,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 2,
+    "scoreCT": 1,
     "scoreT": 0,
     "mvp": "gromozeka4"
   },
@@ -19,7 +20,7 @@
     "index": 2,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 3,
+    "scoreCT": 2,
     "scoreT": 0,
     "mvp": "mag-ua"
   },
@@ -27,7 +28,7 @@
     "index": 3,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 4,
+    "scoreCT": 3,
     "scoreT": 0,
     "mvp": "nqstr"
   },
@@ -35,7 +36,7 @@
     "index": 4,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 5,
+    "scoreCT": 4,
     "scoreT": 0,
     "mvp": "mag-ua"
   },
@@ -43,7 +44,7 @@
     "index": 5,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 6,
+    "scoreCT": 5,
     "scoreT": 0,
     "mvp": "mag-ua"
   },
@@ -51,7 +52,7 @@
     "index": 6,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 6,
+    "scoreCT": 5,
     "scoreT": 1,
     "mvp": "Invader"
   },
@@ -59,7 +60,7 @@
     "index": 7,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 7,
+    "scoreCT": 6,
     "scoreT": 1,
     "mvp": "gkatmai"
   },
@@ -67,7 +68,7 @@
     "index": 8,
     "winner": 3,
     "endReason": 12,
-    "scoreCT": 8,
+    "scoreCT": 7,
     "scoreT": 1,
     "mvp": "gkatmai"
   },
@@ -75,7 +76,7 @@
     "index": 9,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 8,
+    "scoreCT": 7,
     "scoreT": 2,
     "mvp": "Секрет Люсі"
   },
@@ -83,7 +84,7 @@
     "index": 10,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 9,
+    "scoreCT": 8,
     "scoreT": 2,
     "mvp": "nqstr"
   },
@@ -91,7 +92,7 @@
     "index": 11,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 10,
+    "scoreCT": 9,
     "scoreT": 2,
     "mvp": "nqstr"
   },
@@ -99,7 +100,7 @@
     "index": 12,
     "winner": 2,
     "endReason": 1,
-    "scoreCT": 10,
+    "scoreCT": 9,
     "scoreT": 3,
     "mvp": "Chily"
   },
@@ -107,7 +108,7 @@
     "index": 13,
     "winner": 2,
     "endReason": 1,
-    "scoreCT": 10,
+    "scoreCT": 9,
     "scoreT": 4,
     "mvp": "Секрет Люсі"
   },
@@ -115,7 +116,7 @@
     "index": 14,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 10,
+    "scoreCT": 9,
     "scoreT": 5,
     "mvp": "Секрет Люсі"
   },
@@ -123,7 +124,7 @@
     "index": 15,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 10,
+    "scoreCT": 9,
     "scoreT": 6,
     "mvp": "Кіборг убійца"
   },
@@ -131,120 +132,120 @@
     "index": 16,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 10,
-    "scoreT": 7,
+    "scoreCT": 6,
+    "scoreT": 10,
     "mvp": "gromozeka4"
   },
   {
     "index": 17,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 10,
-    "scoreT": 8,
+    "scoreCT": 6,
+    "scoreT": 11,
     "mvp": "nqstr"
   },
   {
     "index": 18,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 10,
-    "scoreT": 9,
+    "scoreCT": 6,
+    "scoreT": 12,
     "mvp": "nqstr"
   },
   {
     "index": 19,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 11,
-    "scoreT": 9,
+    "scoreCT": 7,
+    "scoreT": 12,
     "mvp": "Секрет Люсі"
   },
   {
     "index": 20,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 12,
-    "scoreT": 9,
+    "scoreCT": 8,
+    "scoreT": 12,
     "mvp": "Секрет Люсі"
   },
   {
     "index": 21,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 13,
-    "scoreT": 9,
+    "scoreCT": 9,
+    "scoreT": 12,
     "mvp": "Chily"
   },
   {
     "index": 22,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 14,
-    "scoreT": 9,
+    "scoreCT": 10,
+    "scoreT": 12,
     "mvp": "Кіборг убійца"
   },
   {
     "index": 23,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 14,
-    "scoreT": 10,
+    "scoreCT": 10,
+    "scoreT": 13,
     "mvp": "hawk"
   },
   {
     "index": 24,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 14,
-    "scoreT": 11,
+    "scoreCT": 10,
+    "scoreT": 14,
     "mvp": "nqstr"
   },
   {
     "index": 25,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 14,
-    "scoreT": 12,
+    "scoreCT": 10,
+    "scoreT": 15,
     "mvp": "gkatmai"
   },
   {
     "index": 26,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 15,
-    "scoreT": 12,
+    "scoreCT": 11,
+    "scoreT": 15,
     "mvp": "alibaba"
   },
   {
     "index": 27,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 16,
-    "scoreT": 12,
+    "scoreCT": 12,
+    "scoreT": 15,
     "mvp": "Invader"
   },
   {
     "index": 28,
     "winner": 3,
     "endReason": 8,
-    "scoreCT": 17,
-    "scoreT": 12,
+    "scoreCT": 13,
+    "scoreT": 15,
     "mvp": "alibaba"
   },
   {
     "index": 29,
     "winner": 3,
     "endReason": 7,
-    "scoreCT": 18,
-    "scoreT": 12,
+    "scoreCT": 14,
+    "scoreT": 15,
     "mvp": "Invader"
   },
   {
     "index": 30,
     "winner": 2,
     "endReason": 9,
-    "scoreCT": 18,
-    "scoreT": 13,
+    "scoreCT": 14,
+    "scoreT": 16,
     "mvp": "nqstr"
   }
 ]

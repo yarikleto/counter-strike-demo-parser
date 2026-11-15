@@ -118,4 +118,18 @@ describe.skipIf(!fixtureAvailable)("DemoResult plain data (de_nuke)", () => {
     const all = new Set(result.kills);
     for (const round of result.rounds) for (const k of round.kills) expect(all.has(k)).toBe(true);
   });
+
+  it("keeps a running score per round that ends at the final score", () => {
+    // The fixture restarts the match after one round (begin_new_match resets
+    // the scoreboard): that round is kept but voided.
+    expect(result.rounds.map((r) => r.voided).indexOf(false)).toBe(1);
+    const counted = result.rounds.filter((r) => !r.voided);
+    expect(counted[counted.length - 1]!.score).toEqual(result.score);
+    expect(result.score.ct + result.score.t).toBe(counted.length);
+    // Each counted round adds exactly one point (sides swap at halftime, so
+    // compare totals).
+    counted.forEach((round, i) => {
+      expect(round.score!.ct + round.score!.t).toBe(i + 1);
+    });
+  });
 });

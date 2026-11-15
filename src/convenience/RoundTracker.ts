@@ -38,8 +38,8 @@
  * plus their `item_purchase`s — so it lines up with `rounds[i]` exactly.
  */
 import type { DemoParser } from "../DemoParser.js";
-import type { TeamSide } from "../enums/TeamSide.js";
-import { RoundEndReason } from "../enums/RoundEndReason.js";
+import type { RoundEndReason } from "../enums/RoundEndReason.js";
+import { TeamSide } from "../enums/TeamSide.js";
 import type { Player } from "../state/Player.js";
 import type { PlayerHurtEvent } from "../events/enrichers/playerHurt.js";
 import type { RoundStartEvent } from "../events/enrichers/roundStart.js";
@@ -50,6 +50,7 @@ import type { ItemPurchaseEvent } from "../events/enrichers/itemPurchase.js";
 import { PlayerRoster } from "./PlayerRoster.js";
 import type { PlayerRef } from "./PlayerRoster.js";
 import type { BombRecord, KillRecord } from "./records.js";
+import { isMatchRoundEnd } from "./RoundBuckets.js";
 
 /** A player's money and purchases in one round. */
 export interface RoundPlayerEconomy {
@@ -124,6 +125,26 @@ export interface RoundSummary {
   readonly players: RoundPlayerStats[];
   /** Bomb events (plants, defuses, explosions) during this round. */
   readonly bombEvents: RoundBombEvents;
+  /**
+   * Scoreboard after this round: rounds won by the team playing CT this
+   * round and by the team playing T. Teams swap sides at halftime, and the
+   * score swaps with them. `undefined` without team entities (unit tests).
+   */
+  readonly score: MatchScore | undefined;
+  /**
+   * `true` when a later `begin_new_match` restarted the match (the engine
+   * resets both scores and the round count, e.g. `mp_restartgame` after a
+   * first round), so this round is not part of the final scoreboard. Rounds
+   * are kept rather than dropped; whether a restart starts "the" match is
+   * left to the application.
+   */
+  voided: boolean;
+}
+
+/** Rounds won by the team on each side, as on the in-game scoreboard. */
+export interface MatchScore {
+  readonly ct: number;
+  readonly t: number;
 }
 
 /** Mutable in-progress accumulator for the open round. Closed on `round_end`. */
@@ -195,7 +216,9 @@ export class ConvenienceRoundTracker {
   onBeginNewMatch(_e: BeginNewMatchEvent): void {
     // A (re)started match begins round 1 here. Anything accumulated before
     // (warmup) is discarded. When a `round_start` follows, it simply opens
-    // the window again at its own tick.
+    // the window again at its own tick. Rounds already played before a
+    // restart no longer count on the scoreboard.
+    for (const round of this.rounds) round.voided = true;
     this.current = this.openWindow(this.getTick());
   }
 
@@ -207,7 +230,7 @@ export class ConvenienceRoundTracker {
     if (this.current === null) {
       // Warmup round_ends and the "Game Commencing" pseudo round end are not
       // part of the match.
-      if (this.isWarmup() || e.reason === RoundEndReason.GameStart) return;
+      if (!isMatchRoundEnd(e, false, this.isWarmup())) return;
       // A live round whose start we never saw (e.g. the recording began
       // mid-round). Keep it — a round with a round_end is never dropped.
       this.current = this.openWindow(this.lastEndTick);
@@ -239,6 +262,8 @@ export class ConvenienceRoundTracker {
       kills: current.kills,
       players: [...current.players.values()],
       bombEvents: current.bombEvents,
+      score: this.scoreAfter(e.winner),
+      voided: false,
     };
 
     this.rounds.push(summary);
@@ -299,6 +324,26 @@ export class ConvenienceRoundTracker {
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
+
+  /**
+   * Score after the round that `winner` just won. The team entities still
+   * hold the previous totals when `round_end` fires (they update a few
+   * ticks later), so the winner's point is added here.
+   */
+  private scoreAfter(winner: TeamSide): MatchScore | undefined {
+    if (this.parser === null) return undefined;
+    let ct: number | undefined;
+    let t: number | undefined;
+    for (const team of this.parser.teams) {
+      if (team.team === TeamSide.CT) ct = team.score;
+      else if (team.team === TeamSide.T) t = team.score;
+    }
+    if (ct === undefined || t === undefined) return undefined;
+    return {
+      ct: ct + (winner === TeamSide.CT ? 1 : 0),
+      t: t + (winner === TeamSide.T ? 1 : 0),
+    };
+  }
 
   private openWindow(startTick: number): RoundInProgress {
     const window: RoundInProgress = {

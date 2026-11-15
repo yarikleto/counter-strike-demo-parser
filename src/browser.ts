@@ -181,6 +181,7 @@ export type {
   RoundPlayerStats,
   RoundPlayerEconomy,
   RoundBombEvents,
+  MatchScore,
 } from "./convenience/RoundTracker.js";
 export type { PlayerRef, PlayerInfo } from "./convenience/PlayerRoster.js";
 export type {

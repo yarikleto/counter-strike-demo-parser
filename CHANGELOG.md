@@ -33,6 +33,12 @@ public surface stabilises.
   economy and `freezeEndTick`.
 - `DemoResult.players`: a roster of everyone seen, including players who
   left; `PlayerRef.index` and `positions.player` point into it.
+- `DemoResult.score` (final scoreboard from the team entities) and
+  `rounds[i].score` (scoreboard after each round, following the halftime
+  side swap). Matches the server's match records on all six club demos.
+- `rounds[i].voided`: rounds played before a later `begin_new_match`
+  (match restart) are kept but marked, since the engine resets the
+  scoreboard.
 - `Player.armor`, `Player.hasHelmet`, `Player.hasDefuser`,
   `weaponNameForItemDefIndex()`, `readEntityOrigin()`, and the `frameEnd`
   parser event.
@@ -74,6 +80,9 @@ public surface stabilises.
   compressed entries such as most `modelprecache` paths.
 - Position samples could mix two ticks (sampled on the first entity update
   of a frame).
+- `DamageMatrix` and `EconomyTracker` counted rounds by `round_start`, so on
+  demos that start at `begin_new_match` every per-round bucket was off by
+  one. They now share the round boundaries of `DemoResult.rounds`.
 
 ### Performance
 - Node parse speed is unchanged (`npm run bench`: 661 → 666 ms mean,
