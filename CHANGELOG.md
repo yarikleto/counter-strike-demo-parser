@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Pre-1.0 caveat: minor versions may include breaking API changes while the
 public surface stabilises.
 
+## [0.3.0] — 2026-11-15
+
+### Added
+- `DemoResult.shots`: one row per `weapon_fire` event as typed-array
+  columns, like `positions`: tick, shooter (`player`, a roster index),
+  shooter origin, yaw/pitch, weapon (index into `shots.weapons`, named like
+  `KillRecord.weapon`), `kind` (`ShotKind.Bullet` / `Knife` / `Grenade` /
+  `Other`: knife swings and grenade throws are kept and marked) and
+  `flags` (`ShotFlags.Silenced`).
+- `DemoResult.hits`: one row per `player_hurt` event as typed-array
+  columns: tick, attacker (`NO_PLAYER` for world damage), victim, weapon,
+  damage, armor damage, hit group, health and armor left, attacker origin
+  (`NaN` without an attacker) and victim origin.
+- `shotBuffers()` / `hitBuffers()` return the `postMessage` transfer lists,
+  like `positionBuffers()`; `shotKind()` classifies a weapon name.
+- `DecodedGameEvent.tick`: the frame tick the event was decoded at, so raw
+  events (`includeRawEvents`) can be ordered in time. `decodeGameEvent()`
+  takes it as an optional third argument (default 0).
+
+Shots and hits are always collected: on six real 74–149 MB matches they
+hold 3.8–10k shots and 0.9–1.7k hits in 150–360 KB of columns (about 3 MB
+as objects), and parse time is unchanged. On those demos 99.9 % or more of
+gun hits share their tick with a shot by the same attacker.
+
+### Changed
+- Code that builds `DecodedGameEvent` objects by hand (for example to test
+  an enricher) must now set `tick`. Events emitted by the parser always
+  carry it.
+
+### Performance
+- `npm run bench` (80 MB `de_nuke` fixture, `--expose-gc`, Apple M5,
+  Node 26): 628 → 632 ms median, within noise.
+
 ## [0.2.0] — 2026-11-15
 
 ### Added

@@ -23,8 +23,8 @@ included), ESM-first with CJS dual export, no native dependencies.
 - Results are plain data (objects, arrays, typed arrays): `postMessage` them
   out of a worker, store them in IndexedDB, or `JSON.stringify` them.
 - Replay-ready: columnar player positions (with view angles, health, armor,
-  money, active weapon), grenade throws, trajectories and effects, bomb events
-  with positions and sites, all in world coordinates.
+  money, active weapon), every shot and hit, grenade throws, trajectories and
+  effects, bomb events with positions and sites, all in world coordinates.
 - Progress reporting and cancellation (`onProgress`, `AbortSignal`).
 - Bit-identical to [`demoinfocs-golang`](https://github.com/markus-wa/demoinfocs-golang)
   on the cross-validated kill stream (337/337 kills on the `de_nuke` fixture).
@@ -66,7 +66,7 @@ so run it in a worker. The worker below is the one the browser smoke test
 
 ```typescript
 // demo-worker.ts
-import { parseDemo, positionBuffers } from "counter-strike-demo-parser";
+import { hitBuffers, parseDemo, positionBuffers, shotBuffers } from "counter-strike-demo-parser";
 
 let controller: AbortController | undefined;
 
@@ -83,8 +83,13 @@ self.onmessage = async (event: MessageEvent) => {
       signal: controller.signal,
       onProgress: (p) => self.postMessage({ type: "progress", fraction: p.fraction }),
     });
-    // Hand the position columns over without copying them.
-    self.postMessage({ type: "done", result }, { transfer: positionBuffers(result.positions!) });
+    // Hand the typed-array columns over without copying them.
+    const transfer = [
+      ...positionBuffers(result.positions!),
+      ...shotBuffers(result.shots),
+      ...hitBuffers(result.hits),
+    ];
+    self.postMessage({ type: "done", result }, { transfer });
   } catch (err) {
     self.postMessage({ type: "error", name: (err as Error).name, message: String(err) });
   }
@@ -132,8 +137,10 @@ demo.grenadeEffects   // smokes and infernos (start/end), flash/HE/decoy detonat
 demo.hostageEvents    // cs_ maps: follows, stops following, rescued, hurt, killed
 demo.damage           // DamageRecord[]: full-match attacker -> victim totals
 demo.chatMessages     // ChatRecord[]
+demo.shots            // columnar: every weapon_fire (gun shots, knife swings, grenade throws)
+demo.hits             // columnar: every player_hurt
 demo.positions        // opt in: collectPlayerPositions: true
-demo.events           // opt in: includeRawEvents: true
+demo.events           // opt in: includeRawEvents: true (each event has its frame tick)
 ```
 
 Players in records are `PlayerRef`s captured when the event happened
@@ -174,6 +181,66 @@ Dead players keep producing rows (with `Alive` cleared) because their
 origin follows their spectator camera: skip them when drawing.
 `positionBuffers(positions)` lists the column buffers for a zero-copy
 `postMessage` transfer.
+
+### Shots and hits
+
+`demo.shots` has one row per `weapon_fire` event and `demo.hits` one row per
+`player_hurt` event, in wire order, as typed-array columns like
+`positions` (a match has thousands of shots: about 360 KB as columns versus
+about 3 MB as objects). Both are always collected; they cost under 1 % of
+parse time. `shotBuffers()` / `hitBuffers()` return the transfer lists.
+
+`demo.shots`:
+
+| Column | Type | |
+|---|---|---|
+| `tick` | `Int32Array` | frame tick of the event |
+| `player` | `Uint16Array` | shooter, index into `demo.players` |
+| `x`, `y`, `z` | `Float32Array` | shooter's origin (feet; the eye is ~64 units higher standing, 46 crouched) |
+| `yaw`, `pitch` | `Float32Array` | shooter's view angles in degrees |
+| `weapon` | `Uint16Array` | index into `shots.weapons`, named like `KillRecord.weapon` (`"ak47"`, `"m4a1_silencer"`, `"knife_t"`) |
+| `kind` | `Uint8Array` | `ShotKind.Bullet`, `Knife`, `Grenade` or `Other` (C4, Healthshot) |
+| `flags` | `Uint8Array` | `ShotFlags.Silenced` |
+
+GOTV networks `weapon_fire` once per trigger pull (not per shotgun pellet),
+for knife swings and grenade throws too; filter on `kind` for tracers.
+
+`demo.hits`:
+
+| Column | Type | |
+|---|---|---|
+| `tick` | `Int32Array` | frame tick of the event |
+| `attacker` | `Uint16Array` | index into `demo.players`, or `NO_PLAYER` (world damage) |
+| `victim` | `Uint16Array` | index into `demo.players` |
+| `weapon` | `Uint16Array` | index into `hits.weapons`, as `player_hurt` names it (`"ak47"`, `"m4a1"` for both M4s, `"inferno"`, `"hegrenade"`) |
+| `damage` | `Uint16Array` | health damage (`dmg_health`) |
+| `armorDamage` | `Uint8Array` | `dmg_armor` |
+| `hitGroup` | `Uint8Array` | `HitGroup` (1 head, 2 chest, 3 stomach, ...) |
+| `health`, `armor` | `Uint8Array` | victim's health and armor after the hit |
+| `attackerX`, `attackerY`, `attackerZ` | `Float32Array` | attacker's origin; `NaN` without an attacker |
+| `victimX`, `victimY`, `victimZ` | `Float32Array` | victim's origin |
+
+On real demos 99.9 % or more of gun hits share their tick with a shot by the
+same attacker, so a replay can draw the tracer from the shot to the hit:
+
+```typescript
+import { NO_PLAYER, ShotKind, parseDemo } from "counter-strike-demo-parser";
+
+const { shots, hits, players } = await parseDemo(bytes);
+
+for (let i = 0; i < shots.length; i++) {
+  if (shots.kind[i] !== ShotKind.Bullet) continue;
+  drawMuzzleFlash(shots.tick[i], shots.x[i], shots.y[i], shots.yaw[i], shots.weapons[shots.weapon[i]]);
+}
+for (let i = 0; i < hits.length; i++) {
+  const by = hits.attacker[i] === NO_PLAYER ? "world" : players[hits.attacker[i]].name;
+  drawHitSpark(hits.tick[i], hits.victimX[i], hits.victimY[i], hits.damage[i], by);
+}
+```
+
+With `includeRawEvents`, every `DecodedGameEvent` in `demo.events` carries
+the frame `tick` it was decoded at (ticks never decrease), so raw events such
+as `round_announce_match_start` or `begin_new_match` can be placed in time.
 
 ### Grenades
 
