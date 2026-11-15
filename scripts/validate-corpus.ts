@@ -26,9 +26,13 @@
  *     the hit-to-shot match rate: the share of gun hits whose attacker fired
  *     a gun within 0 / 2 / 8 ticks before the hit
  *   - parserError events and whether the parse threw
+ *   - with --voice (parses with `collectVoice`): voice messages against the
+ *     raw `voiceData` event count, payload bytes, speakers, unresolved
+ *     speakers, wire formats, codec, 64-byte frame sizes, frames per second
+ *     of speech per speaker, and the share of frames lost on the wire
  *
  * Usage:
- *   npm run validate:corpus -- <dir> [--limit N] [--rate TICKS] [--json]
+ *   npm run validate:corpus -- <dir> [--limit N] [--rate TICKS] [--voice] [--json]
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -44,6 +48,7 @@ import {
   ShotKind,
   hitBuffers,
   shotBuffers,
+  voiceBuffers,
 } from "../src/index.js";
 import type { DemoResult } from "../src/index.js";
 
@@ -102,11 +107,33 @@ interface Report {
   readonly pointsInBoxXY: number;
   readonly pointsInBoxZ: number;
   readonly detonationDistanceMedian: number;
+  /** Only with --voice. */
+  readonly voice?: VoiceReport;
+}
+
+interface VoiceReport {
+  readonly voiceDataEvents: number;
+  readonly messages: number;
+  readonly bytes: number;
+  /** Bytes of every voice column including the payload. */
+  readonly columnBytes: number;
+  readonly speakers: number;
+  readonly unresolved: number;
+  /** Message count per wire format, e.g. "1:41344". */
+  readonly formats: string;
+  readonly codec: string;
+  /** Message count per payload size in frames, e.g. "1:35053 2:6244". */
+  readonly framesPerMessage: string;
+  readonly frames: number;
+  /** Median over speakers of frames per second of speech (talk sections). */
+  readonly framesPerSecond: number;
+  /** Frames missing from the sample clock inside talk sections, as a share. */
+  readonly lostFrames: number;
 }
 
 // ---------- child: parse one demo ------------------------------------------
 
-async function parseOne(path: string, rate: number): Promise<Report> {
+async function parseOne(path: string, rate: number, voice: boolean): Promise<Report> {
   const raw = readFileSync(path);
   const bytes = path.endsWith(".gz") ? gunzipSync(raw) : raw;
 
@@ -118,6 +145,7 @@ async function parseOne(path: string, rate: number): Promise<Report> {
     result = await DemoParser.parse(bytes, {
       collectPlayerPositions: true,
       positionSampleRateTicks: rate,
+      collectVoice: voice,
     });
   } catch (err) {
     threw = err instanceof Error ? err.message : String(err);
@@ -135,7 +163,9 @@ async function parseOne(path: string, rate: number): Promise<Report> {
   let weaponFireEvents = 0;
   let playerHurtEvents = 0;
   let parserErrors = 0;
+  let voiceDataEvents = 0;
   const counter = DemoParser.fromBuffer(bytes);
+  if (voice) counter.on("voiceData", () => voiceDataEvents++);
   counter.on("gameEvent", (e) => {
     if (e.name === "round_end") roundEndEvents++;
     else if (e.name === "grenade_thrown") grenadeThrownEvents++;
@@ -239,7 +269,99 @@ async function parseOne(path: string, rate: number): Promise<Report> {
     pointsInBoxXY: points === 0 ? 1 : inXY / points,
     pointsInBoxZ: points === 0 ? 1 : inZ / points,
     detonationDistanceMedian: distances[distances.length >> 1] ?? NaN,
+    voice: voice ? voiceReport(result, voiceDataEvents) : undefined,
   };
+}
+
+function counts(values: Iterable<number>): string {
+  const map = new Map<number, number>();
+  for (const v of values) map.set(v, (map.get(v) ?? 0) + 1);
+  return [...map]
+    .sort((a, b) => a[0] - b[0])
+    .map(([k, n]) => `${k}:${n}`)
+    .join(" ");
+}
+
+function voiceReport(result: DemoResult, voiceDataEvents: number): VoiceReport {
+  const v = result.voice!;
+  const frameBytes = v.frameBytes || 64;
+  const frameSamples = v.frameSamples || 512;
+  const perSpeaker = new Map<number, { frames: number; seconds: number }>();
+  /** Last row of each (speaker, section). */
+  const last = new Map<number, number>();
+  const sectionStart = new Map<number, number>();
+  let frames = 0;
+  let lost = 0;
+  const closeSection = (player: number, first: number, end: number) => {
+    const s = perSpeaker.get(player) ?? { frames: 0, seconds: 0 };
+    s.seconds += (v.tick[end]! - v.tick[first]!) / result.tickRate;
+    perSpeaker.set(player, s);
+  };
+  for (let i = 0; i < v.length; i++) {
+    const player = v.player[i]!;
+    const n = v.size[i]! / frameBytes;
+    frames += n;
+    const prev = last.get(player);
+    if (prev !== undefined && v.sectionNumber[prev] === v.sectionNumber[i]) {
+      const step = (v.sampleOffset[i]! - v.sampleOffset[prev]!) / frameSamples;
+      lost += Math.max(0, step - v.size[prev]! / frameBytes);
+    } else {
+      if (prev !== undefined) closeSection(player, sectionStart.get(player)!, prev);
+      sectionStart.set(player, i);
+    }
+    const s = perSpeaker.get(player) ?? { frames: 0, seconds: 0 };
+    s.frames += n;
+    perSpeaker.set(player, s);
+    last.set(player, i);
+  }
+  for (const [player, end] of last) closeSection(player, sectionStart.get(player)!, end);
+  const rates = [...perSpeaker.values()]
+    .filter((s) => s.seconds > 1)
+    .map((s) => s.frames / s.seconds)
+    .sort((a, b) => a - b);
+  let unresolved = 0;
+  for (let i = 0; i < v.length; i++) if (v.player[i] === NO_PLAYER) unresolved++;
+  return {
+    voiceDataEvents,
+    messages: v.length,
+    bytes: v.data.length,
+    columnBytes: voiceBuffers(v).reduce((sum, b) => sum + b.byteLength, 0),
+    speakers: perSpeaker.size - (perSpeaker.has(NO_PLAYER) ? 1 : 0),
+    unresolved,
+    formats: counts(v.format),
+    codec: v.codec === "" ? "-" : `${v.codec}/q${v.quality}/v${v.version}`,
+    framesPerMessage: counts(Array.from(v.size, (s) => s / frameBytes)),
+    frames,
+    framesPerSecond: rates[rates.length >> 1] ?? NaN,
+    lostFrames: frames === 0 ? 0 : lost / (frames + lost),
+  };
+}
+
+function voiceTable(reports: readonly Report[]): string {
+  const cols: [string, (r: Report, v: VoiceReport) => string][] = [
+    ["map", (r) => r.map],
+    ["voiceData", (_, v) => String(v.voiceDataEvents)],
+    ["msgs", (_, v) => String(v.messages) + (v.messages === v.voiceDataEvents ? "" : " (!)")],
+    ["frames", (_, v) => String(v.frames)],
+    ["payload KB", (_, v) => (v.bytes / 1024).toFixed(0)],
+    ["col KB", (_, v) => (v.columnBytes / 1024).toFixed(0)],
+    ["speakers", (_, v) => String(v.speakers)],
+    ["unresolved", (_, v) => String(v.unresolved)],
+    ["format", (_, v) => v.formats || "-"],
+    ["codec", (_, v) => v.codec],
+    ["frames/msg", (_, v) => v.framesPerMessage || "-"],
+    ["frames/s", (_, v) => v.framesPerSecond.toFixed(1)],
+    ["lost", (_, v) => `${(v.lostFrames * 100).toFixed(2)}%`],
+  ];
+  const withVoice = reports.filter((r) => r.voice !== undefined);
+  const rows = [cols.map(([h]) => h), ...withVoice.map((r) => cols.map(([, f]) => f(r, r.voice!)))];
+  const widths = cols.map((_, c) => Math.max(...rows.map((row) => row[c]!.length)));
+  return rows
+    .map((row, i) => {
+      const line = row.map((cell, c) => cell.padEnd(widths[c]!)).join("  ");
+      return i === 0 ? `${line}\n${"-".repeat(line.length)}` : line;
+    })
+    .join("\n");
 }
 
 /**
@@ -328,17 +450,19 @@ function parseArgs(argv: readonly string[]) {
   let limit = Infinity;
   let rate = 8;
   let json = false;
+  let voice = false;
   let one: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--limit") limit = Number(argv[++i]);
     else if (arg === "--rate") rate = Number(argv[++i]);
     else if (arg === "--json") json = true;
+    else if (arg === "--voice") voice = true;
     else if (arg === "--one") one = argv[++i];
     else if (arg.startsWith("--")) throw new Error(`Unknown flag: ${arg}`);
     else dir = arg;
   }
-  return { dir, limit, rate, json, one };
+  return { dir, limit, rate, json, voice, one };
 }
 
 function table(reports: readonly Report[]): string {
@@ -392,11 +516,11 @@ function table(reports: readonly Report[]): string {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (args.one !== undefined) {
-    process.stdout.write(JSON.stringify(await parseOne(args.one, args.rate)));
+    process.stdout.write(JSON.stringify(await parseOne(args.one, args.rate, args.voice)));
     return;
   }
   if (args.dir === undefined) {
-    throw new Error("usage: validate-corpus <dir> [--limit N] [--rate TICKS] [--json]");
+    throw new Error("usage: validate-corpus <dir> [--limit N] [--rate TICKS] [--voice] [--json]");
   }
   const dir = args.dir;
   const files = readdirSync(dir)
@@ -411,7 +535,16 @@ async function main(): Promise<void> {
     process.stderr.write(`parsing ${name}...\n`);
     const out = execFileSync(
       process.execPath,
-      ["--import", "tsx", self, "--one", join(dir, name), "--rate", String(args.rate)],
+      [
+        "--import",
+        "tsx",
+        self,
+        "--one",
+        join(dir, name),
+        "--rate",
+        String(args.rate),
+        ...(args.voice ? ["--voice"] : []),
+      ],
       { maxBuffer: 1 << 20 },
     );
     reports.push(JSON.parse(out.toString()) as Report);
@@ -422,6 +555,7 @@ async function main(): Promise<void> {
     return;
   }
   console.log(table(reports));
+  if (args.voice) console.log(`\n${voiceTable(reports)}`);
   const bad = reports.filter((r) => r.threw !== undefined || r.rounds !== r.roundEndEvents);
   console.log(
     `\n${reports.length} demo(s); ${bad.length} with a throw or a rounds/round_end mismatch.` +
