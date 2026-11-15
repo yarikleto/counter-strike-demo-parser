@@ -13,7 +13,12 @@ import { describe, it, expect } from "vitest";
 import { Buffer } from "node:buffer";
 import _m0 from "protobufjs/minimal";
 import { MessageDispatcher, iterateRawMessages } from "../../../src/packet/MessageDispatch.js";
-import { CNETMsg_Tick, CSVCMsg_ServerInfo, CSVCMsg_VoiceData } from "../../../src/proto/index.js";
+import {
+  CNETMsg_Tick,
+  CSVCMsg_ServerInfo,
+  CSVCMsg_VoiceData,
+  CSVCMsg_VoiceInit,
+} from "../../../src/proto/index.js";
 import { NETMessages, SVCMessages } from "../../../src/generated/netmessages.js";
 
 /**
@@ -219,6 +224,26 @@ describe("MessageDispatcher", () => {
   it("registers svc_VoiceData as a known command id (TASK-051)", () => {
     const known = MessageDispatcher.knownCommandIds();
     expect(known).toContain(SVCMessages.svc_VoiceData);
+  });
+
+  it("decodes and dispatches a CSVCMsg_VoiceInit message", () => {
+    const payload = CSVCMsg_VoiceInit.encode(
+      CSVCMsg_VoiceInit.fromPartial({ codec: "vaudio_celt", quality: 5, version: 3 }),
+    ).finish();
+    const stream = buildStream([{ cmd: SVCMessages.svc_VoiceInit, bytes: payload }]);
+    const seen: { codec?: string; quality?: number; version?: number }[] = [];
+    const unknown: number[] = [];
+    const dispatcher = new MessageDispatcher({
+      onVoiceInit: (msg) =>
+        seen.push({ codec: msg.codec, quality: msg.quality, version: msg.version }),
+      onUnknownMessage: (cmd) => unknown.push(cmd),
+    });
+
+    dispatcher.dispatch(stream);
+
+    expect(seen).toEqual([{ codec: "vaudio_celt", quality: 5, version: 3 }]);
+    expect(unknown).toEqual([]);
+    expect(MessageDispatcher.knownCommandIds()).toContain(SVCMessages.svc_VoiceInit);
   });
 
   it("iterateRawMessages yields cmd/payload pairs without decoding", () => {

@@ -41,6 +41,7 @@ import type {
   CSVCMsg_UpdateStringTable,
   CSVCMsg_UserMessage,
   CSVCMsg_VoiceData,
+  CSVCMsg_VoiceInit,
 } from "./proto/index.js";
 import { parseDataTables } from "./datatables/DataTablesParser.js";
 import type { SendTableRegistry } from "./datatables/SendTableRegistry.js";
@@ -742,6 +743,14 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       onUserMessage: (msg: CSVCMsg_UserMessage) => {
         this.handleUserMessage(msg);
       },
+      onVoiceInit: (msg: CSVCMsg_VoiceInit) => {
+        this.emit("voiceInit", {
+          tick: this._currentTick,
+          codec: msg.codec ?? "",
+          quality: msg.quality ?? 0,
+          version: msg.version ?? 0,
+        });
+      },
       onVoiceData: (msg: CSVCMsg_VoiceData) => {
         this.handleVoiceData(msg);
       },
@@ -1291,6 +1300,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    * (a voice frame with zero audio bytes is not a meaningful event).
    */
   private handleVoiceData(msg: CSVCMsg_VoiceData): void {
+    if (this.listenerCount("voiceData") === 0) return;
     const data = msg.voiceData;
     if (data === undefined || data.length === 0) return;
     const client = msg.client;
@@ -1313,6 +1323,13 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       format: msg.format ?? 0,
       proximity: msg.proximity === true ? 1 : 0,
       data,
+      client: client ?? -1,
+      xuid: msg.xuid === undefined ? "0" : msg.xuid.toString(),
+      caster: msg.caster === true ? 1 : 0,
+      audibleMask: msg.audibleMask ?? 0,
+      sequenceBytes: msg.sequenceBytes ?? 0,
+      sectionNumber: msg.sectionNumber ?? 0,
+      uncompressedSampleOffset: msg.uncompressedSampleOffset ?? 0,
     });
   }
 

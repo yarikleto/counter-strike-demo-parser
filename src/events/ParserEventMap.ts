@@ -323,22 +323,34 @@ export interface Tier3EventMap {
     readonly data: Uint8Array;
   };
   /**
+   * Fires when the server's `CSVCMsg_VoiceInit` signon message is decoded:
+   * the voice codec every engine-format (`format` 1) `voiceData` payload
+   * uses. CS:GO servers send `codec: "vaudio_celt"`, `quality: 5`,
+   * `version: 3` (`sv_voicecodec vaudio_celt`).
+   */
+  voiceInit: {
+    readonly tick: number;
+    /** Codec module name, e.g. `"vaudio_celt"`; `""` if absent. */
+    readonly codec: string;
+    readonly quality: number;
+    readonly version: number;
+  };
+  /**
    * Fires when a `CSVCMsg_VoiceData` message is decoded (TASK-051). `player`
    * resolves the speaking client by entity slot via `userInfoIndex` — the
    * value is `undefined` if the userinfo string-table entry hasn't been
-   * populated yet at this tick (rare; can happen for the briefest moment
-   * during signon while a client connects). `data` is the raw compressed
-   * audio payload — CELT or Opus depending on the demo era — emitted
-   * verbatim with no audio decoding. `format` carries the wire format enum
-   * (`VoiceDataFormatT`) so consumers that DO want to decode can route to
-   * the right codec; `proximity` is the 0/1 proximity-chat flag normalised
-   * from the proto's boolean field.
+   * populated yet at this tick, or the speaker has no player entity.
+   * `data` is the raw compressed audio payload, emitted verbatim with no
+   * audio decoding; it is a view into the parser's buffer, so copy it to
+   * keep it. `format` carries the wire format enum (`VoiceDataFormatT`):
+   * 1 (engine) payloads are whole frames of the codec announced by
+   * `voiceInit` — for `vaudio_celt`, 64-byte CELT frames of 512 samples at
+   * 22050 Hz, with no header. `proximity` and `caster` are the proto's
+   * booleans as 0/1.
    *
-   * Bot-driven competitive demos typically have zero voice messages — the
-   * server records authoritative ticks, not the client voice channel. POV
-   * recordings and casual demos with active voice chat will emit one event
-   * per ~20-50ms voice frame per active speaker. A subscriber may
-   * legitimately observe zero events on a given fixture.
+   * Demos recorded without voice (`tv_relayvoice 0`, matchmaking) have no
+   * voice messages. GOTV recordings with voice emit one event per voice
+   * packet (1–5 frames) per speaker, about 43 frames per second of speech.
    */
   voiceData: {
     readonly tick: number;
@@ -346,6 +358,28 @@ export interface Tier3EventMap {
     readonly format: number;
     readonly proximity: number;
     readonly data: Uint8Array;
+    /** Speaker's zero-based client slot (entity id − 1); −1 if absent. */
+    readonly client: number;
+    /** Speaker's SteamID64 as a decimal string; `"0"` if absent. */
+    readonly xuid: string;
+    /** 1 when the message is from a GOTV caster, else 0. */
+    readonly caster: number;
+    /** Bitmask of the teams that hear the message (`audible_mask`). */
+    readonly audibleMask: number;
+    /**
+     * Running byte count of the speaker's current talk section, including
+     * this payload (0 if absent). A jump larger than `data.length` means
+     * packets were lost in between.
+     */
+    readonly sequenceBytes: number;
+    /** Talk-section number; increases by one per push-to-talk burst. */
+    readonly sectionNumber: number;
+    /**
+     * Speaker's sample clock (codec sample rate) at the start of this
+     * payload; it keeps running across sections, so gaps between bursts
+     * can be placed exactly.
+     */
+    readonly uncompressedSampleOffset: number;
   };
   /**
    * Recoverable parse failure (TASK-059). Fires when the parser encounters

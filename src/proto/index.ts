@@ -30,6 +30,7 @@ import {
   CSVCMsgUpdateStringTable,
   CSVCMsgUserMessage,
   CSVCMsgVoiceData,
+  CSVCMsgVoiceInit,
   VoiceDataFormatT,
 } from "../generated/netmessages.js";
 import {
@@ -78,6 +79,9 @@ export const CSVCMsg_UserMessage = CSVCMsgUserMessage;
 
 export type CSVCMsg_VoiceData = CSVCMsgVoiceData;
 export const CSVCMsg_VoiceData = CSVCMsgVoiceData;
+
+export type CSVCMsg_VoiceInit = CSVCMsgVoiceInit;
+export const CSVCMsg_VoiceInit = CSVCMsgVoiceInit;
 
 export { VoiceDataFormatT };
 
