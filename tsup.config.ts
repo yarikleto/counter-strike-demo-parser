@@ -12,4 +12,11 @@ export default defineConfig({
   target: "es2022",
   splitting: false,
   treeshake: true,
+  esbuildOptions(options) {
+    // Valve's netmessages.proto aliases two ESplitScreenMessageType values
+    // (`allow_alias`), so ts-proto's generated JSON helpers contain a
+    // repeated `case 1:`. Harmless dead code; hand-written source is still
+    // checked by ESLint's no-duplicate-case.
+    options.logOverride = { ...options.logOverride, "duplicate-case": "silent" };
+  },
 });
