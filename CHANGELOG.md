@@ -35,7 +35,7 @@ public surface stabilises.
   left; `PlayerRef.index` and `positions.player` point into it.
 - `DemoResult.score` (final scoreboard from the team entities) and
   `rounds[i].score` (scoreboard after each round, following the halftime
-  side swap). Matches the server's match records on all six club demos.
+  side swap).
 - `rounds[i].voided`: rounds played before a later `begin_new_match`
   (match restart) are kept but marked, since the engine resets the
   scoreboard.

@@ -230,7 +230,7 @@ toward `score`. Deciding which restart starts "the" match is up to you.
 ## Status
 
 `v0.2.0`. Validated on the 5v5 `de_nuke` fixture and on 128-tick GOTV demos
-of club matches with up to 21 players, and bit-identical to
+of community-server matches with up to 21 players, and bit-identical to
 `demoinfocs-golang` on the kill stream of the fixture. The public API may still change before `1.0`; see the
 [changelog](./CHANGELOG.md) for breaking changes.
 
@@ -246,7 +246,7 @@ Apple M5, Node 22. `npm run bench` (80 MB `de_nuke` fixture, `--expose-gc`):
 | Throughput | ~120 MB/s |
 | Peak RSS | 233 MB |
 
-156 MB 128-tick `de_dust2` club demo:
+156 MB 128-tick `de_dust2` demo:
 
 | | Node 22 | Chrome (Web Worker) |
 |---|---|---|
