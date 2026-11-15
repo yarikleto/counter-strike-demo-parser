@@ -29,7 +29,22 @@ export default tseslint.config(
     files: ["**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
-      globals: { console: "readonly", process: "readonly", URL: "readonly" },
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        // Referenced inside callbacks Playwright runs in the page.
+        window: "readonly",
+      },
+    },
+  },
+  {
+    // The browser smoke page / worker have their own DOM-typed project.
+    files: ["test/browser/**/*.ts"],
+    languageOptions: {
+      parserOptions: { project: "./test/browser/tsconfig.json" },
     },
   },
   {

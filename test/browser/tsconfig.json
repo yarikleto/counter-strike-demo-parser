@@ -1,0 +1,17 @@
+{
+  // The browser smoke page and worker: DOM typings, no Node types, and the
+  // package name mapped to the browser entry's source.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../..",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "noImplicitAny": false,
+    "baseUrl": ".",
+    "paths": { "counter-strike-demo-parser": ["../../src/browser.ts"] }
+  },
+  "include": ["*.ts", "../../src/types/*.d.ts"],
+  // The base config excludes "test"; this project is exactly that folder.
+  "exclude": ["node_modules"]
+}
