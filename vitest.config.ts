@@ -9,11 +9,7 @@ export default defineConfig({
   test: {
     include: ["test/unit/**/*.test.ts", "test/integration/**/*.test.ts"],
     pool: "threads",
-    poolOptions: {
-      threads: {
-        maxThreads: 4,
-      },
-    },
+    maxWorkers: 4,
     testTimeout: 60000,
     coverage: {
       provider: "v8",
