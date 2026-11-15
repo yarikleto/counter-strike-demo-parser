@@ -11,6 +11,7 @@ export default defineConfig({
     include: ["test/integration/**/*.test.ts"],
     pool: "threads",
     maxWorkers: 1,
+    fileParallelism: false,
     testTimeout: 60000,
     coverage: {
       provider: "v8",
