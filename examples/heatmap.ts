@@ -5,18 +5,17 @@
  * a heatmap in your tool of choice. Uses the high-level `DemoParser.parse()`
  * one-shot API with `collectPlayerPositions: true`.
  *
- * Known limitation: `DemoResult` does NOT carry player display names — rows
- * are identified by entity slot only. For named output use the streaming API
- * (see examples/scoreboard.ts) and resolve via `parser.userInfoIndex`.
+ * `result.positions` is columnar (typed arrays); `positions.player[i]`
+ * indexes `result.players`, which carries display names and SteamIDs.
  *
  * Run:
  *   npx tsx examples/heatmap.ts [path/to/demo.dem] > positions.csv
  *
  * Output (CSV, header first):
- *   tick,slot,x,y,z
- *   123,1,-1820.5,2103.7,140.0
+ *   tick,player,x,y,z
+ *   64,"Adrian",-1947.0,-965.1,-416.8
  */
-import { DemoParser } from "../src/index.js";
+import { DemoParser, PositionFlags } from "../src/index.js";
 
 const demoPath = process.argv[2] ?? "test/fixtures/de_nuke.dem";
 
@@ -25,7 +24,12 @@ const result = await DemoParser.parse(demoPath, {
   positionSampleRateTicks: 64,
 });
 
-console.log("tick,slot,x,y,z");
-for (const sample of result.playerPositions ?? []) {
-  console.log(`${sample.tick},${sample.player.slot},${sample.x},${sample.y},${sample.z}`);
+// Columnar samples: row i of every column is one (player, tick) sample.
+// Skip dead players — their origin follows their spectator camera.
+const pos = result.positions!;
+console.log("tick,player,x,y,z");
+for (let i = 0; i < pos.length; i++) {
+  if ((pos.flags[i]! & PositionFlags.Alive) === 0) continue;
+  const name = result.players[pos.player[i]!]!.name;
+  console.log(`${pos.tick[i]},${JSON.stringify(name)},${pos.x[i]},${pos.y[i]},${pos.z[i]}`);
 }

@@ -1,6 +1,6 @@
 {
   "name": "counter-strike-demo-parser",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript library for parsing CS:GO .dem files. Streaming event-emitter architecture, fully typed, minimal dependencies.",
   "author": "Yaroslav Pakhaliuk",
   "license": "MIT",
@@ -82,7 +82,7 @@
     "build": "tsup",
     "build:native": "node-gyp configure --directory native && node-gyp build --directory native",
     "rebuild:native": "node-gyp rebuild --directory native",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc -p tsconfig.browser.json && tsc -p test/browser/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.eslint.json && tsc -p tsconfig.browser.json && tsc -p test/browser/tsconfig.json",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
