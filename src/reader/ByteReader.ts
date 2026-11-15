@@ -1,5 +1,5 @@
 /**
- * ByteReader — sequential binary reader over a Node.js Buffer.
+ * ByteReader — sequential binary reader over a `Uint8Array`.
  *
  * Tracks a cursor (position) and provides typed read methods for
  * little-endian integers, floats, raw byte slices, and fixed-length
@@ -7,17 +7,21 @@
  * number of bytes consumed.
  *
  * Design note: the cursor is a simple integer offset — no separate
- * "remaining" tracking. The Buffer itself is never copied; reads
+ * "remaining" tracking. The bytes are never copied; reads
  * return slices or values directly from the underlying memory.
  * Out-of-bounds reads throw immediately (fail fast) rather than
  * returning partial data.
  */
+import { decodeUtf8 } from "./text.js";
+
 export class ByteReader {
-  private readonly buffer: Buffer;
+  private readonly buffer: Uint8Array;
+  private readonly view: DataView;
   private cursor: number;
 
-  constructor(buffer: Buffer) {
+  constructor(buffer: Uint8Array) {
     this.buffer = buffer;
+    this.view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     this.cursor = 0;
   }
 
@@ -47,7 +51,7 @@ export class ByteReader {
   /** Read a signed 32-bit little-endian integer. Advances cursor by 4. */
   readInt32(): number {
     this.ensureAvailable(4);
-    const value = this.buffer.readInt32LE(this.cursor);
+    const value = this.view.getInt32(this.cursor, true);
     this.cursor += 4;
     return value;
   }
@@ -55,7 +59,7 @@ export class ByteReader {
   /** Read an unsigned 32-bit little-endian integer. Advances cursor by 4. */
   readUInt32(): number {
     this.ensureAvailable(4);
-    const value = this.buffer.readUInt32LE(this.cursor);
+    const value = this.view.getUint32(this.cursor, true);
     this.cursor += 4;
     return value;
   }
@@ -63,13 +67,16 @@ export class ByteReader {
   /** Read a 32-bit little-endian float. Advances cursor by 4. */
   readFloat32(): number {
     this.ensureAvailable(4);
-    const value = this.buffer.readFloatLE(this.cursor);
+    const value = this.view.getFloat32(this.cursor, true);
     this.cursor += 4;
     return value;
   }
 
-  /** Read exactly `n` bytes as a new Buffer. Advances cursor by `n`. */
-  readBytes(n: number): Buffer {
+  /**
+   * Read exactly `n` bytes as a view into the underlying buffer (no copy).
+   * Advances cursor by `n`.
+   */
+  readBytes(n: number): Uint8Array {
     this.ensureAvailable(n);
     const slice = this.buffer.subarray(this.cursor, this.cursor + n);
     this.cursor += n;
@@ -113,7 +120,7 @@ export class ByteReader {
     const raw = this.readBytes(n);
     const nullIndex = raw.indexOf(0x00);
     const end = nullIndex === -1 ? n : nullIndex;
-    return raw.toString("utf8", 0, end);
+    return decodeUtf8(raw, 0, end);
   }
 
   /** Throw if fewer than `n` bytes remain from the cursor position. */

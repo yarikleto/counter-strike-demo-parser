@@ -59,6 +59,7 @@
  * invariant that `infoForUserId` returns a fully-populated record OR
  * `undefined` — never a half-decoded one.
  */
+import { decodeUtf8 } from "../reader/text.js";
 import type { StringTableManager } from "../stringtables/StringTableManager.js";
 
 /**
@@ -180,20 +181,21 @@ function decodePlayerInfo(
   blob: Uint8Array,
   entitySlot: number,
 ): { userId: number; info: UserInfo } | undefined {
-  // Wrap in a Buffer view so we can use Buffer's BE integer readers (the
-  // shared ByteReader in the codebase is LE-only). Source networks every
-  // multi-byte integer in `player_info_t` in network byte order.
-  const buf = Buffer.from(blob.buffer, blob.byteOffset, blob.byteLength);
+  // DataView gives us big-endian readers (the shared ByteReader in the
+  // codebase is LE-only). Source networks every multi-byte integer in
+  // `player_info_t` in network byte order. Out-of-range reads throw
+  // RangeError, which we map to "structurally invalid".
+  const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
 
   let xuid: bigint;
   let userId: number;
   let fakeplayer: number;
-  let nameRaw: Buffer;
+  let nameRaw: Uint8Array;
   try {
-    xuid = buf.readBigUInt64BE(OFFSET_XUID);
-    nameRaw = buf.subarray(OFFSET_NAME, OFFSET_NAME + NAME_LENGTH);
-    userId = buf.readInt32BE(OFFSET_USER_ID);
-    fakeplayer = buf.readUInt8(OFFSET_FAKEPLAYER);
+    xuid = view.getBigUint64(OFFSET_XUID);
+    nameRaw = blob.subarray(OFFSET_NAME, OFFSET_NAME + NAME_LENGTH);
+    userId = view.getInt32(OFFSET_USER_ID);
+    fakeplayer = view.getUint8(OFFSET_FAKEPLAYER);
   } catch {
     return undefined;
   }
@@ -201,8 +203,8 @@ function decodePlayerInfo(
   // Truncate `name` at the first null byte (Source's fixed-width string
   // convention — same shape ByteReader.readString produces).
   const nullIndex = nameRaw.indexOf(0);
-  const nameEnd = nullIndex === -1 ? NAME_LENGTH : nullIndex;
-  const name = nameRaw.toString("utf8", 0, nameEnd);
+  const nameEnd = nullIndex === -1 ? nameRaw.length : nullIndex;
+  const name = decodeUtf8(nameRaw, 0, nameEnd);
 
   const info: UserInfo = Object.freeze({
     name,

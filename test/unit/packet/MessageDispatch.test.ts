@@ -228,6 +228,6 @@ describe("MessageDispatcher", () => {
     const messages = Array.from(iterateRawMessages(stream));
     expect(messages).toHaveLength(1);
     expect(messages[0].commandType).toBe(NETMessages.net_Tick);
-    expect(messages[0].payload.equals(Buffer.from(tickPayload))).toBe(true);
+    expect(Array.from(messages[0].payload)).toEqual(Array.from(tickPayload));
   });
 });

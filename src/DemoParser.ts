@@ -83,6 +83,7 @@ import type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
 import { PositionTracker } from "./convenience/PositionTracker.js";
 import type { PositionSnapshot } from "./convenience/PositionTracker.js";
 import { GrenadeTrajectoryTracker } from "./convenience/GrenadeTrajectoryTracker.js";
+import { decodeLatin1 } from "./reader/text.js";
 
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private readonly buffer: Buffer;
@@ -1065,7 +1066,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    *     payload so power users can inspect the snapshot without needing the
    *     StringTableManager.
    */
-  private handleStringTableSnapshot(tick: number, data: Buffer): void {
+  private handleStringTableSnapshot(tick: number, data: Uint8Array): void {
     const snapshot = parseStringTableSnapshot(data);
     if (this._stringTables === undefined) {
       this._stringTables = new StringTableManager();
@@ -1438,14 +1439,13 @@ export type _StringTableEntryEventPayload = StringTableEntry;
  *
  * The payload is treated as `latin1` rather than UTF-8 because console
  * commands have always been ASCII in the engine; defaulting to `latin1`
- * avoids Buffer's UTF-8 replacement character substitution if a non-ASCII
- * byte ever sneaks through (e.g. a user-typed alias with locale-specific
- * characters).
+ * avoids UTF-8 replacement character substitution if a non-ASCII byte ever
+ * sneaks through (e.g. a user-typed alias with locale-specific characters).
  */
-function decodeConsoleCommand(data: Buffer): string {
+function decodeConsoleCommand(data: Uint8Array): string {
   if (data.length === 0) return "";
   const end = data[data.length - 1] === 0x00 ? data.length - 1 : data.length;
-  return data.toString("latin1", 0, end);
+  return decodeLatin1(data, 0, end);
 }
 
 /**

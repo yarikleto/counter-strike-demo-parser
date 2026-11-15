@@ -31,6 +31,7 @@
  * Strings are read until a 0x00 terminator; we decode them as UTF-8 (ASCII
  * is a strict subset, so this is safe for the engine's own table/key names).
  */
+import { decodeUtf8 } from "../reader/text.js";
 import { ByteReader } from "../reader/ByteReader.js";
 
 /**
@@ -67,7 +68,7 @@ export interface DecodedSnapshotEntry {
  * already been consumed). Throws `RangeError` if the buffer is truncated mid-
  * structure, matching the failure mode of the rest of the parser stack.
  */
-export function parseStringTableSnapshot(buffer: Buffer): DecodedStringTableSnapshot {
+export function parseStringTableSnapshot(buffer: Uint8Array): DecodedStringTableSnapshot {
   const reader = new ByteReader(buffer);
   const numTables = reader.readUInt8();
   const tables: DecodedSnapshotTable[] = [];
@@ -130,7 +131,7 @@ function readNullTerminatedString(reader: ByteReader): string {
   reader.position = start;
   const raw = reader.readBytes(length);
   reader.readUInt8();
-  return raw.toString("utf8");
+  return decodeUtf8(raw);
 }
 
 /** Read an unsigned 16-bit little-endian integer. ByteReader has no native

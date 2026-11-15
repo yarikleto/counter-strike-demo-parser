@@ -22,7 +22,6 @@
  *   - Decoding uses ts-proto's `Type.decode(bytes, length?)` overload. We
  *     pass the raw `Uint8Array` slice; ts-proto wraps it in its own Reader.
  */
-import type { Buffer } from "node:buffer";
 import { ByteReader } from "../reader/ByteReader.js";
 import { NETMessages, SVCMessages } from "../generated/netmessages.js";
 import {
@@ -56,7 +55,7 @@ interface ProtoDecoder<T> {
 /** A single protobuf message extracted from a packet payload. */
 export interface RawPacketMessage {
   commandType: number;
-  payload: Buffer;
+  payload: Uint8Array;
 }
 
 /**
@@ -108,7 +107,7 @@ interface DispatchEntry<K extends keyof MessageHandlers> {
  * Useful for callers that want full control over which messages to decode.
  * `MessageDispatcher.dispatch` uses this internally.
  */
-export function* iterateRawMessages(data: Buffer): Generator<RawPacketMessage> {
+export function* iterateRawMessages(data: Uint8Array): Generator<RawPacketMessage> {
   const reader = new ByteReader(data);
   while (reader.position < reader.length) {
     const commandType = reader.readVarInt32();
@@ -209,9 +208,9 @@ export class MessageDispatcher {
    * invoking the matching handler. Unknown types are skipped (their payload
    * bytes are consumed but not decoded). Returns nothing.
    */
-  dispatch(data: Buffer): void {
+  dispatch(data: Uint8Array): void {
     for (const { commandType, payload } of iterateRawMessages(data)) {
-      // The Uint8Array view shares memory with the Buffer slice — no copy.
+      // The Uint8Array view shares memory with the Uint8Array slice — no copy.
       const view = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
       const entry = MessageDispatcher.registry.get(commandType);
       if (entry === undefined) {

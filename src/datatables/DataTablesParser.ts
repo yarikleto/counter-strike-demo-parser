@@ -26,6 +26,7 @@
  *      silently ignore subsequent duplicates — this matches the behavior
  *      of demoinfocs-golang and other reference parsers.
  */
+import { decodeUtf8 } from "../reader/text.js";
 import { ByteReader } from "../reader/ByteReader.js";
 import { SVCMessages } from "../generated/netmessages.js";
 import { CSVCMsg_SendTable } from "../proto/index.js";
@@ -50,7 +51,7 @@ export interface DataTablesParseResult {
  * SendTable section, or if the class-info section runs out of bytes mid-
  * record.
  */
-export function parseDataTables(data: Buffer): DataTablesParseResult {
+export function parseDataTables(data: Uint8Array): DataTablesParseResult {
   const reader = new ByteReader(data);
   const sendTables = new SendTableRegistry();
 
@@ -154,7 +155,7 @@ function readCString(reader: ByteReader): string {
   while (reader.position < reader.length) {
     const byte = reader.readUInt8();
     if (byte === 0) {
-      return Buffer.from(bytes).toString("utf8");
+      return decodeUtf8(Uint8Array.from(bytes));
     }
     bytes.push(byte);
   }

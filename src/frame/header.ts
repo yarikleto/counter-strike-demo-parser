@@ -20,6 +20,7 @@
  * The magic value is always "HL2DEMO\0" (8 bytes including the null).
  * If it doesn't match, the file is not a valid Source engine demo.
  */
+import { decodeUtf8 } from "../reader/text.js";
 import type { ByteReader } from "../reader/ByteReader.js";
 
 /** Expected magic bytes at the start of every .dem file (8 bytes including null terminator). */
@@ -108,7 +109,7 @@ export function parseHeader(reader: ByteReader): DemoHeader {
   // Read magic as raw bytes so we can validate the null terminator too.
   // readString would strip the trailing \0, losing information.
   const magicBytes = reader.readBytes(8);
-  const magicStr = magicBytes.toString("utf8", 0, 7);
+  const magicStr = decodeUtf8(magicBytes, 0, 7);
 
   if (magicStr !== DEMO_MAGIC_PREFIX || magicBytes[7] !== 0x00) {
     throw new Error(

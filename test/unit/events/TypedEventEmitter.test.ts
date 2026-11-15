@@ -179,6 +179,49 @@ describe("TypedEventEmitter", () => {
       expect(() => emitter.emit("roundEnd", { winningTeam: "CT" })).toThrow("boom");
       expect(after).not.toHaveBeenCalled();
     });
+
+    it("off() with the original listener removes a once() registration", () => {
+      const emitter = new TypedEventEmitter<TestEvents>();
+      const listener = vi.fn();
+      emitter.once("roundEnd", listener);
+      emitter.off("roundEnd", listener);
+
+      emitter.emit("roundEnd", { winningTeam: "T" });
+      expect(listener).not.toHaveBeenCalled();
+      expect(emitter.listenerCount("roundEnd")).toBe(0);
+    });
+
+    it("listeners removed or added during emit don't affect the in-flight emit", () => {
+      const emitter = new TypedEventEmitter<TestEvents>();
+      const second = vi.fn();
+      const late = vi.fn();
+      emitter.on("roundEnd", () => {
+        emitter.off("roundEnd", second);
+        emitter.on("roundEnd", late);
+      });
+      emitter.on("roundEnd", second);
+
+      emitter.emit("roundEnd", { winningTeam: "T" });
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(late).not.toHaveBeenCalled();
+
+      emitter.emit("roundEnd", { winningTeam: "T" });
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(late).toHaveBeenCalledTimes(1);
+    });
+
+    it("removeAllListeners() without an event clears everything", () => {
+      const emitter = new TypedEventEmitter<TestEvents>();
+      emitter.on("roundEnd", vi.fn());
+      emitter.on("serverInfo", vi.fn());
+      emitter.removeAllListeners();
+      expect(emitter.listenerCount("roundEnd") + emitter.listenerCount("serverInfo")).toBe(0);
+    });
+
+    it("works without Node's EventEmitter (no inherited Node API)", () => {
+      const emitter = new TypedEventEmitter<TestEvents>();
+      expect("setMaxListeners" in emitter).toBe(false);
+    });
   });
 
   describe("type-level checks (compile-time)", () => {

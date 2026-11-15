@@ -52,20 +52,20 @@ export interface FrameHeader {
  */
 export interface Frame extends FrameHeader {
   /** Raw protobuf message stream for packet frames, undefined otherwise. */
-  packetData: Buffer | undefined;
+  packetData: Uint8Array | undefined;
   /** Raw payload of a dem_datatables frame, undefined otherwise. */
-  dataTablesData: Buffer | undefined;
+  dataTablesData: Uint8Array | undefined;
   /** Raw ASCII payload of a dem_consolecmd frame, undefined otherwise. */
-  consoleCmdData: Buffer | undefined;
+  consoleCmdData: Uint8Array | undefined;
   /** Raw byte-level payload of a dem_stringtables snapshot frame, undefined
    * otherwise. Decode with `parseStringTableSnapshot`. */
-  stringTablesData: Buffer | undefined;
+  stringTablesData: Uint8Array | undefined;
   /** Outgoing sequence number + raw command-encoding blob for a dem_usercmd
    * frame, undefined otherwise. */
-  userCmdData: { sequence: number; data: Buffer } | undefined;
+  userCmdData: { sequence: number; data: Uint8Array } | undefined;
   /** Type discriminator + raw plugin-defined payload for a dem_customdata
    * frame, undefined otherwise. */
-  customData: { type: number; data: Buffer } | undefined;
+  customData: { type: number; data: Uint8Array } | undefined;
 }
 
 /**
