@@ -57,10 +57,12 @@ import type { BitReader } from "../reader/BitReader.js";
 import type { StringTable, StringTableEntry } from "./StringTable.js";
 
 /** Maximum entries kept in the recent-history ring for prefix references.
- * Source's HISTORY_BITS is 5 (so the index field can address up to 32),
- * but the ring is capped at 31 in practice — demoinfocs's
- * `processStringTable` keeps `len(hist) <= 31` by trimming when it exceeds. */
-const HISTORY_SIZE = 31;
+ * Source's `CNetworkStringTable::ParseUpdate` drops the oldest entry only
+ * once the ring holds MORE than 31, then appends — so a full ring holds 32
+ * entries, exactly what the 5-bit history index addresses. Capping at 31
+ * shifts every reference by one once the ring is full (verified: 495 of
+ * 843 modelprecache paths decoded garbled on de_nuke.dem). */
+const HISTORY_SIZE = 32;
 /** Bits used for the recent-history index in a prefix-reference entry. */
 const HISTORY_BITS = 5;
 /** Bits used for the prefix-byte-count in a prefix-reference entry. */

@@ -181,6 +181,44 @@ describe("parseStringTableEntries — history-prefix mode", () => {
     expect(table.getByIndex(0)?.key).toBe("model_player_terror");
     expect(table.getByIndex(1)?.key).toBe("model_player_ct");
   });
+
+  it("keeps 32 history entries so index 31 addresses the oldest one", () => {
+    // Regression: the ring used to be capped at 31, which shifted every
+    // reference by one once the ring filled up and garbled modelprecache
+    // paths (e.g. "ied_dropped.mdlpist_fraggrenade_dropped.mdl").
+    const writer = new BitWriter();
+    for (let i = 0; i < 33; i++) {
+      writer.writeBit(i === 0 ? 0 : 1); // absolute index 0, then sequential
+      if (i === 0) writer.writeBits(0, 7);
+      writer.writeBit(1); // has-string
+      writer.writeBit(0); // direct
+      writer.writeNullTerminatedString(`models/entry_${i}.mdl`);
+      writer.writeBit(0); // no userdata
+    }
+    // Entry 33: copy "models/entry_" (13 bytes) from history slot 31 — after
+    // 33 pushes into a 32-entry ring that is entry 32.
+    writer.writeBit(1);
+    writer.writeBit(1); // has-string
+    writer.writeBit(1); // history mode
+    writer.writeBits(31, 5);
+    writer.writeBits(16, 5); // "models/entry_32."
+    writer.writeNullTerminatedString("vmt");
+    writer.writeBit(0);
+    // Entry 34: slot 0 is the oldest surviving entry — entry 2.
+    writer.writeBit(1);
+    writer.writeBit(1);
+    writer.writeBit(1);
+    writer.writeBits(0, 5);
+    writer.writeBits(15, 5); // "models/entry_2."
+    writer.writeNullTerminatedString("vmt");
+    writer.writeBit(0);
+
+    const reader = new BitReader(writer.toUint8Array());
+    const table = makeTable({ maxEntries: 128 });
+    parseStringTableEntries(reader, table, 35);
+    expect(table.getByIndex(33)?.key).toBe("models/entry_32.vmt");
+    expect(table.getByIndex(34)?.key).toBe("models/entry_2.vmt");
+  });
 });
 
 describe("parseStringTableEntries — fixed-size user data", () => {
