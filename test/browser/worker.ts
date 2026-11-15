@@ -3,7 +3,13 @@
  * README's worker example. Imports the package by name, so resolution goes
  * through package.json "exports" with the "browser" condition.
  */
-import { hitBuffers, parseDemo, positionBuffers, shotBuffers } from "counter-strike-demo-parser";
+import {
+  hitBuffers,
+  parseDemo,
+  positionBuffers,
+  shotBuffers,
+  voiceBuffers,
+} from "counter-strike-demo-parser";
 
 let controller: AbortController | undefined;
 
@@ -21,6 +27,7 @@ self.onmessage = async (event: MessageEvent) => {
     const result = await parseDemo(bytes, {
       collectPlayerPositions: true,
       positionSampleRateTicks: 8,
+      collectVoice: true,
       signal: controller.signal,
       onProgress: (p) => self.postMessage({ type: "progress", fraction: p.fraction }),
     });
@@ -29,13 +36,17 @@ self.onmessage = async (event: MessageEvent) => {
       ...positionBuffers(result.positions!),
       ...shotBuffers(result.shots),
       ...hitBuffers(result.hits),
+      ...voiceBuffers(result.voice!),
     ];
     self.postMessage({ type: "done", result, fetchedMs, parseMs }, { transfer });
     // After a transfer the worker's copies are detached (zero-copy hand-off).
     self.postMessage({
       type: "detached",
       byteLength:
-        result.positions!.x.byteLength + result.shots.x.byteLength + result.hits.victimX.byteLength,
+        result.positions!.x.byteLength +
+        result.shots.x.byteLength +
+        result.hits.victimX.byteLength +
+        result.voice!.data.byteLength,
     });
   } catch (err) {
     self.postMessage({ type: "error", name: (err as Error).name, message: String(err) });

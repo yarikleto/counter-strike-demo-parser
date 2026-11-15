@@ -20,6 +20,8 @@ interface Summary {
   positionRows?: number;
   shots?: number;
   hits?: number;
+  voiceMessages?: number;
+  voiceBytes?: number;
   workerBytesAfterTransfer?: number;
   receivedTypedArray?: boolean;
 }
@@ -50,11 +52,14 @@ worker.onmessage = (event: MessageEvent) => {
       positionRows: result.positions!.length,
       shots: result.shots.length,
       hits: result.hits.length,
+      voiceMessages: result.voice!.length,
+      voiceBytes: result.voice!.data.length,
       receivedTypedArray:
         result.positions!.x instanceof Float32Array &&
         result.shots.x instanceof Float32Array &&
         result.shots.x.length === result.shots.length &&
-        result.hits.victimX instanceof Float32Array,
+        result.hits.victimX instanceof Float32Array &&
+        result.voice!.data instanceof Uint8Array,
     });
   } else if (msg.type === "detached") {
     summary.workerBytesAfterTransfer = msg.byteLength;

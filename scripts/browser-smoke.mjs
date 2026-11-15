@@ -8,9 +8,9 @@
  *      "counter-strike-demo-parser" by name) with Vite.
  *   2. Serves it with `vite preview`, plus the demo file at /demo.dem.
  *   3. Runs installed Google Chrome (headless) through playwright-core.
- *   4. Checks the worker's rounds / kills / grenades / shots / hits against a
- *      Node parse of the same file, that positions, shots and hits arrived as
- *      transferred typed arrays,
+ *   4. Checks the worker's rounds / kills / grenades / shots / hits / voice
+ *      against a Node parse of the same file, that positions, shots, hits and
+ *      voice arrived as transferred typed arrays,
  *      and that cancelling mid-parse rejects with AbortError.
  *   5. Reports fetch + parse time and the peak RSS of the page's renderer
  *      process (which hosts the worker), sampled every 100 ms.
@@ -54,7 +54,7 @@ if (!existsSync(link)) symlinkSync(repo, link, "dir");
 
 // Expected values from the Node build.
 const { parseDemo } = await import(join(repo, "dist", "index.js"));
-const expected = await parseDemo(demoPath);
+const expected = await parseDemo(demoPath, { collectVoice: true });
 
 const outDir = mkdtempSync(join(tmpdir(), "csdp-browser-"));
 const serveDemo = {
@@ -147,8 +147,12 @@ try {
   );
   check(`shots ${s.shots} === ${expected.shots.length}`, s.shots === expected.shots.length);
   check(`hits ${s.hits} === ${expected.hits.length}`, s.hits === expected.hits.length);
+  check(
+    `voice ${s.voiceMessages}/${s.voiceBytes} B === ${expected.voice.length}/${expected.voice.data.length} B`,
+    s.voiceMessages === expected.voice.length && s.voiceBytes === expected.voice.data.length,
+  );
   check("progress reported", s.progressMessages > 1);
-  check("positions, shots and hits arrived as Float32Array", s.receivedTypedArray === true);
+  check("positions, shots, hits and voice arrived as typed arrays", s.receivedTypedArray === true);
   check("columns transferred, not copied", s.workerBytesAfterTransfer === 0);
 
   const cancelled = await run("?demo=/demo.dem&cancel=1");
