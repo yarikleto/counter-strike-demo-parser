@@ -1,442 +1,282 @@
 /**
  * scripts/validate-corpus.ts
  *
- * Corpus validator. Walks a directory of gzipped CS:GO `.dem.gz` files,
- * decompresses each, parses with our streaming `DemoParser`, and reports per
- * file whether the parse threw, whether any `parserError` events fired, and a
- * handful of sanity-check counts (kills / rounds / players). After the loop
- * a summary block prints aggregate stats — median / p99 parse time, total
- * `parserError` events broken down by `kind`, and the unique throw messages.
+ * Corpus validator: parses every `.dem` / `.dem.gz` in a directory with
+ * `DemoParser.parse()` (positions on) and prints a per-demo sanity report.
+ * Its job is to surface parser bugs on real demos that are not in the test
+ * corpus. It never writes to disk and prints no player names or SteamIDs,
+ * only counts and measurements.
  *
- * The validator's ONLY job is to surface bugs in the parser by running it
- * against real-world demos that are absent from the test corpus. It never
- * mutates demos and never writes to disk. Output is plain stdout.
+ * Each demo is parsed in a child process so the reported peak RSS belongs
+ * to that demo alone.
  *
- * CLI flags:
- *   --limit N       parse only the first N matching files (default 10)
- *   --map de_nuke   filter to a single map (matched against `/-(de_\\w+)-/`)
- *   --all           parse every demo in the directory (explicit opt-in)
- *
- * Selection: by default we pick a DIVERSE sample — one demo per map,
- * round-robin, until `--limit` is reached. This maximises map coverage even
- * when the limit is small (10 demos across ~7 maps).
+ * Per demo:
+ *   - parse time and peak RSS (positions sampled every --rate ticks)
+ *   - rounds vs `round_end` events (must match: a live round is never dropped)
+ *   - kills, grenade trajectories, derived throws, raw `grenade_thrown` events
+ *   - grenade coordinate sanity: share of trajectory points inside the
+ *     bounding box of all sampled player positions ± margin (XY and Z
+ *     reported separately — on vertigo grenades legitimately fall off the
+ *     building), and the median distance from each trajectory's last point
+ *     to the engine-reported detonation position
+ *   - parserError events and whether the parse threw
  *
  * Usage:
- *   npm run validate:corpus -- --limit 10
- *   npm run validate:corpus -- --map de_nuke --limit 3
- *   npm run validate:corpus -- --all   (heavy — parses everything)
- *
- * Constraints (per task brief):
- *   - Node builtins only — no new dependencies.
- *   - Read-only against `src/` — this is detective work, not feature work.
- *   - 60-second per-file timeout (Promise.race against parse).
+ *   npm run validate:corpus -- <dir> [--limit N] [--rate TICKS] [--json]
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { resolve, basename, join } from "node:path";
+import { join, basename } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { performance } from "node:perf_hooks";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-import { DemoParser } from "../src/index.js";
-import type { ParserEventMap } from "../src/index.js";
+import { DemoParser, PositionFlags } from "../src/index.js";
 
-// ---------- CLI parsing -----------------------------------------------------
+/** Margin around the player bounding box, in world units. */
+const BBOX_MARGIN = 500;
 
-interface Args {
-  readonly dir: string;
-  readonly limit: number;
-  readonly map: string | undefined;
-  readonly all: boolean;
-}
-
-function parseArgs(argv: readonly string[]): Args {
-  let dir = "/Users/yaroslavp/Downloads/DEMOS";
-  let limit = 10;
-  let map: string | undefined;
-  let all = false;
-
-  // First positional (after `node script.ts`) overrides the default dir.
-  const positionals: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === undefined) continue;
-    if (arg === "--all") {
-      all = true;
-    } else if (arg === "--limit") {
-      const next = argv[i + 1];
-      if (next === undefined) throw new Error("--limit requires a value");
-      const parsed = Number.parseInt(next, 10);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        throw new Error(`--limit must be a positive integer, got: ${next}`);
-      }
-      limit = parsed;
-      i++;
-    } else if (arg === "--map") {
-      const next = argv[i + 1];
-      if (next === undefined) throw new Error("--map requires a value");
-      map = next;
-      i++;
-    } else if (arg.startsWith("--")) {
-      throw new Error(`Unknown flag: ${arg}`);
-    } else {
-      positionals.push(arg);
-    }
-  }
-  if (positionals[0] !== undefined) dir = positionals[0];
-
-  return { dir, limit, map, all };
-}
-
-// ---------- File selection --------------------------------------------------
-
-interface CorpusFile {
-  readonly path: string;
-  readonly name: string;
-  readonly map: string;
-  readonly sizeBytes: number;
-}
-
-const MAP_REGEX = /-(de_\w+)-/;
-
-function listCorpus(dir: string): CorpusFile[] {
-  const entries = readdirSync(dir).filter((n) => n.endsWith(".dem.gz"));
-  entries.sort();
-  const out: CorpusFile[] = [];
-  for (const name of entries) {
-    const match = MAP_REGEX.exec(name);
-    if (match === null) continue;
-    const mapName = match[1];
-    if (mapName === undefined) continue;
-    const full = join(dir, name);
-    const st = statSync(full);
-    out.push({ path: full, name, map: mapName, sizeBytes: st.size });
-  }
-  return out;
-}
-
-/**
- * Round-robin one-per-map selection. Walks the sorted file list, taking the
- * first unseen map each pass until `limit` files are accumulated. This gives
- * the broadest map coverage for a small `limit`.
- */
-function selectDiverseSample(files: readonly CorpusFile[], limit: number): CorpusFile[] {
-  const byMap = new Map<string, CorpusFile[]>();
-  for (const f of files) {
-    const bucket = byMap.get(f.map);
-    if (bucket === undefined) byMap.set(f.map, [f]);
-    else bucket.push(f);
-  }
-  const maps = [...byMap.keys()].sort();
-  const picked: CorpusFile[] = [];
-  let pass = 0;
-  while (picked.length < limit) {
-    let progressed = false;
-    for (const m of maps) {
-      const bucket = byMap.get(m);
-      if (bucket === undefined) continue;
-      const f = bucket[pass];
-      if (f === undefined) continue;
-      picked.push(f);
-      progressed = true;
-      if (picked.length >= limit) break;
-    }
-    if (!progressed) break;
-    pass++;
-  }
-  return picked;
-}
-
-// ---------- Per-file parse --------------------------------------------------
-
-interface FileResult {
-  readonly name: string;
+interface Report {
+  readonly file: string;
   readonly map: string;
   readonly sizeMb: number;
-  readonly decompressedMb: number;
-  readonly parseDurationMs: number;
-  readonly threw: boolean;
-  readonly throwMessage: string | undefined;
-  readonly timedOut: boolean;
-  readonly parserErrorCount: number;
-  readonly parserErrorKinds: readonly {
-    readonly kind: ParserErrorKind;
-    readonly message: string;
-  }[];
-  readonly killsCount: number;
-  readonly roundsCount: number;
-  readonly playersCount: number;
+  readonly parseMs: number;
+  readonly peakRssMb: number;
+  readonly threw: string | undefined;
+  readonly parserErrors: number;
+  readonly roundEndEvents: number;
+  readonly rounds: number;
+  readonly kills: number;
+  readonly trajectories: number;
+  readonly throws: number;
+  readonly grenadeThrownEvents: number;
+  readonly effects: number;
+  readonly bombEvents: number;
+  readonly positionRows: number;
+  readonly pointsInBoxXY: number;
+  readonly pointsInBoxZ: number;
+  readonly detonationDistanceMedian: number;
 }
 
-type ParserErrorPayload = ParserEventMap["parserError"];
-type ParserErrorKind = ParserErrorPayload["kind"];
+// ---------- child: parse one demo ------------------------------------------
 
-const PARSE_TIMEOUT_MS = 60_000;
+async function parseOne(path: string, rate: number): Promise<Report> {
+  const raw = readFileSync(path);
+  const bytes = path.endsWith(".gz") ? gunzipSync(raw) : raw;
 
-/**
- * Parse a single demo with a hard wall-clock timeout. The parser itself is
- * synchronous, so the "timeout" is really a post-hoc check — `parseAll()`
- * runs to completion, then we compare elapsed against the budget. We also
- * race a `setTimeout`-based promise so a hypothetical infinite loop in the
- * parser doesn't hang the validator (the timer fires, we abort, the
- * underlying microtask leaks but the script exits).
- */
-async function parseOne(file: CorpusFile): Promise<FileResult> {
-  const sizeMb = file.sizeBytes / (1024 * 1024);
-
-  let decompressed: Buffer;
+  // Measured parse: exactly what an application would run.
+  const t0 = performance.now();
+  let threw: string | undefined;
+  let result: Awaited<ReturnType<typeof DemoParser.parse>> | undefined;
   try {
-    const raw = readFileSync(file.path);
-    decompressed = gunzipSync(raw);
+    result = await DemoParser.parse(bytes, {
+      collectPlayerPositions: true,
+      positionSampleRateTicks: rate,
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      name: file.name,
-      map: file.map,
-      sizeMb,
-      decompressedMb: 0,
-      parseDurationMs: 0,
-      threw: true,
-      throwMessage: `decompress failed: ${message}`,
-      timedOut: false,
-      parserErrorCount: 0,
-      parserErrorKinds: [],
-      killsCount: 0,
-      roundsCount: 0,
-      playersCount: 0,
-    };
+    threw = err instanceof Error ? err.message : String(err);
+  }
+  const parseMs = performance.now() - t0;
+  const peakRssMb = process.resourceUsage().maxRSS / 1024;
+
+  if (result === undefined) {
+    return emptyReport(path, bytes.length, parseMs, peakRssMb, threw);
   }
 
-  const decompressedMb = decompressed.length / (1024 * 1024);
-
-  const parseTask = async (): Promise<{
-    readonly result: FileResult;
-  }> => {
-    const parser = DemoParser.fromBuffer(decompressed);
-    const errors: ParserErrorPayload[] = [];
-    parser.on("parserError", (e) => {
-      errors.push(e);
-    });
-
-    let kills = 0;
-    let rounds = 0;
-    parser.on("player_death", () => {
-      kills++;
-    });
-    parser.on("round_end", () => {
-      rounds++;
-    });
-
-    const t0 = performance.now();
-    let threw = false;
-    let throwMessage: string | undefined;
-    try {
-      parser.parseAll();
-    } catch (err) {
-      threw = true;
-      throwMessage = err instanceof Error ? err.message : String(err);
-    }
-    const t1 = performance.now();
-
-    const playersCount = parser.players.length;
-
-    const kinds = errors.slice(0, 3).map((e) => ({
-      kind: e.kind,
-      message: e.message,
-    }));
-
-    return {
-      result: {
-        name: file.name,
-        map: file.map,
-        sizeMb,
-        decompressedMb,
-        parseDurationMs: t1 - t0,
-        threw,
-        throwMessage,
-        timedOut: false,
-        parserErrorCount: errors.length,
-        parserErrorKinds: kinds,
-        killsCount: kills,
-        roundsCount: rounds,
-        playersCount,
-      },
-    };
-  };
-
-  const timeoutTask = new Promise<{ readonly timedOut: true }>((resolveT) => {
-    setTimeout(() => resolveT({ timedOut: true }), PARSE_TIMEOUT_MS).unref();
+  // Second, unmeasured pass for raw counts that DemoResult doesn't carry.
+  let roundEndEvents = 0;
+  let grenadeThrownEvents = 0;
+  let parserErrors = 0;
+  const counter = DemoParser.fromBuffer(bytes);
+  counter.on("gameEvent", (e) => {
+    if (e.name === "round_end") roundEndEvents++;
+    else if (e.name === "grenade_thrown") grenadeThrownEvents++;
   });
+  counter.on("parserError", () => parserErrors++);
+  counter.parseAll();
 
-  const winner = await Promise.race([parseTask(), timeoutTask]);
-
-  if ("timedOut" in winner) {
-    return {
-      name: file.name,
-      map: file.map,
-      sizeMb,
-      decompressedMb,
-      parseDurationMs: PARSE_TIMEOUT_MS,
-      threw: false,
-      throwMessage: undefined,
-      timedOut: true,
-      parserErrorCount: 0,
-      parserErrorKinds: [],
-      killsCount: 0,
-      roundsCount: 0,
-      playersCount: 0,
-    };
+  // Bounding box of alive players' sampled positions.
+  const pos = result.positions!;
+  const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < pos.length; i++) {
+    if ((pos.flags[i]! & PositionFlags.Alive) === 0) continue;
+    box.minX = Math.min(box.minX, pos.x[i]!);
+    box.maxX = Math.max(box.maxX, pos.x[i]!);
+    box.minY = Math.min(box.minY, pos.y[i]!);
+    box.maxY = Math.max(box.maxY, pos.y[i]!);
+    minZ = Math.min(minZ, pos.z[i]!);
+    maxZ = Math.max(maxZ, pos.z[i]!);
   }
-  return winner.result;
-}
-
-// ---------- Reporting ------------------------------------------------------
-
-function pad(s: string, n: number): string {
-  if (s.length >= n) return s.slice(0, n);
-  return s + " ".repeat(n - s.length);
-}
-function padLeft(s: string, n: number): string {
-  if (s.length >= n) return s.slice(0, n);
-  return " ".repeat(n - s.length) + s;
-}
-
-function formatTable(rows: readonly FileResult[]): string {
-  const header = [
-    pad("file", 64),
-    padLeft("map", 11),
-    padLeft("gzMB", 7),
-    padLeft("rawMB", 7),
-    padLeft("ms", 8),
-    padLeft("threw", 6),
-    padLeft("pErr", 5),
-    padLeft("kills", 6),
-    padLeft("rounds", 7),
-    padLeft("players", 8),
-  ].join("  ");
-  const sep = "-".repeat(header.length);
-  const lines: string[] = [header, sep];
-  for (const r of rows) {
-    const threwStr = r.threw ? "YES" : r.timedOut ? "TIMEOUT" : "no";
-    lines.push(
-      [
-        pad(r.name, 64),
-        padLeft(r.map, 11),
-        padLeft(r.sizeMb.toFixed(1), 7),
-        padLeft(r.decompressedMb.toFixed(1), 7),
-        padLeft(r.parseDurationMs.toFixed(0), 8),
-        padLeft(threwStr, 6),
-        padLeft(String(r.parserErrorCount), 5),
-        padLeft(String(r.killsCount), 6),
-        padLeft(String(r.roundsCount), 7),
-        padLeft(String(r.playersCount), 8),
-      ].join("  "),
-    );
-  }
-  return lines.join("\n");
-}
-
-function percentile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx] ?? 0;
-}
-
-function summarise(results: readonly FileResult[]): string {
-  const total = results.length;
-  const threw = results.filter((r) => r.threw).length;
-  const timedOut = results.filter((r) => r.timedOut).length;
-  const withParserErrors = results.filter((r) => r.parserErrorCount > 0).length;
-
-  const durations = results
-    .filter((r) => !r.threw && !r.timedOut)
-    .map((r) => r.parseDurationMs)
-    .sort((a, b) => a - b);
-  const median = percentile(durations, 50);
-  const p99 = percentile(durations, 99);
-
-  const totalParserEvents = results.reduce((sum, r) => sum + r.parserErrorCount, 0);
-
-  const kindCounts = new Map<ParserErrorKind, number>();
-  for (const r of results) {
-    for (const k of r.parserErrorKinds) {
-      kindCounts.set(k.kind, (kindCounts.get(k.kind) ?? 0) + 1);
+  let points = 0;
+  let inXY = 0;
+  let inZ = 0;
+  const distances: number[] = [];
+  for (const t of result.grenadeTrajectories) {
+    for (const p of t.trajectory) {
+      points++;
+      if (
+        p.x >= box.minX - BBOX_MARGIN &&
+        p.x <= box.maxX + BBOX_MARGIN &&
+        p.y >= box.minY - BBOX_MARGIN &&
+        p.y <= box.maxY + BBOX_MARGIN
+      ) {
+        inXY++;
+      }
+      if (p.z >= minZ - BBOX_MARGIN && p.z <= maxZ + BBOX_MARGIN) inZ++;
+    }
+    const last = t.trajectory[t.trajectory.length - 1];
+    const det = t.detonationPosition;
+    if (last !== undefined && det !== undefined) {
+      distances.push(Math.hypot(last.x - det.x, last.y - det.y, last.z - det.z));
     }
   }
+  distances.sort((a, b) => a - b);
 
-  const uniqueThrows = new Set<string>();
-  for (const r of results) {
-    if (r.throwMessage !== undefined) uniqueThrows.add(r.throwMessage);
-  }
-
-  const lines: string[] = [];
-  lines.push("");
-  lines.push("=== Summary ===");
-  lines.push(`files parsed:        ${total}`);
-  lines.push(`threw exceptions:    ${threw}`);
-  lines.push(`timed out (>60s):    ${timedOut}`);
-  lines.push(`had parserError:     ${withParserErrors}`);
-  lines.push(`total parserError events seen: ${totalParserEvents}`);
-  lines.push(`median parse ms:     ${median.toFixed(0)}`);
-  lines.push(`p99 parse ms:        ${p99.toFixed(0)}`);
-  lines.push("");
-  lines.push("parserError breakdown by kind (first 3 per file sampled):");
-  if (kindCounts.size === 0) {
-    lines.push("  (none)");
-  } else {
-    for (const [kind, count] of kindCounts) {
-      lines.push(`  ${kind}: ${count}`);
-    }
-  }
-  lines.push("");
-  lines.push("unique thrown error messages:");
-  if (uniqueThrows.size === 0) {
-    lines.push("  (none)");
-  } else {
-    for (const msg of uniqueThrows) lines.push(`  - ${msg}`);
-  }
-  return lines.join("\n");
+  return {
+    file: basename(path),
+    map: result.header.mapName,
+    sizeMb: bytes.length / 1_048_576,
+    parseMs,
+    peakRssMb,
+    threw,
+    parserErrors,
+    roundEndEvents,
+    rounds: result.rounds.length,
+    kills: result.kills.length,
+    trajectories: result.grenadeTrajectories.length,
+    throws: result.grenades.length,
+    grenadeThrownEvents,
+    effects: result.grenadeEffects.length,
+    bombEvents: result.bomb.length,
+    positionRows: pos.length,
+    pointsInBoxXY: points === 0 ? 1 : inXY / points,
+    pointsInBoxZ: points === 0 ? 1 : inZ / points,
+    detonationDistanceMedian: distances[distances.length >> 1] ?? NaN,
+  };
 }
 
-// ---------- Main -----------------------------------------------------------
+function emptyReport(
+  path: string,
+  size: number,
+  parseMs: number,
+  peakRssMb: number,
+  threw: string | undefined,
+): Report {
+  return {
+    file: basename(path),
+    map: "?",
+    sizeMb: size / 1_048_576,
+    parseMs,
+    peakRssMb,
+    threw,
+    parserErrors: 0,
+    roundEndEvents: 0,
+    rounds: 0,
+    kills: 0,
+    trajectories: 0,
+    throws: 0,
+    grenadeThrownEvents: 0,
+    effects: 0,
+    bombEvents: 0,
+    positionRows: 0,
+    pointsInBoxXY: 0,
+    pointsInBoxZ: 0,
+    detonationDistanceMedian: NaN,
+  };
+}
+
+// ---------- parent: walk the directory --------------------------------------
+
+function parseArgs(argv: readonly string[]) {
+  let dir: string | undefined;
+  let limit = Infinity;
+  let rate = 8;
+  let json = false;
+  let one: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--limit") limit = Number(argv[++i]);
+    else if (arg === "--rate") rate = Number(argv[++i]);
+    else if (arg === "--json") json = true;
+    else if (arg === "--one") one = argv[++i];
+    else if (arg.startsWith("--")) throw new Error(`Unknown flag: ${arg}`);
+    else dir = arg;
+  }
+  return { dir, limit, rate, json, one };
+}
+
+function table(reports: readonly Report[]): string {
+  const cols: [string, (r: Report) => string][] = [
+    ["map", (r) => r.map],
+    ["MB", (r) => r.sizeMb.toFixed(0)],
+    ["parse s", (r) => (r.parseMs / 1000).toFixed(2)],
+    ["RSS MB", (r) => r.peakRssMb.toFixed(0)],
+    ["round_end", (r) => String(r.roundEndEvents)],
+    ["rounds", (r) => String(r.rounds) + (r.rounds === r.roundEndEvents ? "" : " (!)")],
+    ["kills", (r) => String(r.kills)],
+    ["traj", (r) => String(r.trajectories)],
+    ["throws", (r) => String(r.throws)],
+    ["g_thrown", (r) => String(r.grenadeThrownEvents)],
+    ["effects", (r) => String(r.effects)],
+    ["bomb", (r) => String(r.bombEvents)],
+    ["pos rows", (r) => String(r.positionRows)],
+    ["inBox XY", (r) => `${(r.pointsInBoxXY * 100).toFixed(1)}%`],
+    ["inBox Z", (r) => `${(r.pointsInBoxZ * 100).toFixed(1)}%`],
+    ["det dist", (r) => r.detonationDistanceMedian.toFixed(2)],
+    ["pErr", (r) => String(r.parserErrors)],
+    ["threw", (r) => (r.threw === undefined ? "no" : "YES")],
+  ];
+  const rows = [cols.map(([h]) => h), ...reports.map((r) => cols.map(([, f]) => f(r)))];
+  const widths = cols.map((_, c) => Math.max(...rows.map((row) => row[c]!.length)));
+  return rows
+    .map((row, i) => {
+      const line = row.map((cell, c) => cell.padStart(widths[c]!)).join("  ");
+      return i === 0 ? `${line}\n${"-".repeat(line.length)}` : line;
+    })
+    .join("\n");
+}
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const dir = resolve(args.dir);
-  process.stdout.write(`corpus dir: ${dir}\n`);
-
-  const all = listCorpus(dir);
-  process.stdout.write(`found ${all.length} .dem.gz files\n`);
-
-  const filtered = args.map === undefined ? all : all.filter((f) => f.map === args.map);
-  if (args.map !== undefined) {
-    process.stdout.write(`filtered to map=${args.map}: ${filtered.length} files\n`);
+  if (args.one !== undefined) {
+    process.stdout.write(JSON.stringify(await parseOne(args.one, args.rate)));
+    return;
   }
+  if (args.dir === undefined) {
+    throw new Error("usage: validate-corpus <dir> [--limit N] [--rate TICKS] [--json]");
+  }
+  const dir = args.dir;
+  const files = readdirSync(dir)
+    .filter((n) => n.endsWith(".dem") || n.endsWith(".dem.gz"))
+    .filter((n) => statSync(join(dir, n)).isFile())
+    .sort()
+    .slice(0, args.limit);
 
-  const picked = args.all ? filtered : selectDiverseSample(filtered, args.limit);
-  process.stdout.write(`parsing ${picked.length} files\n\n`);
-  for (const f of picked) process.stdout.write(`  - ${basename(f.name)}\n`);
-  process.stdout.write("\n");
-
-  const results: FileResult[] = [];
-  for (const f of picked) {
-    process.stdout.write(`[parse] ${f.name} ... `);
-    const result = await parseOne(f);
-    const status = result.threw ? "THREW" : result.timedOut ? "TIMEOUT" : "ok";
-    process.stdout.write(
-      `${status} ${result.parseDurationMs.toFixed(0)}ms parserErrors=${result.parserErrorCount}\n`,
+  const self = fileURLToPath(import.meta.url);
+  const reports: Report[] = [];
+  for (const name of files) {
+    process.stderr.write(`parsing ${name}...\n`);
+    const out = execFileSync(
+      process.execPath,
+      ["--import", "tsx", self, "--one", join(dir, name), "--rate", String(args.rate)],
+      { maxBuffer: 1 << 20 },
     );
-    results.push(result);
+    reports.push(JSON.parse(out.toString()) as Report);
   }
 
-  process.stdout.write("\n");
-  process.stdout.write(formatTable(results));
-  process.stdout.write("\n");
-  process.stdout.write(summarise(results));
-  process.stdout.write("\n");
+  if (args.json) {
+    process.stdout.write(JSON.stringify(reports, null, 2) + "\n");
+    return;
+  }
+  console.log(table(reports));
+  const bad = reports.filter((r) => r.threw !== undefined || r.rounds !== r.roundEndEvents);
+  console.log(
+    `\n${reports.length} demo(s); ${bad.length} with a throw or a rounds/round_end mismatch.` +
+      ` Positions sampled every ${args.rate} ticks; bounding-box margin ${BBOX_MARGIN} units.`,
+  );
+  if (bad.length > 0) process.exitCode = 1;
 }
 
-main().catch((err) => {
-  process.stderr.write(
-    `fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
-  );
-  process.exit(1);
-});
+await main();
