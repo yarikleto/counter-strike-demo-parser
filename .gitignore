@@ -49,3 +49,5 @@ bench/results-*.json
 
 # demoinfocs-golang cross-validation export (per-run output)
 bench/demoinfocs-export.json
+# CodeGraph local index
+.codegraph/
