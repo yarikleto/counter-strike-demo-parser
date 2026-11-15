@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Pre-1.0 caveat: minor versions may include breaking API changes while the
 public surface stabilises.
 
+## [0.4.0] — 2026-11-15
+
+### Added
+- `ParseOptions.collectVoice` (default `false`) and `DemoResult.voice`:
+  every `CSVCMsg_VoiceData` message as typed-array columns — tick, speaker
+  (`player`, a roster index, or `NO_PLAYER`), `format`, `flags`
+  (`VoiceFlags.Proximity` / `Caster`), `sectionNumber`, `sequenceBytes`,
+  `sampleOffset` (the speaker's sample clock), `offset` / `size` — plus all
+  payloads concatenated in one `Uint8Array`. The codec from `svc_VoiceInit`
+  (`codec`, `quality`, `version`) and its frame geometry (`sampleRate`,
+  `frameSamples`, `frameBytes`: 22050 / 512 / 64 for `vaudio_celt`) come
+  with it. Nothing is decoded; the README documents the frame layout for a
+  decoder.
+- `voiceBuffers()` (transfer list) and `voiceFrame(voice, i)` (row payload),
+  `VoiceFlags`, `VoiceFormat` and the `PlayerVoice` type.
+- Streaming `voiceInit` event (`codec`, `quality`, `version`), decoded from
+  `svc_VoiceInit`.
+- The `voiceData` event now also carries `client`, `xuid`, `caster`,
+  `audibleMask`, `sequenceBytes`, `sectionNumber` and
+  `uncompressedSampleOffset`.
+- `npm run validate:corpus -- <dir> --voice` reports voice messages, bytes,
+  speakers, formats, frame sizes, frames per second and lost frames;
+  `npm run bench -- --collect-voice` benchmarks with voice on.
+
+Speakers resolve by client slot when the slot's userinfo has the message's
+SteamID, and by SteamID otherwise, so reconnecting players keep their roster
+index. On six real 74–149 MB matches voice is 36–70k messages and 2.7–5.4 MB
+of payload from 10–20 speakers, all `vaudio_celt`, with every speaker
+resolved.
+
+### Changed
+- `svc_VoiceInit` (command 14) is now decoded, so it no longer reaches the
+  `unknownMessage` event.
+- With `collectVoice`, players who only spoke (for example spectators) are
+  added to `DemoResult.players`, which can shift later roster indices.
+- The `voiceData` handler does no work when nothing listens to it.
+
+### Performance
+- `npm run bench` (Apple M5, Node 26, 10 runs, median): the default parse is
+  unchanged (80 MB `de_nuke` fixture 606 → 606 ms; 74 MB club `de_nuke`
+  532 → 534 ms). With `collectVoice`: 608 ms (+0.3 %, 25k messages) and
+  549 ms (+2.9 %, 41k messages, 3 MB).
+
 ## [0.3.0] — 2026-11-15
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "counter-strike-demo-parser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "TypeScript library for parsing CS:GO .dem files. Streaming event-emitter architecture, fully typed, minimal dependencies.",
   "author": "Yaroslav Pakhaliuk",
   "license": "MIT",

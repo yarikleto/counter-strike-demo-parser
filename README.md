@@ -25,6 +25,8 @@ included), ESM-first with CJS dual export, no native dependencies.
 - Replay-ready: columnar player positions (with view angles, health, armor,
   money, active weapon), every shot and hit, grenade throws, trajectories and
   effects, bomb events with positions and sites, all in world coordinates.
+- Opt-in voice: every player's voice packets with speaker, timing and the
+  raw CELT frames, ready for a decoder.
 - Progress reporting and cancellation (`onProgress`, `AbortSignal`).
 - Bit-identical to [`demoinfocs-golang`](https://github.com/markus-wa/demoinfocs-golang)
   on the cross-validated kill stream (337/337 kills on the `de_nuke` fixture).
@@ -66,7 +68,13 @@ so run it in a worker. The worker below is the one the browser smoke test
 
 ```typescript
 // demo-worker.ts
-import { hitBuffers, parseDemo, positionBuffers, shotBuffers } from "counter-strike-demo-parser";
+import {
+  hitBuffers,
+  parseDemo,
+  positionBuffers,
+  shotBuffers,
+  voiceBuffers,
+} from "counter-strike-demo-parser";
 
 let controller: AbortController | undefined;
 
@@ -80,6 +88,7 @@ self.onmessage = async (event: MessageEvent) => {
     const result = await parseDemo(bytes, {
       collectPlayerPositions: true,
       positionSampleRateTicks: 8, // 16 samples/s on a 128-tick demo
+      collectVoice: true, // only if you play voice
       signal: controller.signal,
       onProgress: (p) => self.postMessage({ type: "progress", fraction: p.fraction }),
     });
@@ -88,6 +97,7 @@ self.onmessage = async (event: MessageEvent) => {
       ...positionBuffers(result.positions!),
       ...shotBuffers(result.shots),
       ...hitBuffers(result.hits),
+      ...voiceBuffers(result.voice!),
     ];
     self.postMessage({ type: "done", result }, { transfer });
   } catch (err) {
@@ -140,6 +150,7 @@ demo.chatMessages     // ChatRecord[]
 demo.shots            // columnar: every weapon_fire (gun shots, knife swings, grenade throws)
 demo.hits             // columnar: every player_hurt
 demo.positions        // opt in: collectPlayerPositions: true
+demo.voice            // opt in: collectVoice: true (columnar voice packets + raw payload bytes)
 demo.events           // opt in: includeRawEvents: true (each event has its frame tick)
 ```
 
@@ -154,6 +165,7 @@ Options:
 | `collectPlayerPositions` | `false` | Fill `demo.positions`. |
 | `positionSampleRateTicks` | `32` | Sample every N ticks. |
 | `includeRawEvents` | `false` | Keep every raw game event in `demo.events`. |
+| `collectVoice` | `false` | Fill `demo.voice` (large and private: off unless asked for). |
 | `onProgress` | – | `({ bytesParsed, totalBytes, tick, totalTicks, fraction }) => void` |
 | `signal` | – | `AbortSignal`; the promise rejects with its reason (an `AbortError`). |
 | `yieldIntervalMs` | `50` | Parse time between yields to the event loop when `onProgress` or `signal` is set. |
@@ -242,6 +254,100 @@ With `includeRawEvents`, every `DecodedGameEvent` in `demo.events` carries
 the frame `tick` it was decoded at (ticks never decrease), so raw events such
 as `round_announce_match_start` or `begin_new_match` can be placed in time.
 
+### Voice
+
+GOTV demos record players' voice when the server relays it (`tv_relayvoice
+1`, the default). With `collectVoice: true`, `demo.voice` keeps every
+`CSVCMsg_VoiceData` message: one row per message in wire order, plus all
+payloads concatenated in `voice.data`. Nothing is decoded. A talkative
+one-hour match holds 3–6 MB of payload; the default parse is unaffected and
+collecting costs up to about 3 % of parse time. `voiceBuffers()` returns the
+transfer list; `voiceFrame(voice, i)` is row `i`'s payload (a view, no copy).
+
+| Field | Type | |
+|---|---|---|
+| `codec`, `quality`, `version` | `string`, `number`, `number` | from the server's `svc_VoiceInit`: `"vaudio_celt"`, 5, 3 on CS:GO |
+| `sampleRate`, `frameSamples`, `frameBytes` | `number` | codec geometry: 22050, 512, 64 for `vaudio_celt` (0 for codecs it does not know) |
+| `tick` | `Int32Array` | frame tick the message arrived at |
+| `player` | `Uint16Array` | speaker, index into `demo.players`, or `NO_PLAYER` |
+| `format` | `Uint8Array` | `VoiceFormat.Engine` (1, every CS:GO demo seen) or `VoiceFormat.Steam` (0) |
+| `flags` | `Uint8Array` | `VoiceFlags.Proximity`, `VoiceFlags.Caster` |
+| `sectionNumber` | `Uint32Array` | the speaker's talk burst; +1 each time they press push-to-talk |
+| `sequenceBytes` | `Int32Array` | bytes the speaker sent in this section, including this message |
+| `sampleOffset` | `Uint32Array` | the speaker's sample clock at the start of this payload (`uncompressed_sample_offset`) |
+| `offset`, `size` | `Uint32Array` | where the payload sits in `data` |
+| `data` | `Uint8Array` | every payload, concatenated |
+
+The speaker comes from the message's client slot when that slot's userinfo
+has the message's SteamID, and from the SteamID otherwise, so a player who
+reconnects keeps one roster index. Enabling `collectVoice` can add players
+who only spoke (spectators) to `demo.players`.
+
+**Codec facts** (checked on seven 128-tick GOTV demos from a community
+server, 324,556 messages, about 399,000 frames; see the sources below):
+
+- `svc_VoiceInit` announces `codec "vaudio_celt"`, quality 5, version 3, and
+  every voice message has `format` 1 (`VOICEDATA_FORMAT_ENGINE`).
+- An engine-format payload is 1–5 CELT frames of exactly 64 bytes each,
+  back to back, with **no header** (73–92 % of messages hold one frame,
+  nearly all the rest two). Split it every 64 bytes and decode each frame on
+  its own.
+- Each frame decodes to 512 mono 16-bit samples at 22050 Hz (23.2 ms),
+  i.e. 43.07 frames per second of speech; measured against ticks, speakers
+  send 44 frames/s.
+- The decoder is a CELT custom mode: `celt_mode_create(22050, 512)`,
+  `celt_decoder_create_custom(mode, 1)`, `celt_decode(dec, frame, 64, pcm,
+  512)`. That is the CELT 0.9–0.11 API (CELT 0.7 has neither
+  `celt_decoder_create_custom` nor a frame-size argument); both reference
+  decoders below build against CELT 0.11 headers and call Valve's own
+  `vaudio_celt` library. Keep one decoder state per speaker: CELT frames are
+  not independent.
+- `sampleOffset` advances by 512 per frame and keeps running across talk
+  bursts at 22050 Hz, so `sampleOffset` differences place every frame and
+  every burst exactly. When it jumps by more than the previous payload's
+  frames × 512 (0.2–0.7 % of frames on real demos), packets were lost: fill
+  the gap with silence or CELT packet-loss concealment. `sequenceBytes` jumps
+  the same way.
+- `proximity` and `caster` were 0 and `audible_mask` 3 on every message.
+
+Sources: [akiver/csgo-voice-extractor](https://github.com/akiver/csgo-voice-extractor)
+(`csgo/extractor.go`: `SampleRate = 22050`, `PacketSize = 64`, `FrameSize =
+512`, and its check for `vaudio_celt` quality 5 version 3; `csgo/decoder.c`:
+the CELT calls above, 64 bytes at a time from the start of the payload) and
+[ericek111's vaudio_celt decoder gist](https://gist.github.com/ericek111/abe5829f6e52e4b25b3b97a0efd0b22b)
+(same mode, 64-byte steps, CELT 0.11.1 headers). `demoinfocs-golang` passes
+`CSVCMsg_VoiceData` through without decoding it.
+
+Playing voice in a replay and showing who is talking:
+
+```typescript
+import { NO_PLAYER, parseDemo, voiceFrame } from "counter-strike-demo-parser";
+
+const demo = await parseDemo(bytes, { collectVoice: true });
+const voice = demo.voice!;
+
+// Anchor each talk burst at the tick of its first message, then place every
+// frame by the speaker's sample clock.
+const bursts = new Map<string, { tick: number; sampleOffset: number }>();
+for (let i = 0; i < voice.length; i++) {
+  const speaker = voice.player[i];
+  if (speaker === NO_PLAYER) continue;
+  const key = `${speaker}:${voice.sectionNumber[i]}`;
+  let burst = bursts.get(key);
+  if (!burst) bursts.set(key, (burst = { tick: voice.tick[i], sampleOffset: voice.sampleOffset[i] }));
+  const startSeconds =
+    burst.tick / demo.tickRate + (voice.sampleOffset[i] - burst.sampleOffset) / voice.sampleRate;
+
+  const payload = voiceFrame(voice, i);
+  for (let f = 0; f * voice.frameBytes < payload.length; f++) {
+    const frame = payload.subarray(f * voice.frameBytes, (f + 1) * voice.frameBytes);
+    const pcm = celtDecoderFor(speaker).decode(frame); // your CELT build: 512 Int16 samples
+    schedule(speaker, startSeconds + (f * voice.frameSamples) / voice.sampleRate, pcm);
+    markSpeaking(demo.players[speaker].name, startSeconds, voice.frameSamples / voice.sampleRate);
+  }
+}
+```
+
 ### Grenades
 
 GOTV demos do not network the `grenade_thrown` game event (0 occurrences on
@@ -278,6 +384,11 @@ parser.parseAll(); // or: await parser.parseAllAsync({ onProgress, signal })
 `BombPlantedEvent`, etc.); raw game events fall back to the catch-all
 `gameEvent` channel.
 
+The streaming `voiceInit` event reports the codec and `voiceData` fires once
+per voice message with the speaker (`client`, `xuid`, `player`), the
+sequence fields above and the payload (a view into the parser's buffer:
+copy it to keep it).
+
 Standalone streaming helpers: `DamageMatrix`, `EconomyTracker` and
 `GrenadeTrajectoryTracker`. Attach one to a parser before `parseAll()`.
 Per-round indices of `DamageMatrix` and `EconomyTracker` match
@@ -296,7 +407,7 @@ toward `score`. Deciding which restart starts "the" match is up to you.
 
 ## Status
 
-`v0.2.0`. Validated on the 5v5 `de_nuke` fixture and on 128-tick GOTV demos
+`v0.4.0`. Validated on the 5v5 `de_nuke` fixture and on 128-tick GOTV demos
 of community-server matches with up to 21 players, and bit-identical to
 `demoinfocs-golang` on the kill stream of the fixture. The public API may still change before `1.0`; see the
 [changelog](./CHANGELOG.md) for breaking changes.
