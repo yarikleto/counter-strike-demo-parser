@@ -109,6 +109,8 @@ export class UserInfoIndex {
   private readonly userIdToInfo = new Map<number, UserInfo>();
   /** entitySlot -> userId (reverse lookup for enrichers that have a slot). */
   private readonly slotToUserId = new Map<number, number>();
+  /** SteamID64 (decimal) -> userId, for humans only (bots have xuid "0"). */
+  private readonly xuidToUserId = new Map<string, number>();
 
   constructor(manager: StringTableManager) {
     this.manager = manager;
@@ -124,6 +126,7 @@ export class UserInfoIndex {
     this.userIdToSlot.clear();
     this.userIdToInfo.clear();
     this.slotToUserId.clear();
+    this.xuidToUserId.clear();
 
     const table = this.manager.getByName("userinfo");
     if (table === undefined) return;
@@ -140,6 +143,7 @@ export class UserInfoIndex {
       this.userIdToSlot.set(decoded.userId, slot);
       this.slotToUserId.set(slot, decoded.userId);
       this.userIdToInfo.set(decoded.userId, decoded.info);
+      if (decoded.info.xuid !== "0") this.xuidToUserId.set(decoded.info.xuid, decoded.userId);
     }
   }
 
@@ -169,6 +173,14 @@ export class UserInfoIndex {
    */
   userIdForEntitySlot(entitySlot: number): number | undefined {
     return this.slotToUserId.get(entitySlot);
+  }
+
+  /**
+   * Find the userid currently bound to a SteamID64 (decimal string), or
+   * `undefined` if no connected human has it. Bots (xuid "0") never match.
+   */
+  userIdForXuid(xuid: string): number | undefined {
+    return this.xuidToUserId.get(xuid);
   }
 }
 

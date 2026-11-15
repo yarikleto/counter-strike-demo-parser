@@ -4,7 +4,7 @@
  *
  * `DemoResult` is the one-shot parsed representation of a demo file, made
  * of plain data only: numbers, strings, booleans, plain objects, arrays and
- * (for `positions`, `shots` and `hits`) typed arrays. It holds no references into the parser,
+ * (for `positions`, `shots`, `hits` and `voice`) typed arrays. It holds no references into the parser,
  * so it can be `postMessage`d out of a Web Worker, stored in IndexedDB, or
  * `JSON.stringify`d (typed arrays serialize as index-keyed objects; convert
  * them with `Array.from` first if you need JSON arrays).
@@ -21,6 +21,7 @@ import type { PlayerInfo } from "./PlayerRoster.js";
 import type { PlayerPositions } from "./PositionRecorder.js";
 import type { PlayerShots } from "./ShotRecorder.js";
 import type { PlayerHits } from "./HitRecorder.js";
+import type { PlayerVoice } from "./VoiceRecorder.js";
 import type { GrenadeTrajectory } from "./GrenadeTrajectoryTracker.js";
 import type {
   BombRecord,
@@ -51,6 +52,13 @@ export interface ParseOptions {
    * replay of a 128-tick demo, 8 (16 samples/s) is a good value.
    */
   positionSampleRateTicks?: number;
+  /**
+   * When `true`, every voice message is kept in the columnar
+   * `DemoResult.voice` (speaker, timing and the raw compressed payload).
+   * Defaults to `false`: voice is large (about 3 MB per hour of a
+   * talkative match) and private.
+   */
+  collectVoice?: boolean;
   /**
    * Progress callback. When this or `signal` is set, the parse runs in time
    * slices and yields to the event loop between them (see
@@ -126,4 +134,12 @@ export interface DemoResult {
   readonly events?: DecodedGameEvent[];
   /** Columnar player samples; only with `collectPlayerPositions`. */
   readonly positions?: PlayerPositions;
+  /**
+   * Every voice message as columnar typed arrays plus one byte array of
+   * the raw payloads (not decoded): tick, speaker, section / sequence /
+   * sample-clock fields and the codec's frame geometry. Only with
+   * `collectVoice`; empty (`length` 0) when the demo has no voice.
+   * Transfer with `voiceBuffers()`.
+   */
+  readonly voice?: PlayerVoice;
 }

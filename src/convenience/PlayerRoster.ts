@@ -83,7 +83,15 @@ export class PlayerRoster {
 
   /** Roster index of `player`, registering them on first sight. */
   indexOf(player: Player): number {
-    const userId = this.userInfoIndex.userIdForEntitySlot(player.slot - 1);
+    return this.indexOfSlot(player.slot);
+  }
+
+  /**
+   * Roster index of whoever holds the CCSPlayer entity id `slot` (1-based)
+   * right now, registering them on first sight.
+   */
+  indexOfSlot(slot: number): number {
+    const userId = this.userInfoIndex.userIdForEntitySlot(slot - 1);
     if (userId !== undefined) {
       const cached = this.byUserId.get(userId);
       if (cached !== undefined) return cached;
@@ -91,7 +99,7 @@ export class PlayerRoster {
     const info = userId !== undefined ? this.userInfoIndex.infoForUserId(userId) : undefined;
     const steamId = info !== undefined && info.xuid !== "0" ? info.xuid : undefined;
     const key =
-      steamId ?? (info !== undefined ? `bot:${info.name}` : `slot:${player.slot}:${userId ?? "?"}`);
+      steamId ?? (info !== undefined ? `bot:${info.name}` : `slot:${slot}:${userId ?? "?"}`);
     let index = this.byKey.get(key);
     if (index === undefined) {
       index = this.entries.length;
@@ -110,6 +118,30 @@ export class PlayerRoster {
     if (info !== undefined) entry.name = info.name;
     if (userId !== undefined) this.byUserId.set(userId, index);
     return index;
+  }
+
+  /**
+   * Roster index of a voice speaker, from the message's zero-based `client`
+   * slot and SteamID64 (`xuid`, `"0"` when absent). The slot is trusted
+   * when its userinfo agrees with the SteamID; otherwise (the speaker left
+   * or reconnected into another slot) the SteamID decides. `undefined` when
+   * neither resolves.
+   */
+  indexOfSpeaker(client: number, xuid: string): number | undefined {
+    const users = this.userInfoIndex;
+    if (client >= 0) {
+      const userId = users.userIdForEntitySlot(client);
+      const info = userId !== undefined ? users.infoForUserId(userId) : undefined;
+      if (info !== undefined && (xuid === "0" || info.xuid === xuid)) {
+        return this.indexOfSlot(client + 1);
+      }
+    }
+    if (xuid === "0") return undefined;
+    const known = this.byKey.get(xuid);
+    if (known !== undefined) return known;
+    const userId = users.userIdForXuid(xuid);
+    const slot = userId !== undefined ? users.entitySlotForUserId(userId) : undefined;
+    return slot !== undefined ? this.indexOfSlot(slot + 1) : undefined;
   }
 
   /** Capture `player` as a plain {@link PlayerRef} at the current tick. */

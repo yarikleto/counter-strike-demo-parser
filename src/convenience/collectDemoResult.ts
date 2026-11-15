@@ -14,6 +14,7 @@ import { GrenadeTrajectoryTracker } from "./GrenadeTrajectoryTracker.js";
 import { PositionRecorder } from "./PositionRecorder.js";
 import { ShotRecorder } from "./ShotRecorder.js";
 import { HitRecorder } from "./HitRecorder.js";
+import { VoiceRecorder } from "./VoiceRecorder.js";
 import { PlayerRoster } from "./PlayerRoster.js";
 import type { GrenadeThrow } from "./records.js";
 import type { MatchScore } from "./RoundTracker.js";
@@ -49,6 +50,12 @@ export async function collectDemoResult(
     const rate = options.positionSampleRateTicks ?? DEFAULT_POSITION_SAMPLE_RATE;
     positions = new PositionRecorder(rate);
     positions.attach(parser);
+  }
+
+  let voice: VoiceRecorder | undefined;
+  if (options.collectVoice === true) {
+    voice = new VoiceRecorder();
+    voice.attach(parser);
   }
 
   if (options.onProgress !== undefined || options.signal !== undefined) {
@@ -93,6 +100,7 @@ export async function collectDemoResult(
     hits: hits.snapshot(),
     events,
     positions: positions?.snapshot(),
+    voice: voice?.snapshot(),
   };
 }
 

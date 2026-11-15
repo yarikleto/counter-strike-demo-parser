@@ -5,7 +5,7 @@
  * `postMessage` transfer list).
  */
 
-type Column = Int32Array | Uint16Array | Uint8Array | Float32Array;
+type Column = Int32Array | Uint32Array | Uint16Array | Uint8Array | Float32Array;
 type ColumnConstructor = new (length: number) => Column;
 
 /** Field name → typed-array constructor. */

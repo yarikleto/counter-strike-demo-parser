@@ -10,6 +10,14 @@ export { ShotRecorder, ShotKind, ShotFlags, shotBuffers, shotKind } from "./Shot
 export type { PlayerShots } from "./ShotRecorder.js";
 export { HitRecorder, NO_PLAYER, hitBuffers } from "./HitRecorder.js";
 export type { PlayerHits } from "./HitRecorder.js";
+export {
+  VoiceRecorder,
+  VoiceFlags,
+  VoiceFormat,
+  voiceBuffers,
+  voiceFrame,
+} from "./VoiceRecorder.js";
+export type { PlayerVoice } from "./VoiceRecorder.js";
 export { GrenadeTrajectoryTracker } from "./GrenadeTrajectoryTracker.js";
 export type {
   GrenadeTrajectory,

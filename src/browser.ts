@@ -202,6 +202,8 @@ export { ShotKind, ShotFlags, shotBuffers, shotKind } from "./convenience/ShotRe
 export type { PlayerShots } from "./convenience/ShotRecorder.js";
 export { NO_PLAYER, hitBuffers } from "./convenience/HitRecorder.js";
 export type { PlayerHits } from "./convenience/HitRecorder.js";
+export { VoiceFlags, VoiceFormat, voiceBuffers, voiceFrame } from "./convenience/VoiceRecorder.js";
+export type { PlayerVoice } from "./convenience/VoiceRecorder.js";
 export { weaponNameForItemDefIndex } from "./enums/ItemDefinition.js";
 export { MAX_COORD_INTEGER, readEntityOrigin } from "./state/EntityOrigin.js";
 
