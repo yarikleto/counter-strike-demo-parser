@@ -211,6 +211,12 @@ export interface Tier3EventMap {
     readonly tick: number;
     readonly snapshot: DecodedStringTableSnapshot;
   };
+  /**
+   * Fired after each demo frame has been fully processed — all of its
+   * entity updates and game events applied. The payload is the frame tick.
+   * Use it to sample per-tick state (positions, health) consistently.
+   */
+  frameEnd: number;
   /** Emitted when an entity is created via `CSVCMsg_PacketEntities`. */
   entityCreated: Entity;
   /** Emitted when an entity is updated via `CSVCMsg_PacketEntities`. */

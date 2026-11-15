@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { MAX_PLAYER_SLOTS } from "../../src/state/PlayerResource.js";
 import { fixtureAvailable } from "./_fixture.js";
 

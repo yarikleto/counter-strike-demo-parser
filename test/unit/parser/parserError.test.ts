@@ -25,7 +25,7 @@
  * parse silently as garbage `ServerInfo` instances.
  */
 import { describe, it, expect } from "vitest";
-import { DemoParser } from "../../../src/DemoParser.js";
+import { DemoParser } from "../../../src/node.js";
 import { DemoCommands } from "../../../src/frame/DemoCommands.js";
 
 /** Header size: 8 (magic) + 4 + 4 + 260*4 + 4 + 4 + 4 + 4 = 1072 bytes. */

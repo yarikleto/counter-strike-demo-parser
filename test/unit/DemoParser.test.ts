@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { DemoCommands } from "../../src/frame/DemoCommands.js";
 
 /** Header size: 8 (magic) + 4 + 4 + 260*4 + 4 + 4 + 4 + 4 = 1072 bytes. */

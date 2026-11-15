@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
@@ -73,7 +73,7 @@ describe.skipIf(!fixtureAvailable)(
       expect(typeof firstRound.startTick).toBe("number");
       expect(typeof firstRound.endTick).toBe("number");
       expect(Array.isArray(firstRound.kills)).toBe(true);
-      expect(firstRound.players instanceof Map).toBe(true);
+      expect(Array.isArray(firstRound.players)).toBe(true);
       expect(Array.isArray(firstRound.bombEvents.plants)).toBe(true);
       expect(Array.isArray(firstRound.bombEvents.defuses)).toBe(true);
       expect(Array.isArray(firstRound.bombEvents.explosions)).toBe(true);

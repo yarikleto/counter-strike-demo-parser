@@ -24,7 +24,7 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

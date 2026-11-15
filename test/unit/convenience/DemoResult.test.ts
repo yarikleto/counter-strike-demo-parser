@@ -1,77 +1,78 @@
 /**
  * Compile-time type-shape test for DemoResult and ParseOptions.
  *
- * There is no runtime behaviour to exercise here — the interfaces are
- * pure types. We use the `satisfies` operator to verify that a hand-built
- * object matches the expected shape. If any field is missing, has the wrong
- * type, or the imports break, this file will fail to compile and the test
- * suite will catch it.
+ * The interfaces are pure types. We use the `satisfies` operator to verify
+ * that a hand-built object matches the expected shape; if a field is
+ * missing, has the wrong type, or the imports break, this file fails to
+ * compile and the test suite catches it. Runtime plain-data guarantees
+ * (structuredClone / JSON) are checked in test/integration/parse-api.test.ts.
  */
 
 import { describe, it, expect } from "vitest";
 import type { DemoResult, ParseOptions } from "../../../src/convenience/DemoResult.js";
 import type { RoundSummary } from "../../../src/convenience/RoundTracker.js";
-import { DamageMatrix } from "../../../src/convenience/DamageMatrix.js";
 import type { DemoHeader } from "../../../src/frame/header.js";
-import type { PlayerSnapshot } from "../../../src/state/Player.js";
-import type { PlayerDeathEvent } from "../../../src/events/enrichers/playerDeath.js";
-import type { GrenadeThrownEvent } from "../../../src/events/enrichers/grenadeThrown.js";
-import type { ChatMessage } from "../../../src/events/UserMessageDecoder.js";
+import type { PlayerInfo } from "../../../src/convenience/PlayerRoster.js";
+import type {
+  BombRecord,
+  ChatRecord,
+  DamageRecord,
+  GrenadeEffect,
+  GrenadeThrow,
+  HostageRecord,
+  KillRecord,
+} from "../../../src/convenience/records.js";
 import type { DecodedGameEvent } from "../../../src/events/GameEventDecoder.js";
 import type { GrenadeTrajectory } from "../../../src/convenience/GrenadeTrajectoryTracker.js";
+import type { PlayerPositions } from "../../../src/convenience/PositionRecorder.js";
+
+function baseResult() {
+  return {
+    header: {} as DemoHeader,
+    tickRate: 128,
+    players: [] as PlayerInfo[],
+    kills: [] as KillRecord[],
+    rounds: [] as RoundSummary[],
+    bomb: [] as BombRecord[],
+    grenades: [] as GrenadeThrow[],
+    grenadeTrajectories: [] as GrenadeTrajectory[],
+    grenadeEffects: [] as GrenadeEffect[],
+    hostageEvents: [] as HostageRecord[],
+    damage: [] as DamageRecord[],
+    chatMessages: [] as ChatRecord[],
+  };
+}
 
 describe("DemoResult types", () => {
   it("DemoResult shape is compile-checkable via satisfies", () => {
-    // Minimal stubs — real values not needed; the goal is compile-time shape verification.
-    const stubHeader = {} as DemoHeader;
-    const stubPlayers: PlayerSnapshot[] = [];
-    const stubKills: PlayerDeathEvent[] = [];
-    const stubRounds: RoundSummary[] = [];
-    const stubGrenades: GrenadeThrownEvent[] = [];
-    const stubGrenadeTrajectories: readonly GrenadeTrajectory[] = [];
-    const stubChatMessages: ChatMessage[] = [];
-    const stubEvents: DecodedGameEvent[] = [];
-    const stubDamageMatrix = new DamageMatrix();
-
-    // `satisfies` ensures the object literal matches DemoResult without widening.
     const result = {
-      header: stubHeader,
-      players: stubPlayers,
-      kills: stubKills,
-      rounds: stubRounds,
-      grenades: stubGrenades,
-      grenadeTrajectories: stubGrenadeTrajectories,
-      chatMessages: stubChatMessages,
-      events: stubEvents,
-      damageMatrix: stubDamageMatrix,
+      ...baseResult(),
+      events: [] as DecodedGameEvent[],
+      positions: {} as PlayerPositions,
     } satisfies DemoResult;
-
-    // Trivial runtime assertion so vitest counts this as a passing test.
     expect(result).toBeDefined();
   });
 
-  it("DemoResult without events also satisfies the type", () => {
-    const stubHeader = {} as DemoHeader;
-
-    const result = {
-      header: stubHeader,
-      players: [] as PlayerSnapshot[],
-      kills: [] as PlayerDeathEvent[],
-      rounds: [] as RoundSummary[],
-      grenades: [] as GrenadeThrownEvent[],
-      grenadeTrajectories: [] as readonly GrenadeTrajectory[],
-      chatMessages: [] as ChatMessage[],
-      damageMatrix: new DamageMatrix(),
-    } satisfies DemoResult;
-
-    expect(result).toBeDefined();
+  it("events and positions are optional", () => {
+    const result = baseResult() satisfies DemoResult;
+    expect((result as DemoResult).positions).toBeUndefined();
   });
 
-  it("ParseOptions shape is compile-checkable", () => {
-    const opts: ParseOptions = { includeRawEvents: true };
-    expect(opts.includeRawEvents).toBe(true);
+  it("ParseOptions accepts every documented field", () => {
+    const controller = new AbortController();
+    const opts = {
+      includeRawEvents: true,
+      collectPlayerPositions: true,
+      positionSampleRateTicks: 8,
+      onProgress: (p) => void p.fraction,
+      signal: controller.signal,
+      yieldIntervalMs: 25,
+    } satisfies ParseOptions;
+    expect(opts.positionSampleRateTicks).toBe(8);
+  });
 
-    const optsDefault: ParseOptions = {};
-    expect(optsDefault.includeRawEvents).toBeUndefined();
+  it("ParseOptions is all-optional", () => {
+    const empty = {} satisfies ParseOptions;
+    expect(empty).toEqual({});
   });
 });

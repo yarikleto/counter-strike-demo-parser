@@ -26,18 +26,19 @@
  *   same `entityid` as the projectile entity. The default at spawn is
  *   `'he'`; the type is rewritten when the detonate event arrives.
  *
- *   `CMolotovProjectile` similarly serves both molotov and incendiary —
- *   distinguishing requires correlating with `grenade_thrown` (whose
- *   `weapon` field reads `weapon_molotov` vs `weapon_incgrenade`). Default
- *   here is `'molotov'`. On bot-only fixtures `grenade_thrown` count is
- *   zero, so the incendiary path isn't exercised on the de_nuke fixture —
- *   it's still wired up so production demos with real players surface it.
+ *   Until then the projectile's model (`m_nModelIndex` → modelprecache,
+ *   `…flashbang…` vs `…fraggrenade…`) gives the type, so throws whose
+ *   detonation is never seen are still typed correctly.
+ *
+ *   `CMolotovProjectile` serves both molotov and incendiary; the
+ *   `m_bIsIncGrenade` prop on `DT_MolotovProjectile` tells them apart.
  *
  * Thrower resolution:
  *   Read `m_hThrower` (Source 21-bit packed entity handle on the
  *   `DT_BaseGrenade` table — see `EntityHandle.ts`) at create time and
- *   resolve to a CCSPlayer via `resolveHandle`, then find the matching
- *   `Player` overlay. Read once at spawn — the thrower doesn't change
+ *   resolve to a CCSPlayer via `resolveHandle`, then capture the matching
+ *   `Player` as a plain `PlayerRef` (plus their position, the throw
+ *   position). Read once at spawn — the thrower doesn't change
  *   mid-flight. Returns `undefined` for grenades whose thrower can't be
  *   resolved (slot reuse, disconnect-mid-flight, world-spawned debug
  *   grenades, dropped→retriggered grenades whose handle has gone stale).
@@ -87,6 +88,8 @@
 
 import type { DemoParser } from "../DemoParser.js";
 import type { Player, Vector3 } from "../state/Player.js";
+import { PlayerRoster, plainVector } from "./PlayerRoster.js";
+import type { PlayerRef } from "./PlayerRoster.js";
 import type { Entity } from "../entities/Entity.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import { resolveHandle } from "../state/EntityHandle.js";
@@ -115,7 +118,9 @@ export interface TrajectoryPoint {
  */
 export interface GrenadeTrajectory {
   /** The throwing player, or `undefined` if the thrower can't be resolved. */
-  readonly thrower: Player | undefined;
+  readonly thrower: PlayerRef | undefined;
+  /** The thrower's position at the throw tick. */
+  readonly throwerPosition: Vector3 | undefined;
   /** Grenade type as inferred from class + matching detonate event. */
   readonly type: GrenadeType;
   /** Per-tick position samples in flight order. Frozen. */
@@ -142,7 +147,8 @@ export interface GrenadeTrajectory {
  * without leaking the assembly path.
  */
 interface MutableTrajectory {
-  thrower: Player | undefined;
+  thrower: PlayerRef | undefined;
+  throwerPosition: Vector3 | undefined;
   type: GrenadeType;
   trajectory: TrajectoryPoint[];
   detonationPosition: Vector3 | undefined;
@@ -201,6 +207,7 @@ export class GrenadeTrajectoryTracker {
   private readonly completed: MutableTrajectory[] = [];
   /** Reference kept so handlers can read live parser state. */
   private parser: DemoParser | null = null;
+  private roster: PlayerRoster | null = null;
 
   /**
    * Wire the tracker to a parser by subscribing to the entity-lifecycle and
@@ -208,6 +215,7 @@ export class GrenadeTrajectoryTracker {
    */
   attach(parser: DemoParser): void {
     this.parser = parser;
+    this.roster = PlayerRoster.for(parser);
     parser.on("entityCreated", (e) => this.onEntityCreated(e));
     parser.on("entityUpdated", (e) => this.onEntityUpdated(e));
     parser.on("entityDeleted", (e) => this.onEntityDeleted(e));
@@ -241,8 +249,9 @@ export class GrenadeTrajectoryTracker {
     const tick = this.parser!.currentTick;
 
     const record: MutableTrajectory = {
-      thrower,
-      type,
+      thrower: thrower !== undefined ? this.roster!.ref(thrower) : undefined,
+      throwerPosition: thrower !== undefined ? plainVector(thrower.position) : undefined,
+      type: this.refineType(entity, type),
       trajectory: [],
       detonationPosition: undefined,
       entityIndex: entity.id,
@@ -298,12 +307,30 @@ export class GrenadeTrajectoryTracker {
     record.detonationTick = this.parser!.currentTick;
     // Override the class-based default with the event-derived type. This
     // is the disambiguation step for CBaseCSGrenadeProjectile (HE vs flash).
-    record.type = finalType;
+    // molotov_detonate cannot tell incendiaries apart; keep the prop-based type.
+    if (!(finalType === "molotov" && record.type === "incendiary")) record.type = finalType;
   }
 
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Spawn-time type refinement: `m_bIsIncGrenade` splits molotov from
+   * incendiary, and the model splits flash from HE. A later detonate event
+   * still has the final word.
+   */
+  private refineType(entity: Entity, type: GrenadeType): GrenadeType {
+    if (type === "molotov") {
+      return readProp(entity, "m_bIsIncGrenade") === 1 ? "incendiary" : "molotov";
+    }
+    if (type === "he") {
+      const model = readProp(entity, "m_nModelIndex");
+      const path = typeof model === "number" ? this.parser!.modelPrecache.get(model) : undefined;
+      if (path?.includes("flashbang") === true) return "flash";
+    }
+    return type;
+  }
 
   /**
    * Resolve the projectile's thrower via `m_hThrower`. The handle is in the
@@ -358,6 +385,12 @@ export class GrenadeTrajectoryTracker {
   }
 }
 
+/** Read a prop by name straight from the store (no staleness check needed at spawn). */
+function readProp(entity: Entity, name: string): unknown {
+  const idx = entity.serverClass.flattenedProps.findIndex((p) => p.prop.varName === name);
+  return idx < 0 ? undefined : entity.store.read(entity.storageSlot, idx);
+}
+
 /**
  * Promote a mutable record to a frozen public-typed `GrenadeTrajectory`.
  * Freezing the trajectory array guards against accidental post-snapshot
@@ -367,6 +400,7 @@ export class GrenadeTrajectoryTracker {
 function toFrozen(r: MutableTrajectory): GrenadeTrajectory {
   return Object.freeze({
     thrower: r.thrower,
+    throwerPosition: r.throwerPosition,
     type: r.type,
     trajectory: Object.freeze(r.trajectory.slice()),
     detonationPosition: r.detonationPosition,

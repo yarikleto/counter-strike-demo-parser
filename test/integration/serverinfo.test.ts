@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import type { CSVCMsg_ServerInfo as ServerInfo } from "../../src/proto/index.js";
 import { fixtureAvailable } from "./_fixture.js";
 

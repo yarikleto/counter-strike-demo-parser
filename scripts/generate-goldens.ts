@@ -296,7 +296,8 @@ async function main(): Promise<void> {
       endReason: round.endReason,
       scoreCT,
       scoreT,
-      mvp: round.mvp !== undefined ? nameOf(round.mvp, parser) : undefined,
+      // The MVP's name as captured when round_mvp fired.
+      mvp: round.mvp !== undefined ? round.mvp.name || `slot ${round.mvp.slot}` : undefined,
     };
   });
   writeGolden("rounds", roundRows);

@@ -21,13 +21,11 @@ import { RoundEndReason } from "../../../src/enums/RoundEndReason.js";
 import type { RoundStartEvent } from "../../../src/events/enrichers/roundStart.js";
 import type { RoundEndEvent } from "../../../src/events/enrichers/roundEnd.js";
 import type { RoundMvpEvent } from "../../../src/events/enrichers/roundMvp.js";
-import type { PlayerDeathEvent } from "../../../src/events/enrichers/playerDeath.js";
 import type { PlayerHurtEvent } from "../../../src/events/enrichers/playerHurt.js";
-import type { BombPlantedEvent } from "../../../src/events/enrichers/bombPlanted.js";
-import type { BombDefusedEvent } from "../../../src/events/enrichers/bombDefused.js";
-import type { BombExplodedEvent } from "../../../src/events/enrichers/bombExploded.js";
 import type { ItemPurchaseEvent } from "../../../src/events/enrichers/itemPurchase.js";
 import type { Player } from "../../../src/state/Player.js";
+import type { PlayerRef } from "../../../src/convenience/PlayerRoster.js";
+import type { BombRecord, KillRecord } from "../../../src/convenience/records.js";
 
 // ---------------------------------------------------------------------------
 // Stub helpers — minimal objects that satisfy the enriched event interfaces.
@@ -59,25 +57,42 @@ function makeRoundEnd(
   });
 }
 
-/** Minimal Player stub — only `slot` is needed by the tracker. */
-function makePlayer(slot: number): Player {
-  return { slot } as unknown as Player;
+/**
+ * Player stub. Without an attached parser the tracker has no roster and
+ * takes event players as already-plain refs, so one object serves as both
+ * the `Player` an event carries and the `PlayerRef` the summary stores.
+ */
+function makePlayer(slot: number): Player & PlayerRef {
+  const ref: PlayerRef = {
+    index: slot,
+    slot,
+    userId: slot + 100,
+    name: `player${slot}`,
+    steamId: undefined,
+    team: 2,
+  };
+  return ref as unknown as Player & PlayerRef;
 }
 
-function makePlayerDeath(victim: Player, attacker?: Player, assister?: Player): PlayerDeathEvent {
-  return Object.freeze({
-    eventName: "player_death",
-    eventId: 3,
+function makePlayerDeath(
+  victim: PlayerRef,
+  attacker?: PlayerRef,
+  assister?: PlayerRef,
+): KillRecord {
+  return {
+    tick: 0,
     victim,
     attacker,
     assister,
-    weapon: "weapon_ak47",
+    weapon: "ak47",
     headshot: false,
     penetrated: false,
     noscope: false,
     thrusmoke: false,
     attackerblind: false,
-  });
+    attackerPosition: attacker !== undefined ? { x: 0, y: 0, z: 0 } : undefined,
+    victimPosition: { x: 1, y: 1, z: 0 },
+  };
 }
 
 function makePlayerHurt(victim: Player, attacker: Player, damage: number): PlayerHurtEvent {
@@ -95,16 +110,15 @@ function makePlayerHurt(victim: Player, attacker: Player, damage: number): Playe
   });
 }
 
-function makeBombPlanted(player: Player, site = 0): BombPlantedEvent {
-  return Object.freeze({ eventName: "bomb_planted", eventId: 5, player, site });
-}
-
-function makeBombDefused(player: Player, site = 0): BombDefusedEvent {
-  return Object.freeze({ eventName: "bomb_defused", eventId: 6, player, site });
-}
-
-function makeBombExploded(site = 0): BombExplodedEvent {
-  return Object.freeze({ eventName: "bomb_exploded", eventId: 7, site });
+function makeBomb(type: BombRecord["type"], player?: PlayerRef, site = 0): BombRecord {
+  return {
+    type,
+    tick: 0,
+    player,
+    position: { x: 0, y: 0, z: 0 },
+    site: "A",
+    siteEntityIndex: site,
+  };
 }
 
 function makeRoundMvp(player: Player): RoundMvpEvent {
@@ -185,7 +199,7 @@ describe("ConvenienceRoundTracker", () => {
     expect(r.endReason).toBe(RoundEndReason.CTWin);
     expect(r.mvp).toBeUndefined();
     expect(r.kills).toHaveLength(0);
-    expect(r.players.size).toBe(0);
+    expect(r.players.length).toBe(0);
     expect(r.bombEvents.plants).toHaveLength(0);
     expect(r.bombEvents.defuses).toHaveLength(0);
     expect(r.bombEvents.explosions).toHaveLength(0);
@@ -225,7 +239,7 @@ describe("ConvenienceRoundTracker", () => {
     tracker.onRoundEnd(makeRoundEnd());
 
     const round = tracker.snapshot()[0]!;
-    expect(round.players.size).toBe(0);
+    expect(round.players.length).toBe(0);
   });
 
   it("accumulates kills within a round", () => {
@@ -258,19 +272,18 @@ describe("ConvenienceRoundTracker", () => {
 
     const round = tracker.snapshot()[0]!;
 
-    const attackerStats = round.players.get(attacker.slot)!;
+    const attackerStats = round.players.find((st) => st.player.slot === attacker.slot)!;
     expect(attackerStats.kills).toBe(1);
     expect(attackerStats.deaths).toBe(0);
     expect(attackerStats.assists).toBe(0);
     expect(attackerStats.damage).toBe(80);
-    expect(attackerStats.moneySpent).toBe(0); // TODO(TASK-064)
 
-    const victimStats = round.players.get(victim.slot)!;
+    const victimStats = round.players.find((st) => st.player.slot === victim.slot)!;
     expect(victimStats.kills).toBe(0);
     expect(victimStats.deaths).toBe(1);
     expect(victimStats.assists).toBe(0);
 
-    const assisterStats = round.players.get(assister.slot)!;
+    const assisterStats = round.players.find((st) => st.player.slot === assister.slot)!;
     expect(assisterStats.assists).toBe(1);
     expect(assisterStats.kills).toBe(0);
   });
@@ -285,8 +298,8 @@ describe("ConvenienceRoundTracker", () => {
 
     const round = tracker.snapshot()[0]!;
     // Only victim creates a stats entry — no attacker
-    expect(round.players.size).toBe(1);
-    const victimStats = round.players.get(victim.slot)!;
+    expect(round.players.length).toBe(1);
+    const victimStats = round.players.find((st) => st.player.slot === victim.slot)!;
     expect(victimStats.deaths).toBe(1);
   });
 
@@ -329,8 +342,8 @@ describe("ConvenienceRoundTracker", () => {
     const defuser = makePlayer(2);
 
     tracker.onRoundStart(makeRoundStart());
-    tracker.onBombPlanted(makeBombPlanted(planter, 174));
-    tracker.onBombDefused(makeBombDefused(defuser, 174));
+    tracker.onBomb(makeBomb("planted", planter, 174));
+    tracker.onBomb(makeBomb("defused", defuser, 174));
     tracker.onRoundEnd(makeRoundEnd());
 
     const round = tracker.snapshot()[0]!;
@@ -345,8 +358,8 @@ describe("ConvenienceRoundTracker", () => {
     const planter = makePlayer(1);
 
     tracker.onRoundStart(makeRoundStart());
-    tracker.onBombPlanted(makeBombPlanted(planter));
-    tracker.onBombExploded(makeBombExploded(174));
+    tracker.onBomb(makeBomb("planted", planter));
+    tracker.onBomb(makeBomb("exploded", undefined, 174));
     tracker.onRoundEnd(makeRoundEnd(0, TeamSide.T));
 
     const round = tracker.snapshot()[0]!;
@@ -359,7 +372,7 @@ describe("ConvenienceRoundTracker", () => {
     const planter = makePlayer(1);
 
     // Warmup bomb plant
-    tracker.onBombPlanted(makeBombPlanted(planter));
+    tracker.onBomb(makeBomb("planted", planter));
 
     tracker.onRoundStart(makeRoundStart());
     tracker.onRoundEnd(makeRoundEnd());
@@ -413,7 +426,7 @@ describe("ConvenienceRoundTracker", () => {
     expect(rounds[1]!.kills).toHaveLength(0);
   });
 
-  it("moneySpent is always 0 (TODO TASK-064) even when item_purchase fires", () => {
+  it("item_purchase records the item on the buyer's round economy", () => {
     const tracker = new ConvenienceRoundTracker();
     const buyer = makePlayer(1);
 
@@ -421,11 +434,19 @@ describe("ConvenienceRoundTracker", () => {
     tracker.onItemPurchase(makeItemPurchase(buyer));
     tracker.onRoundEnd(makeRoundEnd());
 
-    // No player stats entry created for item_purchase alone — stats are keyed
-    // by slot and only created when kill/hurt events fire.
-    // (No assertion on moneySpent here since no stats entry exists for buyer.)
-    const round = tracker.snapshot()[0]!;
-    expect(round).toBeDefined();
+    const stats = tracker.snapshot()[0]!.players.find((st) => st.player.slot === 1)!;
+    expect(stats.economy?.purchases).toEqual(["weapon_ak47"]);
+  });
+
+  it("bomb steps other than planted/defused/exploded stay out of the buckets", () => {
+    const tracker = new ConvenienceRoundTracker();
+    tracker.onRoundStart(makeRoundStart());
+    tracker.onBomb(makeBomb("begin_plant", makePlayer(1)));
+    tracker.onBomb(makeBomb("dropped", makePlayer(1)));
+    tracker.onRoundEnd(makeRoundEnd());
+
+    const { plants, defuses, explosions } = tracker.snapshot()[0]!.bombEvents;
+    expect(plants.length + defuses.length + explosions.length).toBe(0);
   });
 
   it("startTick and endTick come from the getTick closure", () => {

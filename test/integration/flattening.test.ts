@@ -52,7 +52,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { SPropFlags } from "../../src/datatables/SPropFlags.js";
 import type { ServerClass } from "../../src/datatables/ServerClass.js";
 import type { ServerClassRegistry } from "../../src/datatables/ServerClassRegistry.js";

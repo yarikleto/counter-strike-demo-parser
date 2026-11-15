@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import type { RoundStateChange } from "../../src/state/RoundTracker.js";
 import { fixtureAvailable } from "./_fixture.js";
 

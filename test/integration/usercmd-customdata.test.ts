@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");

@@ -1,107 +1,104 @@
 /**
- * Convenience types for the high-level `DemoParser.parse()` async API.
+ * Convenience types for the high-level `DemoParser.parse()` / `parseDemo()`
+ * API.
  *
- * `DemoResult` is the one-shot parsed representation of a demo file: all
- * events collected into typed arrays, the header, and the player roster as
- * it stood at `dem_stop`. It is designed for the 80% of consumers who want
- * structured data without wiring up event listeners manually.
+ * `DemoResult` is the one-shot parsed representation of a demo file, made
+ * of plain data only: numbers, strings, booleans, plain objects, arrays and
+ * (for `positions`) typed arrays. It holds no references into the parser,
+ * so it can be `postMessage`d out of a Web Worker, stored in IndexedDB, or
+ * `JSON.stringify`d (typed arrays serialize as index-keyed objects; convert
+ * them with `Array.from` first if you need JSON arrays).
  *
- * Key caveat on `players`: the array reflects **live entities at the moment
- * `dem_stop` is reached**. Players who disconnected before the demo ended are
- * absent — their CCSPlayer entities are deleted when they leave, so they do
- * not appear in the final entity list. Consumers who need a complete roster
- * (including leavers) should use the streaming API and collect `player_death`
- * / `chatMessage` senders instead.
- *
- * `events` is opt-in via `ParseOptions.includeRawEvents` (default `false`).
- * Competitive demos generate thousands of raw `DecodedGameEvent` records;
- * leaving this off prevents unintended memory blowup for the common case.
+ * Players appear as {@link PlayerRef}s captured at event time; their
+ * `index` points into `DemoResult.players`, the roster of everyone seen.
  */
 
 import type { DemoHeader } from "../frame/header.js";
-import type { PlayerSnapshot } from "../state/Player.js";
-import type { PlayerDeathEvent } from "../events/enrichers/playerDeath.js";
-import type { GrenadeThrownEvent } from "../events/enrichers/grenadeThrown.js";
-import type { ChatMessage } from "../events/UserMessageDecoder.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
+import type { ParseProgress } from "../DemoParser.js";
 import type { RoundSummary } from "./RoundTracker.js";
-import type { DamageMatrix } from "./DamageMatrix.js";
-import type { PositionSnapshot } from "./PositionTracker.js";
+import type { PlayerInfo } from "./PlayerRoster.js";
+import type { PlayerPositions } from "./PositionRecorder.js";
 import type { GrenadeTrajectory } from "./GrenadeTrajectoryTracker.js";
+import type {
+  BombRecord,
+  ChatRecord,
+  DamageRecord,
+  GrenadeEffect,
+  GrenadeThrow,
+  HostageRecord,
+  KillRecord,
+} from "./records.js";
 
-/** Options for `DemoParser.parse()`. */
+/** Options for `DemoParser.parse()` / `parseDemo()`. */
 export interface ParseOptions {
   /**
    * When `true`, every raw `DecodedGameEvent` is collected into
-   * `DemoResult.events`. Defaults to `false` to avoid memory blowup on
-   * competitive demos which carry thousands of game events.
+   * `DemoResult.events`. Defaults to `false` — competitive demos carry tens
+   * of thousands of game events.
    */
   includeRawEvents?: boolean;
   /**
-   * When `true`, player positions are sampled at the configured tick interval
-   * and surfaced via `DemoResult.playerPositions`. Defaults to `false` —
-   * mirrors `includeRawEvents` to avoid memory blowup on long demos
-   * (~36 000 snapshots for a 30-min match at the default 32-tick rate).
+   * When `true`, player state is sampled every `positionSampleRateTicks`
+   * ticks into the columnar `DemoResult.positions`. Defaults to `false`.
    */
   collectPlayerPositions?: boolean;
   /**
-   * Sample interval (in parser ticks) for the position tracker, when
-   * `collectPlayerPositions` is `true`. Defaults to `32` (~0.5s on a
-   * 64-tick server). Ignored when `collectPlayerPositions` is omitted or
-   * `false`.
+   * Sample interval in ticks for `collectPlayerPositions`. Defaults to `32`
+   * (4 samples/s on a 128-tick demo, 2 on a 64-tick one). For a smooth 2D
+   * replay of a 128-tick demo, 8 (16 samples/s) is a good value.
    */
   positionSampleRateTicks?: number;
+  /**
+   * Progress callback. When this or `signal` is set, the parse runs in time
+   * slices and yields to the event loop between them (see
+   * `DemoParser.parseAllAsync`).
+   */
+  onProgress?: (progress: ParseProgress) => void;
+  /** Cancels the parse; the promise rejects with the signal's reason. */
+  signal?: AbortSignal;
+  /** Milliseconds of parsing between yields (default 50). */
+  yieldIntervalMs?: number;
 }
 
-/** The structured result returned by `DemoParser.parse()`. */
+/** The structured, plain-data result returned by `DemoParser.parse()`. */
 export interface DemoResult {
-  /** The parsed demo file header (map, tick rate, etc.). */
+  /** The parsed demo file header (map, tick count, etc.). */
   readonly header: DemoHeader;
+  /** Server tick rate (e.g. 64 or 128), from `CSVCMsg_ServerInfo`. */
+  readonly tickRate: number;
   /**
-   * Snapshots of all players present at `dem_stop`.
-   *
-   * Disconnected players are **absent** — their CCSPlayer entities are
-   * removed when they leave, so only players still connected at the end of
-   * the demo are included.
+   * Everyone who appeared on a team or in an event, including players who
+   * disconnected before the end. `PlayerRef.index` and
+   * `positions.player[i]` index this array.
    */
-  readonly players: PlayerSnapshot[];
-  /** All `player_death` events emitted during the demo, in wire order. */
-  readonly kills: PlayerDeathEvent[];
-  /** Per-round aggregated summaries, one per completed competitive round. */
+  readonly players: PlayerInfo[];
+  /** All kills, in wire order. */
+  readonly kills: KillRecord[];
+  /** Per-round summaries, one per `round_end` of the match (warmup excluded). */
   readonly rounds: RoundSummary[];
+  /** Bomb lifecycle events with positions and sites, in wire order. */
+  readonly bomb: BombRecord[];
   /**
-   * Full-match and per-round damage aggregation matrix.
-   *
-   * Keyed by (attacker slot, victim slot) pairs derived from `player_hurt`
-   * events. Provides both full-match and per-round views. See
-   * {@link DamageMatrix} for the complete API.
+   * Grenade throws, derived from projectile entities (GOTV demos do not
+   * network `grenade_thrown`). One per entry of `grenadeTrajectories`.
    */
-  readonly damageMatrix: DamageMatrix;
-  /** All `grenade_thrown` events emitted during the demo, in wire order. */
-  readonly grenades: GrenadeThrownEvent[];
+  readonly grenades: GrenadeThrow[];
   /**
-   * Reconstructed trajectories for every grenade projectile observed in the
-   * demo, from spawn to detonation. Built by
-   * {@link GrenadeTrajectoryTracker} from the entity-lifecycle stream and
-   * the matching `*_detonate` events. See its file-level docstring for the
-   * detection / disambiguation rules.
+   * In-flight path of every grenade projectile, from spawn to detonation,
+   * in world coordinates.
    */
-  readonly grenadeTrajectories: readonly GrenadeTrajectory[];
-  /** All chat messages decoded from `CSVCMsg_UserMessage` frames, in wire order. */
-  readonly chatMessages: ChatMessage[];
-  /**
-   * All raw decoded game events, in wire order.
-   *
-   * Only populated when `ParseOptions.includeRawEvents` is `true`.
-   * `undefined` otherwise.
-   */
+  readonly grenadeTrajectories: GrenadeTrajectory[];
+  /** Smokes and infernos with start/end, plus flash/HE/decoy detonations. */
+  readonly grenadeEffects: GrenadeEffect[];
+  /** Hostage events (cs_ maps); empty on bomb maps. */
+  readonly hostageEvents: HostageRecord[];
+  /** Full-match damage per (attacker, victim) pair. */
+  readonly damage: DamageRecord[];
+  /** Chat messages, in wire order. */
+  readonly chatMessages: ChatRecord[];
+  /** Raw decoded game events; only with `includeRawEvents`. */
   readonly events?: DecodedGameEvent[];
-  /**
-   * Sampled player position snapshots, in tick-ascending order.
-   *
-   * Only populated when `ParseOptions.collectPlayerPositions` is `true`.
-   * `undefined` otherwise. Sample cadence is controlled by
-   * `ParseOptions.positionSampleRateTicks` (default 32 ticks).
-   */
-  readonly playerPositions?: readonly PositionSnapshot[];
+  /** Columnar player samples; only with `collectPlayerPositions`. */
+  readonly positions?: PlayerPositions;
 }

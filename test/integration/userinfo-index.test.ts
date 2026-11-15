@@ -22,7 +22,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE_PATH = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");

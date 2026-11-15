@@ -7,7 +7,7 @@
  */
 import { describe, it } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import type { Player } from "../../src/state/Player.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
 import { fixtureAvailable } from "./_fixture.js";

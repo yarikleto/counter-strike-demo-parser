@@ -24,6 +24,15 @@ export default tseslint.config(
     },
   },
   {
+    // Plain-JS Node scripts (e.g. scripts/smoke-dist.mjs) are outside the
+    // TypeScript project: lint them without type information.
+    files: ["**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: { console: "readonly", process: "readonly", URL: "readonly" },
+    },
+  },
+  {
     ignores: ["dist/", "node_modules/", "src/generated/", "coverage/", "*.config.*"],
   },
 );

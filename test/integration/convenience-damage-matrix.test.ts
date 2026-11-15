@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +20,7 @@ const FIXTURE = path.join(__dirname, "../fixtures/de_nuke.dem");
 describe.skipIf(!fixtureAvailable)("DamageMatrix integration (de_nuke)", () => {
   it("produces > 50 damage entries across the match", async () => {
     const result = await DemoParser.parse(FIXTURE);
-    const entries = [...result.damageMatrix.entries()];
+    const entries = result.damage;
 
     // A competitive de_nuke demo has many players dealing damage to each other.
     expect(entries.length).toBeGreaterThan(50);
@@ -35,7 +35,7 @@ describe.skipIf(!fixtureAvailable)("DamageMatrix integration (de_nuke)", () => {
   it("total damage across all match entries exceeds 1000", async () => {
     const result = await DemoParser.parse(FIXTURE);
     let total = 0;
-    for (const e of result.damageMatrix.entries()) {
+    for (const e of result.damage) {
       total += e.totalDamage;
     }
 

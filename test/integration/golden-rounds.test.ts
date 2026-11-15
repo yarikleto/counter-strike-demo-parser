@@ -7,22 +7,12 @@
  */
 import { describe, it } from "vitest";
 import { join } from "node:path";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import { ConvenienceRoundTracker } from "../../src/convenience/RoundTracker.js";
-import type { Player } from "../../src/state/Player.js";
 import { expectMatchesGolden } from "../golden/_compare.js";
 import { fixtureAvailable } from "./_fixture.js";
 
 const FIXTURE = join(import.meta.dirname, "..", "fixtures", "de_nuke.dem");
-
-function nameOf(player: Player | undefined, parser: DemoParser): string {
-  if (player === undefined) return "world";
-  const entitySlot = player.slot - 1;
-  const userId = parser.userInfoIndex.userIdForEntitySlot(entitySlot);
-  if (userId === undefined) return `slot ${player.slot}`;
-  const info = parser.userInfoIndex.infoForUserId(userId);
-  return info?.name ?? `slot ${player.slot}`;
-}
 
 describe.skipIf(!fixtureAvailable)("golden: rounds", () => {
   it("matches the committed snapshot", () => {
@@ -44,7 +34,8 @@ describe.skipIf(!fixtureAvailable)("golden: rounds", () => {
         endReason: round.endReason,
         scoreCT,
         scoreT,
-        mvp: round.mvp !== undefined ? nameOf(round.mvp, parser) : undefined,
+        // The MVP's name as captured when round_mvp fired.
+        mvp: round.mvp !== undefined ? round.mvp.name || `slot ${round.mvp.slot}` : undefined,
       };
     });
 

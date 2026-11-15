@@ -124,11 +124,26 @@ function makeFakeParser(): FakeParser {
     },
   };
 
+  // userinfo: entity slot N ↔ user id N + 100, one SteamID per user.
+  const fakeUserInfoIndex = {
+    userIdForEntitySlot: (slot: number) => slot + 100,
+    infoForUserId: (userId: number) => ({
+      name: `player${userId - 100}`,
+      xuid: `7656119800000${userId}`,
+      isFakePlayer: false,
+    }),
+  };
+  const fakeModelPrecache = {
+    get: (index: number) => (index === 7 ? "models/weapons/w_eq_flashbang_dropped.mdl" : undefined),
+  };
+
   const proxy = new Proxy(emitter, {
     get(target, prop) {
       if (prop === "currentTick") return tick;
       if (prop === "players") return players;
       if (prop === "entities") return fakeEntityList;
+      if (prop === "userInfoIndex") return fakeUserInfoIndex;
+      if (prop === "modelPrecache") return fakeModelPrecache;
       const val = (target as unknown as Record<string | symbol, unknown>)[prop];
       return typeof val === "function" ? val.bind(target) : val;
     },
@@ -154,7 +169,7 @@ function makeFakeParser(): FakeParser {
 }
 
 function makePlayer(slot: number): Player {
-  return { slot } as unknown as Player;
+  return { slot, team: 2, position: { x: 1, y: 2, z: 3 } } as unknown as Player;
 }
 
 /**
@@ -439,7 +454,50 @@ describe("GrenadeTrajectoryTracker", () => {
     });
     fake.emitCreated(projectile);
 
-    expect(tracker.snapshot()[0]!.thrower).toBe(player);
+    // The thrower is captured as a plain PlayerRef plus their position.
+    const snap = tracker.snapshot()[0]!;
+    expect(player.slot).toBe(5);
+    expect(snap.thrower).toEqual({
+      index: 0,
+      slot: 5,
+      userId: 104,
+      name: "player4",
+      steamId: "7656119800000104",
+      team: 2,
+    });
+    expect(snap.throwerPosition).toEqual({ x: 1, y: 2, z: 3 });
+  });
+
+  it("types CMolotovProjectile with m_bIsIncGrenade=1 as incendiary", () => {
+    const tracker = new GrenadeTrajectoryTracker();
+    const fake = makeFakeParser();
+    tracker.attach(fake.asParser);
+
+    fake.emitCreated(
+      makeEntity({
+        id: 70,
+        className: "CMolotovProjectile",
+        props: { m_vecOrigin: { x: 0, y: 0, z: 0 }, m_hThrower: 0xffffffff, m_bIsIncGrenade: 1 },
+      }),
+    );
+    // molotov_detonate cannot tell the two apart and must not downgrade it.
+    fake.emitGameEvent("molotov_detonate", { entityid: 70, x: 1, y: 2, z: 3 });
+    expect(tracker.snapshot()[0]!.type).toBe("incendiary");
+  });
+
+  it("types a flashbang by its model before any detonate event", () => {
+    const tracker = new GrenadeTrajectoryTracker();
+    const fake = makeFakeParser();
+    tracker.attach(fake.asParser);
+
+    fake.emitCreated(
+      makeEntity({
+        id: 71,
+        className: "CBaseCSGrenadeProjectile",
+        props: { m_vecOrigin: { x: 0, y: 0, z: 0 }, m_hThrower: 0xffffffff, m_nModelIndex: 7 },
+      }),
+    );
+    expect(tracker.snapshot()[0]!.type).toBe("flash");
   });
 
   it("returns undefined thrower when m_hThrower is INVALID_HANDLE", () => {

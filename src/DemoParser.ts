@@ -1,29 +1,28 @@
 /**
  * DemoParser — main public API for parsing CS:GO .dem files.
  *
- * This is the entry point for consumers of the library. It accepts a Buffer
- * containing the raw .dem file data and emits typed events as it parses
- * through frames, packets, entities, and game state.
+ * This is the entry point for consumers of the library. It accepts the raw
+ * .dem bytes (`Uint8Array` — a Node `Buffer` is one — or `ArrayBuffer`) and
+ * emits typed events as it parses through frames, packets, entities, and
+ * game state. This module is browser-safe: no Node built-ins. The Node
+ * conveniences (`fromFile`, `fromStream`, file-path `parse`) live in
+ * `src/node.ts`.
  *
  * Architecture: The parser is a pipeline of layers, each feeding the next:
  *   ByteReader -> FrameParser -> PacketDecoder -> DataTables/Entities -> GameState -> Events
  *
- * Three ways to create a parser:
- *   - new DemoParser(buffer)        — from an existing Buffer
- *   - DemoParser.fromBuffer(buffer) — same, explicit factory
- *   - DemoParser.fromFile(path)     — read a .dem file from disk
+ * Ways to create a parser:
+ *   - new DemoParser(bytes)        — from a Uint8Array / ArrayBuffer
+ *   - DemoParser.fromBuffer(bytes) — same, explicit factory
  *
- * One-shot convenience:
- *   - DemoParser.parse(buffer)      — create + parseAll in one call
+ * Ways to run it:
+ *   - parser.parseAll()            — synchronous, fastest
+ *   - parser.parseAllAsync(opts)   — yields to the event loop periodically,
+ *                                    reports progress, honours an AbortSignal
+ *   - DemoParser.parse(bytes)      — one-shot, returns a plain-data DemoResult
  *
- * Event emission: extends Node.js EventEmitter. Currently emits:
- *   - 'serverInfo' — when CSVCMsg_ServerInfo is decoded (decoded by ts-proto
- *                    via the MessageDispatcher; payload is the generated
- *                    CSVCMsg_ServerInfo type).
+ * Event emission: extends the dependency-free `TypedEventEmitter`.
  */
-import { readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import type { Readable } from "node:stream";
 import { TypedEventEmitter } from "./events/TypedEventEmitter.js";
 import type { ParserEventMap, Tier1EventMap } from "./events/ParserEventMap.js";
 import { ByteReader } from "./reader/ByteReader.js";
@@ -71,22 +70,55 @@ import { decodeGameEvent } from "./events/GameEventDecoder.js";
 import { enricherTable } from "./events/enrichers/index.js";
 import { buildEnricherContext } from "./events/EnricherContext.js";
 import { decodeChatMessage } from "./events/UserMessageDecoder.js";
-import type { ChatMessage, ChatMessageContext } from "./events/UserMessageDecoder.js";
-import type { DecodedGameEvent } from "./events/GameEventDecoder.js";
-import type { PlayerDeathEvent } from "./events/enrichers/playerDeath.js";
-import type { GrenadeThrownEvent } from "./events/enrichers/grenadeThrown.js";
+import type { ChatMessageContext } from "./events/UserMessageDecoder.js";
 import type { DemoResult, ParseOptions } from "./convenience/DemoResult.js";
-import { ConvenienceRoundTracker } from "./convenience/RoundTracker.js";
-import { DamageMatrix } from "./convenience/DamageMatrix.js";
-import { EconomyTracker } from "./convenience/EconomyTracker.js";
-import type { PlayerRoundEconomy } from "./convenience/EconomyTracker.js";
-import { PositionTracker } from "./convenience/PositionTracker.js";
-import type { PositionSnapshot } from "./convenience/PositionTracker.js";
-import { GrenadeTrajectoryTracker } from "./convenience/GrenadeTrajectoryTracker.js";
+import { collectDemoResult } from "./convenience/collectDemoResult.js";
 import { decodeLatin1 } from "./reader/text.js";
 
+/** Progress snapshot passed to {@link ParseProgressOptions.onProgress}. */
+export interface ParseProgress {
+  /** Bytes of the demo consumed so far. */
+  readonly bytesParsed: number;
+  /** Total demo size in bytes. */
+  readonly totalBytes: number;
+  /** Tick of the most recently parsed frame. */
+  readonly tick: number;
+  /** `header.playbackTicks` — may be 0 on demos whose recording was cut short. */
+  readonly totalTicks: number;
+  /** `bytesParsed / totalBytes`, in [0, 1]. */
+  readonly fraction: number;
+}
+
+/** Options for {@link DemoParser.parseAllAsync}. */
+export interface ParseProgressOptions {
+  /** Called after every time slice and once more at the end. */
+  readonly onProgress?: (progress: ParseProgress) => void;
+  /**
+   * Cancels the parse. Checked between time slices; on abort the promise
+   * rejects with `signal.reason` (an `AbortError` DOMException by default).
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Milliseconds of parsing between yields to the event loop. Defaults to
+   * 50. Lower values make cancellation more responsive; each yield costs
+   * well under a millisecond.
+   */
+  readonly yieldIntervalMs?: number;
+}
+
+/** Iteration state of one parse, so it can be resumed across time slices. */
+interface ParseSession {
+  readonly reader: ByteReader;
+  readonly dispatcher: MessageDispatcher;
+  readonly frames: Generator<Frame>;
+  done: boolean;
+}
+
+/** Frames processed between clock checks in {@link DemoParser.parseAllAsync}. */
+const FRAMES_PER_CLOCK_CHECK = 256;
+
 export class DemoParser extends TypedEventEmitter<ParserEventMap> {
-  private readonly buffer: Buffer;
+  private readonly buffer: Uint8Array;
   private _header: DemoHeader | undefined;
   private _serverInfo: CSVCMsg_ServerInfo | undefined;
   private _sendTables: SendTableRegistry | undefined;
@@ -175,9 +207,9 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
   private _soundPrecache: PrecacheTable | null = null;
   private _downloadables: PrecacheTable | null = null;
 
-  constructor(buffer: Buffer) {
+  constructor(input: Uint8Array | ArrayBuffer) {
     super();
-    this.buffer = buffer;
+    this.buffer = input instanceof Uint8Array ? input : new Uint8Array(input);
   }
 
   /** The parsed demo header. Available after parseAll() completes. */
@@ -566,181 +598,37 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    *   `parseSync` remains for synchronous contexts but the async `parse` is
    *   the preferred primary entry point as of v0.1.
    */
-  static parseSync(buffer: Buffer): DemoParser {
-    const parser = new DemoParser(buffer);
+  static parseSync(input: Uint8Array | ArrayBuffer): DemoParser {
+    const parser = new this(input);
     parser.parseAll();
     return parser;
   }
 
   /**
-   * High-level async convenience API (ADR-009). Accepts a file path (string)
-   * or an in-memory Buffer, parses the entire demo, and returns a frozen
-   * {@link DemoResult} with all events collected into typed arrays.
+   * High-level async convenience API (ADR-009). Parses the entire demo and
+   * returns a {@link DemoResult} of plain data — no references to parser
+   * internals, so it can be `postMessage`d out of a Web Worker or
+   * `JSON.stringify`d (columnar positions aside, see `DemoResult.positions`).
    *
-   * When given a `string`, the file is read with `fs/promises.readFile`.
-   * A single `setImmediate` yield after I/O (but before parse) keeps the
-   * event loop responsive for callers that chain multiple `parse` calls.
+   * Passing `onProgress` or `signal` switches to {@link parseAllAsync}, which
+   * yields to the event loop between time slices; otherwise the parse runs
+   * synchronously after a single initial yield.
    *
-   * `options.includeRawEvents` (default `false`) opts into collecting every
-   * raw `DecodedGameEvent`. Leave it off on competitive demos — the raw event
-   * stream is large and callers rarely need it alongside the Tier-1 arrays.
-   *
-   * A Node `Readable` (e.g. `fs.createReadStream`, an `http.IncomingMessage`,
-   * or any `Readable.from(...)` producer) is also accepted. The stream is
-   * fully drained into a Buffer via {@link DemoParser.fromStream} before
-   * parsing — see that method for the trade-off (TASK-071a vs. TASK-071's
-   * future true-streaming work).
+   * The Node entry point additionally accepts a file path or a `Readable`.
    */
   static async parse(
-    input: string | Buffer | Readable,
+    input: Uint8Array | ArrayBuffer,
     options: ParseOptions = {},
   ): Promise<DemoResult> {
-    let buffer: Buffer;
-    if (typeof input === "string") {
-      buffer = await readFile(input);
-    } else if (Buffer.isBuffer(input)) {
-      buffer = input;
-    } else {
-      // Node `Readable` — drain to a Buffer. Duck-typed via `Symbol.asyncIterator`
-      // through `fromStream` so any compliant async-iterable stream works
-      // (http.IncomingMessage, fs.createReadStream, Readable.from, …).
-      const streamParser = await DemoParser.fromStream(input);
-      buffer = streamParser.buffer;
-    }
-
-    // Yield once so I/O-heavy callers don't starve the event loop between
-    // sequential parse() calls. Negligible overhead (~0 ms) for single calls.
-    await new Promise<void>((resolve) => setImmediate(resolve));
-
-    const parser = new DemoParser(buffer);
-
-    const kills: PlayerDeathEvent[] = [];
-    const grenades: GrenadeThrownEvent[] = [];
-    const chatMessages: ChatMessage[] = [];
-    const events: DecodedGameEvent[] | undefined = options.includeRawEvents ? [] : undefined;
-
-    parser.on("player_death", (e) => kills.push(e));
-    parser.on("grenade_thrown", (e) => grenades.push(e));
-    parser.on("chatMessage", (e) => chatMessages.push(e));
-    if (events !== undefined) {
-      parser.on("gameEvent", (e) => events.push(e));
-    }
-
-    const roundTracker = new ConvenienceRoundTracker();
-    roundTracker.attach(parser);
-
-    const damageMatrix = new DamageMatrix();
-    damageMatrix.attach(parser);
-
-    const economyTracker = new EconomyTracker();
-    economyTracker.attach(parser);
-
-    const grenadeTrajectoryTracker = new GrenadeTrajectoryTracker();
-    grenadeTrajectoryTracker.attach(parser);
-
-    // Position sampling is opt-in (ParseOptions.collectPlayerPositions).
-    // When omitted/false the tracker is never instantiated — no entityUpdated
-    // listener is registered, no per-tick sampling overhead is incurred, and
-    // `DemoResult.playerPositions` is left `undefined`.
-    let positionTracker: PositionTracker | undefined;
-    if (options.collectPlayerPositions === true) {
-      positionTracker = new PositionTracker();
-      positionTracker.attach(parser, {
-        sampleRateTicks: options.positionSampleRateTicks,
-      });
-    }
-
-    parser.parseAll();
-
-    const rounds = roundTracker.snapshot();
-
-    // Decorate each RoundPlayerStats with the corresponding economy record.
-    // The cast below is the ONLY place we sidestep the `readonly economy?`
-    // constraint — `RoundPlayerStats.economy` is readonly in the public type
-    // but the field is `undefined` at construction time and must be filled in
-    // here during post-parse assembly. Using a cast avoids making the mutable
-    // field visible in the public interface.
-    for (let i = 0; i < rounds.length; i++) {
-      const round = rounds[i];
-      if (round === undefined) continue;
-      for (const stats of round.players.values()) {
-        const econ = economyTracker.getEconomy(i, stats.player.slot);
-        if (econ !== undefined) {
-          (stats as { economy?: PlayerRoundEconomy }).economy = econ;
-        }
-      }
-    }
-
-    const playerPositions: readonly PositionSnapshot[] | undefined = positionTracker?.snapshot();
-
-    return Object.freeze({
-      header: parser.header as DemoHeader,
-      players: parser.players.map((p) => p.snapshot()),
-      kills,
-      rounds,
-      grenades,
-      grenadeTrajectories: grenadeTrajectoryTracker.snapshot(),
-      chatMessages,
-      events,
-      damageMatrix,
-      playerPositions,
-    });
+    return collectDemoResult(new this(input), options);
   }
 
   /**
-   * Create a parser by reading a .dem file from disk.
+   * Create a parser from existing bytes (explicit factory alternative to
+   * the constructor).
    */
-  static fromFile(path: string): DemoParser {
-    const buffer = readFileSync(path);
-    return new DemoParser(buffer);
-  }
-
-  /**
-   * Create a parser from an existing Buffer (explicit factory alternative to constructor).
-   */
-  static fromBuffer(buffer: Buffer): DemoParser {
-    return new DemoParser(buffer);
-  }
-
-  /**
-   * Create a parser by draining a Node `Readable` stream (TASK-071a).
-   *
-   * Accepts any Node `Readable` — `fs.createReadStream(path)`, an
-   * `http.IncomingMessage` from a download, an S3 SDK body stream, or a
-   * synthetic `Readable.from([chunkA, chunkB, …])`. Chunks are collected via
-   * `for await` (so any stream that implements `Symbol.asyncIterator` works),
-   * normalized through `Buffer.from(chunk)` to coerce string chunks if the
-   * stream happens to be in text mode, and concatenated exactly once at the
-   * end before construction — minimal allocator churn, single contiguous
-   * Buffer hand-off to the parser.
-   *
-   * Error propagation is automatic: if the underlying stream errors mid-read,
-   * `for await` rethrows and the returned Promise rejects with the original
-   * error. No special wiring is needed.
-   *
-   * Trade-off: the entire demo is buffered into memory before parsing begins.
-   * For an HTTP download of a typical competitive demo (~50–150 MB) this is
-   * negligible; for very large or memory-constrained environments it is a
-   * known limitation. v1 deliberately does NOT do incremental / true-streaming
-   * parse — that's tracked separately under TASK-071 (perf-tracked benchmarks
-   * for the future streaming pipeline). The wire format does not support
-   * streaming entity decode without first observing the signon-phase
-   * datatables, so partial-buffer parsing is a non-trivial redesign rather
-   * than a small extension.
-   *
-   * @example
-   * ```ts
-   * import { createReadStream } from "node:fs";
-   * const parser = await DemoParser.fromStream(createReadStream("match.dem"));
-   * parser.parseAll();
-   * ```
-   */
-  static async fromStream(readable: Readable): Promise<DemoParser> {
-    const chunks: Buffer[] = [];
-    for await (const chunk of readable) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return new DemoParser(Buffer.concat(chunks));
+  static fromBuffer(input: Uint8Array | ArrayBuffer): DemoParser {
+    return new this(input);
   }
 
   /**
@@ -756,6 +644,50 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
    * caller hands in a zero-byte buffer.
    */
   parseAll(): void {
+    const session = this.beginParse();
+    this.runFrames(session, Infinity);
+  }
+
+  /**
+   * Asynchronous variant of {@link parseAll}: parses in time slices of
+   * `yieldIntervalMs`, yielding to the event loop in between so a Web
+   * Worker (or a Node server) can handle messages, report progress, and
+   * cancel. Events, error handling and results are identical to
+   * `parseAll()`.
+   *
+   * @throws the `signal`'s abort reason when cancelled.
+   */
+  async parseAllAsync(options: ParseProgressOptions = {}): Promise<void> {
+    const { onProgress, signal } = options;
+    const sliceMs = options.yieldIntervalMs ?? 50;
+    signal?.throwIfAborted();
+    const session = this.beginParse();
+    for (;;) {
+      const sliceStart = performance.now();
+      while (!session.done && performance.now() - sliceStart < sliceMs) {
+        this.runFrames(session, FRAMES_PER_CLOCK_CHECK);
+      }
+      onProgress?.(this.progressOf(session));
+      if (session.done) return;
+      await yieldToEventLoop();
+      signal?.throwIfAborted();
+    }
+  }
+
+  private progressOf(session: ParseSession): ParseProgress {
+    const totalBytes = this.buffer.length;
+    const bytesParsed = session.done ? totalBytes : session.reader.position;
+    return {
+      bytesParsed,
+      totalBytes,
+      tick: this._currentTick,
+      totalTicks: this._header?.playbackTicks ?? 0,
+      fraction: totalBytes === 0 ? 1 : bytesParsed / totalBytes,
+    };
+  }
+
+  /** Read the header and wire up message dispatch; no frames are parsed yet. */
+  private beginParse(): ParseSession {
     if (this.buffer.length === 0) {
       throw new Error("Empty demo file");
     }
@@ -841,13 +773,22 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
       },
     });
 
-    // Iterate frames defensively. `iterateFrames` is a generator that calls
-    // `readFrame`; any throw inside that generator (RangeError on truncation,
-    // "unknown command byte" on a corrupt frame header) propagates here. We
-    // capture `reader.position` BEFORE each `next()` so a thrown failure
-    // reports the offset where the failing read began.
-    const frames = iterateFrames(reader);
-    for (;;) {
+    return { reader, dispatcher, frames: iterateFrames(reader), done: false };
+  }
+
+  /**
+   * Process up to `maxFrames` frames of `session`. Sets `session.done` when
+   * the demo ends or parsing has to stop.
+   *
+   * Iterates frames defensively. `iterateFrames` is a generator that calls
+   * `readFrame`; any throw inside that generator (RangeError on truncation,
+   * "unknown command byte" on a corrupt frame header) propagates here. We
+   * capture `reader.position` BEFORE each `next()` so a thrown failure
+   * reports the offset where the failing read began.
+   */
+  private runFrames(session: ParseSession, maxFrames: number): void {
+    const { reader, dispatcher, frames } = session;
+    for (let n = 0; n < maxFrames; n++) {
       this._lastFrameOffset = reader.position;
       let next: IteratorResult<Frame>;
       try {
@@ -858,9 +799,13 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
         // A frame-header desync cannot be re-synced (we'd be guessing where
         // the next valid header begins). Both `truncated` and `invalid-frame`
         // terminate the parse cleanly.
+        session.done = true;
         return;
       }
-      if (next.done === true) return;
+      if (next.done === true) {
+        session.done = true;
+        return;
+      }
       const frame = next.value;
       // Update current tick before dispatching so event listeners always read
       // the correct frame tick when they access `parser.currentTick`.
@@ -919,6 +864,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
             );
           }
         }
+        this.emit("frameEnd", frame.tick);
       } catch (err) {
         // Frame-body decoder threw past the per-message guard — typically a
         // truncated packet whose internal varint length walks off the end of
@@ -934,6 +880,7 @@ export class DemoParser extends TypedEventEmitter<ParserEventMap> {
             : `Frame body decode failed: ${err instanceof Error ? err.message : String(err)}`,
           this._lastFrameOffset,
         );
+        session.done = true;
         return;
       }
     }
@@ -1446,6 +1393,33 @@ function decodeConsoleCommand(data: Uint8Array): string {
   if (data.length === 0) return "";
   const end = data[data.length - 1] === 0x00 ? data.length - 1 : data.length;
   return decodeLatin1(data, 0, end);
+}
+
+/**
+ * Let the host's event loop run (pending messages, timers, abort handlers)
+ * before continuing. Node's `setImmediate` is the cheapest option; browsers
+ * and Web Workers use a MessageChannel round trip, which unlike
+ * `setTimeout(0)` is not clamped to 4 ms.
+ */
+function yieldToEventLoop(): Promise<void> {
+  const g = globalThis as { setImmediate?: (cb: () => void) => unknown };
+  if (typeof g.setImmediate === "function") {
+    const setImmediate = g.setImmediate;
+    return new Promise((resolve) => setImmediate(resolve));
+  }
+  if (typeof MessageChannel === "function") {
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      // Typed structurally: Node's MessagePort typings lack `onmessage`.
+      const port = channel.port1 as unknown as { onmessage: (() => void) | null; close(): void };
+      port.onmessage = () => {
+        port.close();
+        resolve();
+      };
+      channel.port2.postMessage(undefined);
+    });
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**

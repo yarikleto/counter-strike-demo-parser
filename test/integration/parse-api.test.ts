@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { DemoParser } from "../../src/DemoParser.js";
+import { DemoParser } from "../../src/node.js";
 import type { DemoResult } from "../../src/convenience/DemoResult.js";
 import { fixtureAvailable } from "./_fixture.js";
 

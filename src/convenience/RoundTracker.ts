@@ -31,35 +31,40 @@
  *   round's end (or tick 0) and carries no per-round events. A round that has
  *   a `round_end` is never dropped.
  *
- * moneySpent (TASK-064 TODO):
- *   `item_purchase` events are subscribed here. The enriched `ItemPurchaseEvent`
- *   carries `{ player, item }` but no `cost` field — economy tracking (including
- *   purchase cost) is deferred to TASK-064. Until that task lands, `moneySpent`
- *   is set to `0` for every player in every round. When TASK-064 adds a `cost`
- *   field to `ItemPurchaseEvent` (or exposes a separate economy-state accessor),
- *   this tracker should accumulate it here instead.
+ * Output is plain data (ADR-009 / v0.2): players are {@link PlayerRef}s
+ * captured at event time, kills and bomb events are the shared records
+ * produced by {@link EventRecorder}, and per-player economy is captured
+ * here — money of every T/CT player when the round opens and when it ends,
+ * plus their `item_purchase`s — so it lines up with `rounds[i]` exactly.
  */
-
 import type { DemoParser } from "../DemoParser.js";
 import type { TeamSide } from "../enums/TeamSide.js";
 import { RoundEndReason } from "../enums/RoundEndReason.js";
 import type { Player } from "../state/Player.js";
-import type { PlayerDeathEvent } from "../events/enrichers/playerDeath.js";
 import type { PlayerHurtEvent } from "../events/enrichers/playerHurt.js";
-import type { BombPlantedEvent } from "../events/enrichers/bombPlanted.js";
-import type { BombDefusedEvent } from "../events/enrichers/bombDefused.js";
-import type { BombExplodedEvent } from "../events/enrichers/bombExploded.js";
 import type { RoundStartEvent } from "../events/enrichers/roundStart.js";
 import type { RoundEndEvent } from "../events/enrichers/roundEnd.js";
 import type { RoundMvpEvent } from "../events/enrichers/roundMvp.js";
 import type { BeginNewMatchEvent } from "../events/enrichers/beginNewMatch.js";
 import type { ItemPurchaseEvent } from "../events/enrichers/itemPurchase.js";
-import type { PlayerRoundEconomy } from "./EconomyTracker.js";
+import { PlayerRoster } from "./PlayerRoster.js";
+import type { PlayerRef } from "./PlayerRoster.js";
+import type { BombRecord, KillRecord } from "./records.js";
+
+/** A player's money and purchases in one round. */
+export interface RoundPlayerEconomy {
+  /** Cash when the round opened (after round-start income). */
+  readonly startMoney: number;
+  /** Cash when the round ended. */
+  readonly endMoney: number;
+  /** Item names bought this round, in order (e.g. "ak47", "vesthelm"). */
+  readonly purchases: string[];
+}
 
 /** Per-player statistics for a single round. */
 export interface RoundPlayerStats {
-  /** Live `Player` reference as it existed during the round. */
-  readonly player: Player;
+  /** The player, captured when they first appeared in this round. */
+  readonly player: PlayerRef;
   /** Number of kills credited to this player this round. */
   kills: number;
   /** Number of times this player died this round. */
@@ -69,35 +74,25 @@ export interface RoundPlayerStats {
   /** Total HP damage dealt by this player this round. */
   damage: number;
   /**
-   * Total money spent by this player this round.
-   *
-   * TODO(TASK-064): currently always `0` — economy tracker not yet wired up.
-   * When TASK-064 lands a `cost` field on `ItemPurchaseEvent`, accumulate it here.
-   * Use `economy.startMoney - economy.endMoney` for a rough estimate; deferred for accuracy.
+   * Money and purchases. `undefined` for players who were not on T/CT when
+   * the round opened and bought nothing (or when the tracker runs without
+   * a parser, as in unit tests).
    */
-  moneySpent: number;
-  /**
-   * Per-player per-round economy snapshot (TASK-064).
-   *
-   * Populated by `EconomyTracker` after `parseAll()` completes (assembled in
-   * `DemoParser.parse()`). `undefined` when a player joined mid-round and
-   * missed the `round_start` snapshot — rare in practice on well-formed demos.
-   */
-  readonly economy?: PlayerRoundEconomy;
+  economy: RoundPlayerEconomy | undefined;
 }
 
 /** Bomb-event buckets for a single round. */
 export interface RoundBombEvents {
-  /** All `bomb_planted` events that fired during this round. */
-  readonly plants: BombPlantedEvent[];
-  /** All `bomb_defused` events that fired during this round. */
-  readonly defuses: BombDefusedEvent[];
-  /** All `bomb_exploded` events that fired during this round. */
-  readonly explosions: BombExplodedEvent[];
+  /** `planted` records of this round. */
+  readonly plants: BombRecord[];
+  /** `defused` records of this round. */
+  readonly defuses: BombRecord[];
+  /** `exploded` records of this round. */
+  readonly explosions: BombRecord[];
 }
 
 /**
- * Aggregated summary for one completed CS:GO round.
+ * Aggregated summary for one completed CS:GO round. Plain data.
  *
  * Rounds are indexed by their 1-based `number`, which is derived from the
  * `round_end` event's `roundNumber` field (itself sourced from
@@ -111,44 +106,22 @@ export interface RoundSummary {
    * completed rounds). We add 1 to produce the human-readable round number.
    */
   readonly number: number;
-  /**
-   * Winning team side (`TeamSide.T`, `TeamSide.CT`). `undefined` for warmup
-   * or unfinished trailing rounds (does not occur in the normal path since the
-   * tracker only emits a summary on `round_end`).
-   */
+  /** Winning team side (`TeamSide.T`, `TeamSide.CT`). */
   readonly winner: TeamSide | undefined;
-  /**
-   * Round end reason (symbolic `RoundEndReason` value or raw number for
-   * forward-compat with newer server builds). `undefined` when no `round_end`
-   * was observed (edge case — never occurs in the normal path).
-   */
+  /** Round end reason (`RoundEndReason` value, or raw number for unknown codes). */
   readonly endReason: RoundEndReason | number | undefined;
-  /**
-   * Player awarded MVP for this round. `undefined` before `round_mvp` arrives.
-   * CS:GO fires `round_mvp` AFTER `round_end`, so this field starts as
-   * `undefined` and is patched in when the event arrives.
-   */
-  mvp: Player | undefined;
-  /**
-   * Parser frame tick at which `round_start` fired. Sourced from
-   * `DemoParser.currentTick` at the moment of the event.
-   */
+  /** Player awarded MVP for this round, if any. */
+  mvp: PlayerRef | undefined;
+  /** Tick at which the round opened (`round_start`, `begin_new_match`, or the previous round's end). */
   readonly startTick: number;
-  /**
-   * Parser frame tick at which `round_end` fired. Sourced from
-   * `DemoParser.currentTick` at the moment of the event.
-   */
+  /** Tick of `round_freeze_end` (buy time over), if observed. */
+  freezeEndTick: number | undefined;
+  /** Tick of `round_end`. */
   readonly endTick: number;
-  /**
-   * All `player_death` events that fell within this round's tick window,
-   * in wire order.
-   */
-  readonly kills: PlayerDeathEvent[];
-  /**
-   * Per-player round statistics, keyed by entity slot (`Player.slot`).
-   * The slot is a stable per-round identity (1-based entity id for CCSPlayer).
-   */
-  readonly players: Map<number, RoundPlayerStats>;
+  /** Kills of this round, in wire order (same objects as `DemoResult.kills`). */
+  readonly kills: KillRecord[];
+  /** Per-player statistics, in order of first appearance this round. */
+  readonly players: RoundPlayerStats[];
   /** Bomb events (plants, defuses, explosions) during this round. */
   readonly bombEvents: RoundBombEvents;
 }
@@ -156,21 +129,20 @@ export interface RoundSummary {
 /** Mutable in-progress accumulator for the open round. Closed on `round_end`. */
 interface RoundInProgress {
   readonly startTick: number;
+  freezeEndTick: number | undefined;
   /** MVP announced before `round_end` closed the window. */
-  mvp: Player | undefined;
-  readonly kills: PlayerDeathEvent[];
+  mvp: PlayerRef | undefined;
+  readonly kills: KillRecord[];
+  /** Keyed by roster index. */
   readonly players: Map<number, RoundPlayerStats>;
-  readonly bombEvents: {
-    readonly plants: BombPlantedEvent[];
-    readonly defuses: BombDefusedEvent[];
-    readonly explosions: BombExplodedEvent[];
-  };
+  readonly bombEvents: RoundBombEvents;
 }
 
 /**
  * Convenience-layer round aggregator. Attach to a `DemoParser` before
  * `parseAll()` and call `snapshot()` afterwards to retrieve the list of
- * completed `RoundSummary` objects.
+ * completed `RoundSummary` objects. Kill and bomb records are pushed in by
+ * the owner (see `collectDemoResult`) through {@link onKill} / {@link onBomb}.
  */
 export class ConvenienceRoundTracker {
   private readonly rounds: RoundSummary[] = [];
@@ -182,30 +154,25 @@ export class ConvenienceRoundTracker {
   private isWarmup: () => boolean = () => false;
   /** Tick of the most recent `round_end`; start of a synthesized window. */
   private lastEndTick = 0;
+  private parser: DemoParser | null = null;
+  private roster: PlayerRoster | null = null;
 
   /**
    * Wire the tracker to a parser by subscribing to the relevant Tier-1 events.
    * Must be called before `parser.parseAll()`.
-   *
-   * @param parser - the `DemoParser` instance to attach to.
    */
   attach(parser: DemoParser): void {
-    // Capture a tick provider so every handler reads the live frame tick.
+    this.parser = parser;
+    this.roster = PlayerRoster.for(parser);
     this.getTick = () => parser.currentTick;
     this.isWarmup = () => parser.gameRules?.isWarmup === true;
 
     parser.on("round_start", (e) => this.onRoundStart(e));
     parser.on("round_end", (e) => this.onRoundEnd(e));
     parser.on("begin_new_match", (e) => this.onBeginNewMatch(e));
-    parser.on("player_death", (e) => this.onKill(e));
+    parser.on("round_freeze_end", () => this.onFreezeEnd());
     parser.on("player_hurt", (e) => this.onHurt(e));
-    parser.on("bomb_planted", (e) => this.onBombPlanted(e));
-    parser.on("bomb_defused", (e) => this.onBombDefused(e));
-    parser.on("bomb_exploded", (e) => this.onBombExploded(e));
     parser.on("round_mvp", (e) => this.onMvp(e));
-    // item_purchase is in the typed event map (TASK-043) but carries no `cost`
-    // field in the current enricher. Subscribe for forward-compat — when
-    // TASK-064 adds cost tracking this handler will be the hook point.
     parser.on("item_purchase", (e) => this.onItemPurchase(e));
   }
 
@@ -232,6 +199,10 @@ export class ConvenienceRoundTracker {
     this.current = this.openWindow(this.getTick());
   }
 
+  onFreezeEnd(): void {
+    if (this.current !== null) this.current.freezeEndTick = this.getTick();
+  }
+
   onRoundEnd(e: RoundEndEvent): void {
     if (this.current === null) {
       // Warmup round_ends and the "Game Commencing" pseudo round end are not
@@ -240,6 +211,17 @@ export class ConvenienceRoundTracker {
       // A live round whose start we never saw (e.g. the recording began
       // mid-round). Keep it — a round with a round_end is never dropped.
       this.current = this.openWindow(this.lastEndTick);
+    }
+    const current = this.current;
+
+    // Close every player's economy with the money they hold now.
+    if (this.parser !== null) {
+      for (const player of this.parser.players) {
+        const stats = current.players.get(this.roster!.indexOf(player));
+        if (stats?.economy !== undefined) {
+          stats.economy = { ...stats.economy, endMoney: player.money };
+        }
+      }
     }
 
     const summary: RoundSummary = {
@@ -250,12 +232,13 @@ export class ConvenienceRoundTracker {
       number: e.roundNumber + 1,
       winner: e.winner,
       endReason: e.reason,
-      mvp: this.current.mvp,
-      startTick: this.current.startTick,
+      mvp: current.mvp,
+      startTick: current.startTick,
+      freezeEndTick: current.freezeEndTick,
       endTick: this.getTick(),
-      kills: this.current.kills,
-      players: this.current.players,
-      bombEvents: this.current.bombEvents,
+      kills: current.kills,
+      players: [...current.players.values()],
+      bombEvents: current.bombEvents,
     };
 
     this.rounds.push(summary);
@@ -263,69 +246,54 @@ export class ConvenienceRoundTracker {
     this.current = null;
   }
 
-  onKill(e: PlayerDeathEvent): void {
+  /** Account a kill record to the open round. */
+  onKill(record: KillRecord): void {
     // Drop events outside any round window (warmup, post-demo trailing events).
     if (this.current === null) return;
 
-    this.current.kills.push(e);
+    this.current.kills.push(record);
+    if (record.attacker !== undefined) this.statsFor(record.attacker).kills += 1;
+    this.statsFor(record.victim).deaths += 1;
+    if (record.assister !== undefined) this.statsFor(record.assister).assists += 1;
+  }
 
-    // Credit attacker kill
-    if (e.attacker !== undefined) {
-      this.getOrCreatePlayerStats(e.attacker).kills += 1;
-    }
-
-    // Credit victim death
-    this.getOrCreatePlayerStats(e.victim).deaths += 1;
-
-    // Credit assister
-    if (e.assister !== undefined) {
-      this.getOrCreatePlayerStats(e.assister).assists += 1;
-    }
+  /** File a bomb record into the open round's buckets. */
+  onBomb(record: BombRecord): void {
+    if (this.current === null) return;
+    const buckets = this.current.bombEvents;
+    if (record.type === "planted") buckets.plants.push(record);
+    else if (record.type === "defused") buckets.defuses.push(record);
+    else if (record.type === "exploded") buckets.explosions.push(record);
   }
 
   onHurt(e: PlayerHurtEvent): void {
     // Drop events outside any round window.
-    if (this.current === null) return;
-
-    if (e.attacker !== undefined) {
-      this.getOrCreatePlayerStats(e.attacker).damage += e.damage;
-    }
-  }
-
-  onBombPlanted(e: BombPlantedEvent): void {
-    if (this.current === null) return;
-    this.current.bombEvents.plants.push(e);
-  }
-
-  onBombDefused(e: BombDefusedEvent): void {
-    if (this.current === null) return;
-    this.current.bombEvents.defuses.push(e);
-  }
-
-  onBombExploded(e: BombExplodedEvent): void {
-    if (this.current === null) return;
-    this.current.bombEvents.explosions.push(e);
+    if (this.current === null || e.attacker === undefined) return;
+    this.statsForPlayer(e.attacker).damage += e.damage;
   }
 
   onMvp(e: RoundMvpEvent): void {
+    const mvp = this.toRef(e.player);
     // CS:GO fires `round_mvp` on the round_end tick, just BEFORE round_end:
     // hold it on the open window until the round closes.
     if (this.current !== null) {
-      this.current.mvp = e.player;
+      this.current.mvp = mvp;
       return;
     }
     // Arriving after the close: attach to the most recent round.
     const lastRound = this.rounds[this.rounds.length - 1];
-    if (lastRound !== undefined) lastRound.mvp = e.player;
+    if (lastRound !== undefined) lastRound.mvp = mvp;
   }
 
-  onItemPurchase(_e: ItemPurchaseEvent): void {
-    // TODO(TASK-064): accumulate purchase cost into per-player `moneySpent`.
-    // Currently ItemPurchaseEvent carries `{ player, item }` but no `cost`
-    // field — the economy tracker (TASK-064) will extend this. Until then,
-    // moneySpent stays 0 for every player in every round.
+  onItemPurchase(e: ItemPurchaseEvent): void {
     if (this.current === null) return;
-    // When TASK-064 lands: this.getOrCreatePlayerStats(e.player).moneySpent += e.cost;
+    const stats = this.statsForPlayer(e.player);
+    if (stats.economy === undefined) {
+      // Joined after the round opened: best effort, current money as start.
+      const money = this.parser !== null ? e.player.money : 0;
+      stats.economy = { startMoney: money, endMoney: money, purchases: [] };
+    }
+    stats.economy.purchases.push(e.item);
   }
 
   // -------------------------------------------------------------------------
@@ -333,33 +301,49 @@ export class ConvenienceRoundTracker {
   // -------------------------------------------------------------------------
 
   private openWindow(startTick: number): RoundInProgress {
-    return {
+    const window: RoundInProgress = {
       startTick,
+      freezeEndTick: undefined,
       mvp: undefined,
       kills: [],
       players: new Map(),
       bombEvents: { plants: [], defuses: [], explosions: [] },
     };
+    if (this.parser !== null) {
+      // Snapshot every T/CT player's money as the round's start money.
+      for (const player of this.parser.players) {
+        if (player.team < 2) continue;
+        const ref = this.roster!.ref(player);
+        const money = player.money;
+        window.players.set(ref.index, {
+          player: ref,
+          kills: 0,
+          deaths: 0,
+          assists: 0,
+          damage: 0,
+          economy: { startMoney: money, endMoney: money, purchases: [] },
+        });
+      }
+    }
+    return window;
   }
 
-  /**
-   * Get or create per-player stats for the current round.
-   * Players are keyed by their entity slot (`Player.slot`), which is the
-   * 1-based CCSPlayer entity id — stable within a round.
-   */
-  private getOrCreatePlayerStats(player: Player): RoundPlayerStats {
-    const key = player.slot;
-    let stats = this.current!.players.get(key);
+  /** Live player → plain ref (unit tests without a parser pass refs directly). */
+  private toRef(player: Player | PlayerRef): PlayerRef {
+    if (this.roster === null || !("position" in player)) return player as PlayerRef;
+    return this.roster.ref(player);
+  }
+
+  private statsForPlayer(player: Player | PlayerRef): RoundPlayerStats {
+    return this.statsFor(this.toRef(player));
+  }
+
+  /** Get or create the open round's stats for `ref` (keyed by roster index). */
+  private statsFor(ref: PlayerRef): RoundPlayerStats {
+    let stats = this.current!.players.get(ref.index);
     if (stats === undefined) {
-      stats = {
-        player,
-        kills: 0,
-        deaths: 0,
-        assists: 0,
-        damage: 0,
-        moneySpent: 0,
-      };
-      this.current!.players.set(key, stats);
+      stats = { player: ref, kills: 0, deaths: 0, assists: 0, damage: 0, economy: undefined };
+      this.current!.players.set(ref.index, stats);
     }
     return stats;
   }
