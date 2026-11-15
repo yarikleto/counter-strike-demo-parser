@@ -27,6 +27,9 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - run: npm run test:integration
+      # Load and run every published entry point from dist/ (ESM, CJS,
+      # browser, node) — unit tests run on src/ and can't catch packaging bugs.
+      - run: npm run test:dist
 
   golden-regression:
     name: golden regression

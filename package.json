@@ -75,11 +75,23 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=22.0.0",
-    "npm": ">=10 <11"
+    "node": ">=22.0.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.0.0",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=10 <11",
+      "onFail": "error"
+    }
   },
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "npm run build",
     "build:native": "node-gyp configure --directory native && node-gyp build --directory native",
     "rebuild:native": "node-gyp rebuild --directory native",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.eslint.json && tsc -p tsconfig.browser.json && tsc -p test/browser/tsconfig.json",
