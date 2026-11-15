@@ -20,6 +20,11 @@
  *     reported separately — on vertigo grenades legitimately fall off the
  *     building), and the median distance from each trajectory's last point
  *     to the engine-reported detonation position
+ *   - shots (`weapon_fire`) and hits (`player_hurt`) against the raw event
+ *     counts, the share of gun shots / knife swings / grenade throws, the
+ *     share of shot positions inside the player bounding box ± margin, and
+ *     the hit-to-shot match rate: the share of gun hits whose attacker fired
+ *     a gun within 0 / 2 / 8 ticks before the hit
  *   - parserError events and whether the parse threw
  *
  * Usage:
@@ -32,10 +37,37 @@ import { performance } from "node:perf_hooks";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { DemoParser, PositionFlags } from "../src/index.js";
+import {
+  DemoParser,
+  NO_PLAYER,
+  PositionFlags,
+  ShotKind,
+  hitBuffers,
+  shotBuffers,
+} from "../src/index.js";
+import type { DemoResult } from "../src/index.js";
 
 /** Margin around the player bounding box, in world units. */
 const BBOX_MARGIN = 500;
+
+/** Hit-to-shot windows, in ticks before the hit. */
+const MATCH_WINDOWS = [0, 2, 8] as const;
+
+/** `player_hurt` weapons that are not fired by a gun. */
+const NON_GUN_HITS: ReadonlySet<string> = new Set([
+  "",
+  "world",
+  "worldspawn",
+  "inferno",
+  "molotov",
+  "incgrenade",
+  "hegrenade",
+  "flashbang",
+  "smokegrenade",
+  "decoy",
+  "knife",
+  "planted_c4",
+]);
 
 interface Report {
   readonly file: string;
@@ -55,6 +87,18 @@ interface Report {
   readonly effects: number;
   readonly bombEvents: number;
   readonly positionRows: number;
+  readonly weaponFireEvents: number;
+  readonly shots: number;
+  readonly knifeShots: number;
+  readonly grenadeShots: number;
+  readonly playerHurtEvents: number;
+  readonly hits: number;
+  /** Bytes of the shot + hit typed-array columns. */
+  readonly shotHitBytes: number;
+  readonly shotsInBoxXY: number;
+  readonly gunHits: number;
+  /** Share of gun hits matched within each of {@link MATCH_WINDOWS}. */
+  readonly hitShotMatch: number[];
   readonly pointsInBoxXY: number;
   readonly pointsInBoxZ: number;
   readonly detonationDistanceMedian: number;
@@ -88,11 +132,15 @@ async function parseOne(path: string, rate: number): Promise<Report> {
   // Second, unmeasured pass for raw counts that DemoResult doesn't carry.
   let roundEndEvents = 0;
   let grenadeThrownEvents = 0;
+  let weaponFireEvents = 0;
+  let playerHurtEvents = 0;
   let parserErrors = 0;
   const counter = DemoParser.fromBuffer(bytes);
   counter.on("gameEvent", (e) => {
     if (e.name === "round_end") roundEndEvents++;
     else if (e.name === "grenade_thrown") grenadeThrownEvents++;
+    else if (e.name === "weapon_fire") weaponFireEvents++;
+    else if (e.name === "player_hurt") playerHurtEvents++;
   });
   counter.on("parserError", () => parserErrors++);
   counter.parseAll();
@@ -136,6 +184,30 @@ async function parseOne(path: string, rate: number): Promise<Report> {
   }
   distances.sort((a, b) => a - b);
 
+  const { shots, hits } = result;
+  let shotsInBox = 0;
+  let knifeShots = 0;
+  let grenadeShots = 0;
+  for (let i = 0; i < shots.length; i++) {
+    if (shots.kind[i] === ShotKind.Knife) knifeShots++;
+    else if (shots.kind[i] === ShotKind.Grenade) grenadeShots++;
+    const x = shots.x[i]!;
+    const y = shots.y[i]!;
+    if (
+      x >= box.minX - BBOX_MARGIN &&
+      x <= box.maxX + BBOX_MARGIN &&
+      y >= box.minY - BBOX_MARGIN &&
+      y <= box.maxY + BBOX_MARGIN
+    ) {
+      shotsInBox++;
+    }
+  }
+  const match = hitShotMatch(result);
+  const shotHitBytes = [...shotBuffers(shots), ...hitBuffers(hits)].reduce(
+    (sum, b) => sum + b.byteLength,
+    0,
+  );
+
   return {
     file: basename(path),
     map: result.header.mapName,
@@ -154,10 +226,58 @@ async function parseOne(path: string, rate: number): Promise<Report> {
     effects: result.grenadeEffects.length,
     bombEvents: result.bomb.length,
     positionRows: pos.length,
+    weaponFireEvents,
+    shots: shots.length,
+    knifeShots,
+    grenadeShots,
+    playerHurtEvents,
+    hits: hits.length,
+    shotHitBytes,
+    shotsInBoxXY: shots.length === 0 ? 1 : shotsInBox / shots.length,
+    gunHits: match.gunHits,
+    hitShotMatch: match.rates,
     pointsInBoxXY: points === 0 ? 1 : inXY / points,
     pointsInBoxZ: points === 0 ? 1 : inZ / points,
     detonationDistanceMedian: distances[distances.length >> 1] ?? NaN,
   };
+}
+
+/**
+ * Share of gun hits whose attacker fired a gun (`ShotKind.Bullet`) at most
+ * `w` ticks before the hit, for each `w` of {@link MATCH_WINDOWS}.
+ */
+function hitShotMatch(result: DemoResult): { gunHits: number; rates: number[] } {
+  const { shots, hits } = result;
+  const shotTicks = new Map<number, number[]>();
+  for (let i = 0; i < shots.length; i++) {
+    if (shots.kind[i] !== ShotKind.Bullet) continue;
+    let list = shotTicks.get(shots.player[i]!);
+    if (list === undefined) shotTicks.set(shots.player[i]!, (list = []));
+    list.push(shots.tick[i]!);
+  }
+  let gunHits = 0;
+  const matched = MATCH_WINDOWS.map(() => 0);
+  for (let i = 0; i < hits.length; i++) {
+    if (hits.attacker[i] === NO_PLAYER || NON_GUN_HITS.has(hits.weapons[hits.weapon[i]!]!)) {
+      continue;
+    }
+    gunHits++;
+    const ticks = shotTicks.get(hits.attacker[i]!) ?? [];
+    const t = hits.tick[i]!;
+    // Latest shot at or before the hit (ticks are sorted).
+    let lo = 0;
+    let hi = ticks.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (ticks[mid]! <= t) lo = mid + 1;
+      else hi = mid;
+    }
+    const gap = lo === 0 ? Infinity : t - ticks[lo - 1]!;
+    MATCH_WINDOWS.forEach((w, k) => {
+      if (gap <= w) matched[k]!++;
+    });
+  }
+  return { gunHits, rates: matched.map((m) => (gunHits === 0 ? 1 : m / gunHits)) };
 }
 
 function emptyReport(
@@ -185,6 +305,16 @@ function emptyReport(
     effects: 0,
     bombEvents: 0,
     positionRows: 0,
+    weaponFireEvents: 0,
+    shots: 0,
+    knifeShots: 0,
+    grenadeShots: 0,
+    playerHurtEvents: 0,
+    hits: 0,
+    shotHitBytes: 0,
+    shotsInBoxXY: 0,
+    gunHits: 0,
+    hitShotMatch: MATCH_WINDOWS.map(() => 0),
     pointsInBoxXY: 0,
     pointsInBoxZ: 0,
     detonationDistanceMedian: NaN,
@@ -227,6 +357,22 @@ function table(reports: readonly Report[]): string {
     ["effects", (r) => String(r.effects)],
     ["bomb", (r) => String(r.bombEvents)],
     ["pos rows", (r) => String(r.positionRows)],
+    ["w_fire", (r) => String(r.weaponFireEvents)],
+    ["shots", (r) => String(r.shots) + (r.shots === r.weaponFireEvents ? "" : " (!)")],
+    ["knife", (r) => String(r.knifeShots)],
+    ["nade", (r) => String(r.grenadeShots)],
+    ["p_hurt", (r) => String(r.playerHurtEvents)],
+    ["hits", (r) => String(r.hits) + (r.hits === r.playerHurtEvents ? "" : " (!)")],
+    ["col KB", (r) => (r.shotHitBytes / 1024).toFixed(0)],
+    ["shot inBox", (r) => `${(r.shotsInBoxXY * 100).toFixed(1)}%`],
+    ["gun hits", (r) => String(r.gunHits)],
+    ...MATCH_WINDOWS.map(
+      (w, k) =>
+        [`hit<-shot ${w}t`, (r: Report) => `${(r.hitShotMatch[k]! * 100).toFixed(1)}%`] as [
+          string,
+          (r: Report) => string,
+        ],
+    ),
     ["inBox XY", (r) => `${(r.pointsInBoxXY * 100).toFixed(1)}%`],
     ["inBox Z", (r) => `${(r.pointsInBoxZ * 100).toFixed(1)}%`],
     ["det dist", (r) => r.detonationDistanceMedian.toFixed(2)],
@@ -279,7 +425,9 @@ async function main(): Promise<void> {
   const bad = reports.filter((r) => r.threw !== undefined || r.rounds !== r.roundEndEvents);
   console.log(
     `\n${reports.length} demo(s); ${bad.length} with a throw or a rounds/round_end mismatch.` +
-      ` Positions sampled every ${args.rate} ticks; bounding-box margin ${BBOX_MARGIN} units.`,
+      ` Positions sampled every ${args.rate} ticks; bounding-box margin ${BBOX_MARGIN} units.` +
+      ` (!) marks shots/hits that differ from the raw weapon_fire/player_hurt count` +
+      ` (events whose player could not be resolved).`,
   );
   if (bad.length > 0) process.exitCode = 1;
 }
