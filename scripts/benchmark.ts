@@ -30,12 +30,15 @@ import { fileURLToPath } from "node:url";
 import { arch, cpus } from "node:os";
 
 import { DemoParser } from "../src/index.js";
+import type { ParseOptions } from "../src/index.js";
 
 interface CliOptions {
   fixture: string;
   iterations: number;
   warmup: number;
   smoke: boolean;
+  /** Parse with `collectVoice: true`. */
+  collectVoice: boolean;
 }
 
 interface IterationSample {
@@ -59,6 +62,7 @@ interface ResultRecord {
   fixtureSizeBytes: number;
   iterations: number;
   warmup: number;
+  collectVoice: boolean;
   hardware: {
     nodeVersion: string;
     arch: string;
@@ -82,6 +86,7 @@ Options:
                            Also configurable via BENCH_ITERATIONS env var.
   --warmup M               Number of warmup iterations (default: 2)
                            Also configurable via BENCH_WARMUP env var.
+  --collect-voice          Parse with { collectVoice: true }.
   --smoke                  Run a single iteration and assert the JSON shape
                            (handy for CI / pre-commit smoke tests).
   --help, -h               Show this help.
@@ -99,6 +104,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
   let iterations: number | undefined;
   let warmup: number | undefined;
   let smoke = false;
+  let collectVoice = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -117,6 +123,8 @@ function parseArgs(argv: readonly string[]): CliOptions {
       i++;
     } else if (arg === "--smoke") {
       smoke = true;
+    } else if (arg === "--collect-voice") {
+      collectVoice = true;
     } else if (arg.startsWith("--iterations=")) {
       iterations = parseIntStrict(arg.slice("--iterations=".length), "--iterations");
     } else if (arg.startsWith("--warmup=")) {
@@ -140,6 +148,7 @@ function parseArgs(argv: readonly string[]): CliOptions {
       ? 0
       : (warmup ?? (envWarmup !== undefined ? parseIntStrict(envWarmup, "BENCH_WARMUP") : 2)),
     smoke,
+    collectVoice,
   };
 }
 
@@ -163,6 +172,7 @@ async function runIteration(
   buffer: Buffer,
   iteration: number,
   fixtureSizeMb: number,
+  options: ParseOptions,
 ): Promise<IterationSample> {
   maybeGc();
 
@@ -176,7 +186,7 @@ async function runIteration(
 
   const start = performance.now();
   try {
-    await DemoParser.parse(buffer);
+    await DemoParser.parse(buffer, options);
   } finally {
     clearInterval(sampler);
   }
@@ -299,12 +309,13 @@ async function main(): Promise<void> {
   const fixtureSizeBytes = buffer.byteLength;
   const fixtureSizeMb = fixtureSizeBytes / 1_048_576;
 
+  const parseOptions: ParseOptions = opts.collectVoice ? { collectVoice: true } : {};
   const iterations = opts.smoke ? 1 : opts.iterations;
   const warmup = opts.smoke ? 0 : opts.warmup;
 
   console.log(`Benchmarking DemoParser.parse() on ${fixturePath} (${fmt(fixtureSizeMb)} MB)`);
   console.log(
-    `iterations=${iterations} warmup=${warmup} node=${process.version} arch=${arch()} cpu="${cpus()[0]?.model ?? "unknown"}"`,
+    `iterations=${iterations} warmup=${warmup} collectVoice=${opts.collectVoice} node=${process.version} arch=${arch()} cpu="${cpus()[0]?.model ?? "unknown"}"`,
   );
 
   // Warmup — runs are not recorded; gives the JIT and any module-level caches
@@ -312,14 +323,14 @@ async function main(): Promise<void> {
   for (let w = 0; w < warmup; w++) {
     process.stdout.write(`  warmup ${w + 1}/${warmup}...`);
     const t0 = performance.now();
-    await DemoParser.parse(buffer);
+    await DemoParser.parse(buffer, parseOptions);
     process.stdout.write(` ${fmt(performance.now() - t0)} ms\n`);
   }
 
   const samples: IterationSample[] = [];
   for (let i = 0; i < iterations; i++) {
     process.stdout.write(`  iter ${i + 1}/${iterations}...`);
-    const sample = await runIteration(buffer, i + 1, fixtureSizeMb);
+    const sample = await runIteration(buffer, i + 1, fixtureSizeMb, parseOptions);
     samples.push(sample);
     process.stdout.write(
       ` ${fmt(sample.durationMs)} ms (${fmt(sample.throughputMbPerSec)} MB/s, peak RSS ${fmt(sample.peakRssMb)} MB)\n`,
@@ -332,6 +343,7 @@ async function main(): Promise<void> {
     fixtureSizeBytes,
     iterations,
     warmup,
+    collectVoice: opts.collectVoice,
     hardware: {
       nodeVersion: process.version,
       arch: arch(),
