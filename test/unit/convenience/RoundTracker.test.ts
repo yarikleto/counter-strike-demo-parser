@@ -125,19 +125,51 @@ describe("ConvenienceRoundTracker", () => {
     expect(tracker.snapshot()).toEqual([]);
   });
 
-  it("warmup guard: round_end with no preceding round_start is not pushed", () => {
+  it("warmup guard: round_end during warmup is not pushed", () => {
     const tracker = new ConvenienceRoundTracker();
-    // Simulate warmup: round_end fires without a round_start.
+    (tracker as unknown as { isWarmup: () => boolean }).isWarmup = () => true;
+    tracker.onRoundEnd(makeRoundEnd(0));
     tracker.onRoundEnd(makeRoundEnd(0));
     expect(tracker.snapshot()).toHaveLength(0);
   });
 
-  it("warmup guard: multiple warmup round_ends are all ignored", () => {
+  it("drops the Game Commencing pseudo round end", () => {
     const tracker = new ConvenienceRoundTracker();
-    tracker.onRoundEnd(makeRoundEnd(0));
-    tracker.onRoundEnd(makeRoundEnd(0));
-    tracker.onRoundEnd(makeRoundEnd(0));
+    tracker.onRoundEnd(makeRoundEnd(0, TeamSide.Spectator, RoundEndReason.GameStart));
     expect(tracker.snapshot()).toHaveLength(0);
+  });
+
+  it("keeps a live round_end that has no preceding round_start", () => {
+    // Regression (club vertigo demo): GOTV recording began after round 1's
+    // round_start, so round 1 only had begin_new_match + round_end. A round
+    // with a round_end must never be dropped.
+    const tracker = new ConvenienceRoundTracker();
+    let tick = 8197;
+    (tracker as unknown as { getTick: () => number }).getTick = () => tick;
+    tracker.onRoundEnd(makeRoundEnd(0, TeamSide.CT, RoundEndReason.CTWin));
+    tick = 9097;
+    tracker.onRoundStart(makeRoundStart(1));
+    tick = 18119;
+    tracker.onRoundEnd(makeRoundEnd(1, TeamSide.T, RoundEndReason.TWin));
+
+    const rounds = tracker.snapshot();
+    expect(rounds.map((r) => r.number)).toEqual([1, 2]);
+    expect(rounds[0]!.startTick).toBe(0);
+    expect(rounds[0]!.endTick).toBe(8197);
+    expect(rounds[0]!.winner).toBe(TeamSide.CT);
+    expect(rounds[1]!.startTick).toBe(9097);
+  });
+
+  it("begin_new_match opens round 1 so its kills are collected", () => {
+    const tracker = new ConvenienceRoundTracker();
+    const victim = makePlayer(2);
+    tracker.onBeginNewMatch({ eventName: "begin_new_match", eventId: 10 });
+    tracker.onKill(makePlayerDeath(victim, makePlayer(1)));
+    tracker.onRoundEnd(makeRoundEnd(0));
+
+    const rounds = tracker.snapshot();
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0]!.kills).toHaveLength(1);
   });
 
   it("emits a round summary after round_start → round_end", () => {
@@ -269,6 +301,17 @@ describe("ConvenienceRoundTracker", () => {
 
     const round = tracker.snapshot()[0]!;
     expect(round.mvp).toBe(mvpPlayer);
+  });
+
+  it("MVP fired just before round_end (CS:GO wire order) attaches to that round", () => {
+    const tracker = new ConvenienceRoundTracker();
+    const mvpPlayer = makePlayer(7);
+
+    tracker.onRoundStart(makeRoundStart());
+    tracker.onMvp(makeRoundMvp(mvpPlayer));
+    tracker.onRoundEnd(makeRoundEnd());
+
+    expect(tracker.snapshot()[0]!.mvp).toBe(mvpPlayer);
   });
 
   it("MVP before any round is ignored gracefully", () => {

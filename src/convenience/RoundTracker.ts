@@ -10,19 +10,26 @@
  * field (ADR-009).
  *
  * State machine:
- *   - `round_start` → opens a new in-progress window (`current` becomes non-null).
- *   - `round_end`   → closes the window, emits a `RoundSummary`, pushes to list.
- *   - `round_mvp`   → attaches MVP to the most-recently-closed round when fired
- *                     after `round_end` (typical CS:GO sequencing).
+ *   - `round_start`     → opens a new in-progress window (`current` becomes non-null).
+ *   - `begin_new_match` → also opens a window. GOTV demos recorded from the
+ *                         live round often start with `begin_new_match` and
+ *                         no `round_start` for round 1 (the start was sent
+ *                         before the recording began).
+ *   - `round_end`       → closes the window, emits a `RoundSummary`, pushes to list.
+ *   - `round_mvp`       → CS:GO fires it on the same tick as, and just before,
+ *                         `round_end`; it is held on the open window and
+ *                         attached when the round closes. An MVP arriving after
+ *                         the close attaches to the most recent round.
  *   - All other events (kills, hurts, bomb events, purchases) accumulate into
- *     `current` only when `current !== null`. Events received before any
- *     `round_start` are warmup — they are silently dropped.
+ *     `current` only when `current !== null`.
  *
- * Warmup exclusion rule (documented here per spec):
- *   If a `round_end` fires with no preceding `round_start` in the current
- *   window (i.e. `current === null`), that round_end is treated as warmup and
- *   is NOT pushed onto the summary list. This handles the common demo pattern
- *   where warmup `round_end` events fire before the first real `round_start`.
+ * Warmup exclusion rule:
+ *   A `round_end` with no open window is only discarded when GameRules
+ *   reports warmup (`m_bWarmupPeriod`) at that moment, or when it is the
+ *   "Game Commencing" pseudo round end (`RoundEndReason.GameStart`). A `round_end` outside warmup with no
+ *   open window still produces a summary — its window starts at the previous
+ *   round's end (or tick 0) and carries no per-round events. A round that has
+ *   a `round_end` is never dropped.
  *
  * moneySpent (TASK-064 TODO):
  *   `item_purchase` events are subscribed here. The enriched `ItemPurchaseEvent`
@@ -35,7 +42,7 @@
 
 import type { DemoParser } from "../DemoParser.js";
 import type { TeamSide } from "../enums/TeamSide.js";
-import type { RoundEndReason } from "../enums/RoundEndReason.js";
+import { RoundEndReason } from "../enums/RoundEndReason.js";
 import type { Player } from "../state/Player.js";
 import type { PlayerDeathEvent } from "../events/enrichers/playerDeath.js";
 import type { PlayerHurtEvent } from "../events/enrichers/playerHurt.js";
@@ -45,6 +52,7 @@ import type { BombExplodedEvent } from "../events/enrichers/bombExploded.js";
 import type { RoundStartEvent } from "../events/enrichers/roundStart.js";
 import type { RoundEndEvent } from "../events/enrichers/roundEnd.js";
 import type { RoundMvpEvent } from "../events/enrichers/roundMvp.js";
+import type { BeginNewMatchEvent } from "../events/enrichers/beginNewMatch.js";
 import type { ItemPurchaseEvent } from "../events/enrichers/itemPurchase.js";
 import type { PlayerRoundEconomy } from "./EconomyTracker.js";
 
@@ -148,6 +156,8 @@ export interface RoundSummary {
 /** Mutable in-progress accumulator for the open round. Closed on `round_end`. */
 interface RoundInProgress {
   readonly startTick: number;
+  /** MVP announced before `round_end` closed the window. */
+  mvp: Player | undefined;
   readonly kills: PlayerDeathEvent[];
   readonly players: Map<number, RoundPlayerStats>;
   readonly bombEvents: {
@@ -168,6 +178,10 @@ export class ConvenienceRoundTracker {
   private current: RoundInProgress | null = null;
   /** Callback to read the parser's current frame tick at event-fire time. */
   private getTick: () => number = () => 0;
+  /** Callback reporting whether GameRules currently says warmup. */
+  private isWarmup: () => boolean = () => false;
+  /** Tick of the most recent `round_end`; start of a synthesized window. */
+  private lastEndTick = 0;
 
   /**
    * Wire the tracker to a parser by subscribing to the relevant Tier-1 events.
@@ -178,9 +192,11 @@ export class ConvenienceRoundTracker {
   attach(parser: DemoParser): void {
     // Capture a tick provider so every handler reads the live frame tick.
     this.getTick = () => parser.currentTick;
+    this.isWarmup = () => parser.gameRules?.isWarmup === true;
 
     parser.on("round_start", (e) => this.onRoundStart(e));
     parser.on("round_end", (e) => this.onRoundEnd(e));
+    parser.on("begin_new_match", (e) => this.onBeginNewMatch(e));
     parser.on("player_death", (e) => this.onKill(e));
     parser.on("player_hurt", (e) => this.onHurt(e));
     parser.on("bomb_planted", (e) => this.onBombPlanted(e));
@@ -206,21 +222,24 @@ export class ConvenienceRoundTracker {
     // Open a fresh in-progress window. Any previously-open window without a
     // matching round_end (e.g. back-to-back round_starts) is discarded — the
     // new round takes precedence.
-    this.current = {
-      startTick: this.getTick(),
-      kills: [],
-      players: new Map(),
-      bombEvents: { plants: [], defuses: [], explosions: [] },
-    };
+    this.current = this.openWindow(this.getTick());
+  }
+
+  onBeginNewMatch(_e: BeginNewMatchEvent): void {
+    // A (re)started match begins round 1 here. Anything accumulated before
+    // (warmup) is discarded. When a `round_start` follows, it simply opens
+    // the window again at its own tick.
+    this.current = this.openWindow(this.getTick());
   }
 
   onRoundEnd(e: RoundEndEvent): void {
-    // Warmup guard: if no round_start preceded this round_end in the current
-    // window, treat as warmup and discard. This handles the common demo pattern
-    // where warmup round_end events fire before the first real round_start.
     if (this.current === null) {
-      // Warmup / orphaned round_end — do not push to summary list.
-      return;
+      // Warmup round_ends and the "Game Commencing" pseudo round end are not
+      // part of the match.
+      if (this.isWarmup() || e.reason === RoundEndReason.GameStart) return;
+      // A live round whose start we never saw (e.g. the recording began
+      // mid-round). Keep it — a round with a round_end is never dropped.
+      this.current = this.openWindow(this.lastEndTick);
     }
 
     const summary: RoundSummary = {
@@ -231,7 +250,7 @@ export class ConvenienceRoundTracker {
       number: e.roundNumber + 1,
       winner: e.winner,
       endReason: e.reason,
-      mvp: undefined,
+      mvp: this.current.mvp,
       startTick: this.current.startTick,
       endTick: this.getTick(),
       kills: this.current.kills,
@@ -240,6 +259,7 @@ export class ConvenienceRoundTracker {
     };
 
     this.rounds.push(summary);
+    this.lastEndTick = summary.endTick;
     this.current = null;
   }
 
@@ -288,16 +308,15 @@ export class ConvenienceRoundTracker {
   }
 
   onMvp(e: RoundMvpEvent): void {
-    // `round_mvp` typically fires AFTER `round_end` in CS:GO wire order.
-    // Attach MVP to the most-recently-closed round when current is null.
-    if (this.rounds.length > 0 && this.current === null) {
-      const lastRound = this.rounds[this.rounds.length - 1]!;
-      lastRound.mvp = e.player;
+    // CS:GO fires `round_mvp` on the round_end tick, just BEFORE round_end:
+    // hold it on the open window until the round closes.
+    if (this.current !== null) {
+      this.current.mvp = e.player;
       return;
     }
-    // Rare case: round_mvp fires before round_end (should not happen on a
-    // well-formed CS:GO demo). Silently tolerate — the MVP won't be attached
-    // to the round summary in this case. The normal path above handles it.
+    // Arriving after the close: attach to the most recent round.
+    const lastRound = this.rounds[this.rounds.length - 1];
+    if (lastRound !== undefined) lastRound.mvp = e.player;
   }
 
   onItemPurchase(_e: ItemPurchaseEvent): void {
@@ -312,6 +331,16 @@ export class ConvenienceRoundTracker {
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
+
+  private openWindow(startTick: number): RoundInProgress {
+    return {
+      startTick,
+      mvp: undefined,
+      kills: [],
+      players: new Map(),
+      bombEvents: { plants: [], defuses: [], explosions: [] },
+    };
+  }
 
   /**
    * Get or create per-player stats for the current round.
