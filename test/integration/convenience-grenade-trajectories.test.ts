@@ -116,4 +116,23 @@ describe.skipIf(!fixtureAvailable)("GrenadeTrajectoryTracker integration (de_nuk
       expect(t.entityIndex).toBeGreaterThan(0);
     }
   });
+
+  it("trajectory points are world coordinates that end at the detonation position", async () => {
+    // Regression: projectile m_vecOrigin is cell-relative. Without combining
+    // it with m_cellX/Y/Z the points sat in [0, 32) instead of world space.
+    // The *_detonate events carry engine-computed world coordinates, so the
+    // last sample before detonation must land right next to them.
+    const result = await DemoParser.parse(path.join(__dirname, "..", "fixtures", "de_nuke.dem"));
+    const distances: number[] = [];
+    for (const t of result.grenadeTrajectories) {
+      const last = t.trajectory[t.trajectory.length - 1];
+      const det = t.detonationPosition;
+      if (last === undefined || det === undefined) continue;
+      distances.push(Math.hypot(last.x - det.x, last.y - det.y, last.z - det.z));
+    }
+    expect(distances.length).toBeGreaterThan(50);
+    distances.sort((a, b) => a - b);
+    expect(distances[Math.floor(distances.length / 2)]).toBeLessThan(8);
+    expect(distances[Math.floor(distances.length * 0.95)]).toBeLessThan(64);
+  });
 });

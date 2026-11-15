@@ -43,8 +43,9 @@
  *   grenades, dropped→retriggered grenades whose handle has gone stale).
  *
  * Trajectory sampling:
- *   On every `entityUpdated` for a tracked projectile, read `m_vecOrigin`
- *   (a `Vector3` value on the wire) and push to the trajectory ARRAY iff
+ *   On every `entityUpdated` for a tracked projectile, read its world-space
+ *   origin (`m_vecOrigin` is cell-relative on projectiles and is combined
+ *   with `m_cellX/Y/Z` — see `EntityOrigin.ts`) and push to the trajectory iff
  *   the position differs from the last sample. CSGO networks
  *   `m_flSimulationTime` and `m_vecOrigin` together so the entity update
  *   typically fires once per tick the grenade moves — duplicate samples
@@ -89,6 +90,7 @@ import type { Player, Vector3 } from "../state/Player.js";
 import type { Entity } from "../entities/Entity.js";
 import type { DecodedGameEvent } from "../events/GameEventDecoder.js";
 import { resolveHandle } from "../state/EntityHandle.js";
+import { readEntityOrigin } from "../state/EntityOrigin.js";
 
 /** The five distinguishable in-flight grenade types. */
 export type GrenadeType = "smoke" | "flash" | "he" | "molotov" | "incendiary" | "decoy";
@@ -153,11 +155,6 @@ interface MutableTrajectory {
   lastZ: number;
   /** Has at least one sample been pushed? Avoids the 0/0/0 edge case. */
   hasSample: boolean;
-  /**
-   * Cached flat-prop index for `m_vecOrigin` on this entity's ServerClass.
-   * Resolved lazily on first sample. -1 = not resolved, -2 = absent.
-   */
-  originIdx: number;
 }
 
 /** ServerClass names that map directly to a single grenade type at spawn. */
@@ -255,7 +252,6 @@ export class GrenadeTrajectoryTracker {
       lastY: 0,
       lastZ: 0,
       hasSample: false,
-      originIdx: -1,
     };
     this.tracked.set(entity.id, record);
 
@@ -336,35 +332,16 @@ export class GrenadeTrajectoryTracker {
   }
 
   /**
-   * Read `m_vecOrigin` off the entity and push a sample if it differs from
-   * the last one. Caches the flat-prop index on the record so repeated
-   * samples don't re-walk `flattenedProps`. Tolerates missing props
-   * silently (record.originIdx === -2) — a grenade ServerClass that
-   * lacks `m_vecOrigin` is impossible in practice but the guard avoids
-   * a hot-path crash.
+   * Read the projectile's world-space origin and push a sample if it differs
+   * from the last one. Projectiles network `m_vecOrigin` as a cell-relative
+   * offset; {@link readEntityOrigin} combines it with `m_cellX/Y/Z` into
+   * world coordinates (the same space as `Player.position`).
    */
   private sampleOrigin(entity: Entity, record: MutableTrajectory, tick: number): void {
-    if (record.originIdx === -1) {
-      const idx = entity.serverClass.flattenedProps.findIndex(
-        (p) => p.prop.varName === "m_vecOrigin",
-      );
-      record.originIdx = idx >= 0 ? idx : -2;
-    }
-    if (record.originIdx < 0) return;
-
-    const value = entity.store.read(entity.storageSlot, record.originIdx);
-    if (
-      value === undefined ||
-      typeof value !== "object" ||
-      !("x" in value) ||
-      !("y" in value) ||
-      !("z" in value)
-    ) {
-      // Origin not yet written — entity created from baseline only on this
-      // tick. Skip; the next entityUpdated will carry it.
-      return;
-    }
-    const v = value as { x: number; y: number; z: number };
+    const v = readEntityOrigin(entity);
+    // Origin not yet written — entity created from baseline only on this
+    // tick. Skip; the next entityUpdated will carry it.
+    if (v === undefined) return;
 
     // Suppress duplicate consecutive samples — the server occasionally
     // re-emits an unchanged origin in the same prop bundle as another

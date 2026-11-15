@@ -573,4 +573,31 @@ describe("GrenadeTrajectoryTracker", () => {
     const types = snap.map((s) => s.type).sort();
     expect(types).toEqual(["decoy", "smoke"]);
   });
+
+  it("reports trajectory points in world space, not cell-relative offsets", () => {
+    // Regression: projectiles network m_vecOrigin relative to their cell
+    // (m_cellX/Y/Z, width 1 << m_cellbits). Raw offsets like (11, 4, 6)
+    // used to leak into trajectories instead of world coordinates.
+    const tracker = new GrenadeTrajectoryTracker();
+    const fake = makeFakeParser();
+    tracker.attach(fake.asParser);
+
+    fake.setTick(10);
+    const ent = makeEntity({
+      id: 60,
+      className: "CSmokeGrenadeProjectile",
+      props: {
+        m_cellbits: 5,
+        m_cellX: 436,
+        m_cellY: 468,
+        m_cellZ: 512,
+        m_vecOrigin: { x: 11, y: 4, z: 6 },
+        m_hThrower: 0xffffffff,
+      },
+    });
+    fake.emitCreated(ent);
+
+    const point = tracker.snapshot()[0]!.trajectory[0]!;
+    expect(point).toEqual({ x: -2421, y: -1404, z: 6, tick: 10 });
+  });
 });
