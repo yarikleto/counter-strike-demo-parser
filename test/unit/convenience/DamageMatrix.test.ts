@@ -37,6 +37,8 @@ type ParserLike = Pick<DemoParser, "on">;
 interface FakeParser {
   asParser: ParserLike;
   emitRoundStart(): void;
+  emitRoundEnd(reason?: number): void;
+  emitBeginNewMatch(): void;
   emitHurt(e: PlayerHurtEvent): void;
 }
 
@@ -45,6 +47,8 @@ function makeFakeParser(): FakeParser {
   return {
     asParser: emitter as unknown as ParserLike,
     emitRoundStart: () => emitter.emit("round_start", {}),
+    emitRoundEnd: (reason = 8) => emitter.emit("round_end", { reason }),
+    emitBeginNewMatch: () => emitter.emit("begin_new_match", {}),
     emitHurt: (e: PlayerHurtEvent) => emitter.emit("player_hurt", e),
   };
 }
@@ -302,6 +306,7 @@ describe("DamageMatrix", () => {
 
     fake.emitRoundStart(); // round 0
     fake.emitHurt(makeHurt(p1, p2, 30, 0));
+    fake.emitRoundEnd();
 
     fake.emitRoundStart(); // round 1
     fake.emitHurt(makeHurt(p1, p2, 50, 0));
@@ -345,6 +350,7 @@ describe("DamageMatrix", () => {
     fake.emitRoundStart(); // round 0
     fake.emitHurt(makeHurt(p1, p2));
     fake.emitHurt(makeHurt(p1, p3));
+    fake.emitRoundEnd();
 
     fake.emitRoundStart(); // round 1
     fake.emitHurt(makeHurt(p2, p1));
@@ -352,6 +358,56 @@ describe("DamageMatrix", () => {
     expect([...matrix.entriesForRound(0)]).toHaveLength(2);
     expect([...matrix.entriesForRound(1)]).toHaveLength(1);
     expect([...matrix.entriesForRound(2)]).toHaveLength(0);
+  });
+
+  it("indexes rounds like DemoResult.rounds when the demo starts at begin_new_match", () => {
+    // Club GOTV demos start recording at begin_new_match: round 1 has no
+    // round_start. Rounds used to be counted by round_start, which shifted
+    // every per-round bucket by one.
+    const matrix = new DamageMatrix();
+    const fake = makeFakeParser();
+    matrix.attach(fake.asParser as DemoParser);
+    const p1 = makePlayer(1);
+    const p2 = makePlayer(2);
+
+    fake.emitBeginNewMatch(); // round 0 opens without a round_start
+    fake.emitHurt(makeHurt(p1, p2, 10, 0));
+    fake.emitRoundEnd();
+    fake.emitRoundStart(); // round 1
+    fake.emitHurt(makeHurt(p1, p2, 20, 0));
+    fake.emitRoundEnd();
+
+    expect(matrix.getForRound(0, 1, 2)!.totalDamage).toBe(10);
+    expect(matrix.getForRound(1, 1, 2)!.totalDamage).toBe(20);
+  });
+
+  it("treats begin_new_match + round_start of the same round as one round", () => {
+    const matrix = new DamageMatrix();
+    const fake = makeFakeParser();
+    matrix.attach(fake.asParser as DemoParser);
+
+    fake.emitRoundStart();
+    fake.emitBeginNewMatch();
+    fake.emitHurt(makeHurt(makePlayer(1), makePlayer(2), 10, 0));
+    fake.emitRoundEnd();
+
+    expect([...matrix.entriesForRound(0)]).toHaveLength(1);
+    expect([...matrix.entriesForRound(1)]).toHaveLength(0);
+  });
+
+  it("counts a live round_end with no recorded start as an (empty) round", () => {
+    const matrix = new DamageMatrix();
+    const fake = makeFakeParser();
+    matrix.attach(fake.asParser as DemoParser);
+
+    fake.emitRoundEnd(16); // Game Commencing: not a round
+    fake.emitRoundEnd(); // live round whose start predates the recording
+    fake.emitRoundStart();
+    fake.emitHurt(makeHurt(makePlayer(1), makePlayer(2), 10, 0));
+    fake.emitRoundEnd();
+
+    expect([...matrix.entriesForRound(0)]).toHaveLength(0);
+    expect(matrix.getForRound(1, 1, 2)!.totalDamage).toBe(10);
   });
 
   // ── HitGroup raw integer forward-compat ──────────────────────────────────

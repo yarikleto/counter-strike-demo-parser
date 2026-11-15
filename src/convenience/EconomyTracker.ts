@@ -14,12 +14,14 @@
  *   capturing here gives "money available to spend this round" — the
  *   figure a user would expect to see in the buy menu.
  *
- * Warmup exclusion (mirrors ConvenienceRoundTracker):
- *   Events arriving before the first `round_start` are silently dropped.
- *   `currentIdx` stays at -1 until `round_start` fires. A player joining
- *   mid-round (i.e. `item_purchase` arrives with no prior round_start for
- *   that player) gets a best-effort entry with `startMoney: e.player.money`
- *   at the time of purchase.
+ * Round boundaries come from {@link RoundBuckets}, the same rules as
+ * `DemoResult.rounds` and `DamageMatrix`: `round_start` / `begin_new_match`
+ * open a round (and take the start-money snapshot), `round_end` takes the
+ * end-money snapshot and commits it. Purchases between rounds are dropped.
+ * A player joining mid-round (an `item_purchase` with no snapshot for that
+ * player) gets a best-effort entry with `startMoney: e.player.money` at the
+ * time of purchase. A round whose start was never recorded has no
+ * start-money snapshots.
  *
  * Round indexing: 0-based, matching `DemoResult.rounds` and
  * `DamageMatrix` round indexes.
@@ -28,6 +30,7 @@
 import type { DemoParser } from "../DemoParser.js";
 import type { Player } from "../state/Player.js";
 import type { ItemPurchaseEvent } from "../events/enrichers/itemPurchase.js";
+import { RoundBuckets } from "./RoundBuckets.js";
 
 /**
  * Economy record for a single player in a single round.
@@ -76,24 +79,24 @@ interface MutableEconomy {
  */
 export class EconomyTracker {
   /**
-   * Indexed by round index (0-based). Each element is a Map from player
-   * slot (CCSPlayer entity id, 1-based) to that player's economy record.
+   * Indexed like `DemoResult.rounds`. Each bucket maps player slot (CCSPlayer
+   * entity id, 1-based) to that player's economy record.
    */
-  private readonly perRound: Map<number, MutableEconomy>[] = [];
-  /** 0-based current round index. -1 = pre-warmup (no round_start yet). */
-  private currentIdx = -1;
+  private readonly rounds = new RoundBuckets<Map<number, MutableEconomy>>(
+    (synthesized) => (synthesized ? new Map() : this.snapshotStartMoney()),
+    (roundMap) => this.recordEndMoney(roundMap),
+  );
   /** Reference kept so handlers can read `parser.players` at event time. */
   private parser: DemoParser | null = null;
 
   /**
-   * Wire the tracker to a parser by subscribing to `round_start`,
-   * `item_purchase`, and `round_end`. Must be called before `parseAll()`.
+   * Wire the tracker to a parser by subscribing to the round boundary
+   * events and `item_purchase`. Must be called before `parseAll()`.
    */
   attach(parser: DemoParser): void {
     this.parser = parser;
-    parser.on("round_start", () => this.onRoundStart());
+    this.rounds.attach(parser);
     parser.on("item_purchase", (e) => this.onPurchase(e));
-    parser.on("round_end", () => this.onRoundEnd());
   }
 
   /**
@@ -104,17 +107,15 @@ export class EconomyTracker {
    * @returns The economy record, or `undefined` if the round/player is absent.
    */
   getEconomy(roundIdx: number, slot: number): PlayerRoundEconomy | undefined {
-    return this.perRound[roundIdx]?.get(slot);
+    return this.rounds.at(roundIdx)?.get(slot);
   }
 
   // ---------------------------------------------------------------------------
   // Event handlers — called synchronously during parseAll()
   // ---------------------------------------------------------------------------
 
-  private onRoundStart(): void {
-    this.currentIdx += 1;
+  private snapshotStartMoney(): Map<number, MutableEconomy> {
     const roundMap = new Map<number, MutableEconomy>();
-    this.perRound.push(roundMap);
 
     // Snapshot every live player's money as startMoney. The buy menu opens
     // during freeze time (which begins at or just after round_start), so
@@ -130,13 +131,14 @@ export class EconomyTracker {
         equipmentValue: 0,
       });
     }
+    return roundMap;
   }
 
   private onPurchase(e: ItemPurchaseEvent): void {
-    // Pre-warmup guard: drop events before any round_start.
-    if (this.currentIdx < 0) return;
+    // Between rounds (warmup, after the match): no round to file it under.
+    const roundMap = this.rounds.openBucket;
+    if (roundMap === undefined) return;
 
-    const roundMap = this.perRound[this.currentIdx]!;
     let entry = roundMap.get(e.player.slot);
 
     if (entry === undefined) {
@@ -156,12 +158,7 @@ export class EconomyTracker {
     entry.purchases.push(e);
   }
 
-  private onRoundEnd(): void {
-    // Pre-warmup guard: if no round_start preceded this event, do nothing.
-    if (this.currentIdx < 0) return;
-
-    const roundMap = this.perRound[this.currentIdx]!;
-
+  private recordEndMoney(roundMap: Map<number, MutableEconomy>): void {
     // Snapshot every live player's money as endMoney. This reflects actual
     // remaining cash after purchases and any mid-round adjustments.
     for (const player of this.parser!.players) {

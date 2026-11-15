@@ -16,18 +16,20 @@
  * per-pair aggregation contract.
  *
  * Per-round bucketing (roundIndex is 0-based, matching DemoResult.rounds):
- *   - `round_start` increments the round index and pushes a fresh Map.
- *   - `player_hurt` accumulates into both the match map and the current
- *     round's map (if a round is in progress).
- *   - Events received before the first `round_start` (warmup) accumulate
- *     into the match map only, not into any per-round bucket. This matches
- *     ConvenienceRoundTracker's warmup-exclusion stance.
+ *   - Round boundaries come from {@link RoundBuckets}, the same rules
+ *     `DemoResult.rounds` uses: `round_start` / `begin_new_match` open a
+ *     round, `round_end` commits it, and a live `round_end` whose start was
+ *     never recorded still counts as a round.
+ *   - `player_hurt` accumulates into both the match map and the open round's
+ *     map. Events between rounds (warmup, after the match) accumulate into
+ *     the match map only.
  */
 
 import type { DemoParser } from "../DemoParser.js";
 import type { Player } from "../state/Player.js";
 import type { HitGroup } from "../enums/HitGroup.js";
 import type { PlayerHurtEvent } from "../events/enrichers/playerHurt.js";
+import { RoundBuckets } from "./RoundBuckets.js";
 
 /** Composite key for a (attacker, victim) pair: `"${attackerSlot}|${victimSlot}"`. */
 type Key = `${number}|${number}`;
@@ -89,28 +91,15 @@ export class DamageMatrix {
   /** Full-match aggregation map. */
   private readonly match = new Map<Key, DamageEntry>();
 
-  /**
-   * Per-round maps, one per round in order. Index 0 = first round after the
-   * initial `round_start`. This is intentionally 0-based to align with
-   * `DemoResult.rounds`.
-   */
-  private readonly perRound: Map<Key, DamageEntry>[] = [];
+  /** Per-round maps, indexed like `DemoResult.rounds`. */
+  private readonly rounds = new RoundBuckets<Map<Key, DamageEntry>>(() => new Map());
 
   /**
-   * Current round index (-1 = before any `round_start`, i.e. warmup).
-   * Incremented on each `round_start`.
-   */
-  private currentRoundIdx = -1;
-
-  /**
-   * Wire the matrix to a parser by subscribing to `round_start` and
-   * `player_hurt` events. Must be called before `parser.parseAll()`.
+   * Wire the matrix to a parser by subscribing to the round boundary events
+   * and `player_hurt`. Must be called before `parser.parseAll()`.
    */
   attach(parser: DemoParser): void {
-    parser.on("round_start", () => {
-      this.currentRoundIdx++;
-      this.perRound.push(new Map());
-    });
+    this.rounds.attach(parser);
     parser.on("player_hurt", (e) => this.onHurt(e));
   }
 
@@ -156,9 +145,7 @@ export class DamageMatrix {
     attackerSlot: number,
     victimSlot: number,
   ): DamageEntry | undefined {
-    const roundMap = this.perRound[roundIndex];
-    if (roundMap === undefined) return undefined;
-    return roundMap.get(this.key(attackerSlot, victimSlot));
+    return this.rounds.at(roundIndex)?.get(this.key(attackerSlot, victimSlot));
   }
 
   /**
@@ -168,9 +155,7 @@ export class DamageMatrix {
    * @param roundIndex - 0-based round index (matches `DemoResult.rounds`).
    */
   entriesForRound(roundIndex: number): IterableIterator<DamageEntry> {
-    const roundMap = this.perRound[roundIndex];
-    if (roundMap === undefined) return new Map<Key, DamageEntry>().values();
-    return roundMap.values();
+    return (this.rounds.at(roundIndex) ?? new Map<Key, DamageEntry>()).values();
   }
 
   // -------------------------------------------------------------------------
@@ -196,12 +181,9 @@ export class DamageMatrix {
     // Accumulate into the full-match map.
     this.accumulate(this.match, k, e.attacker, e.victim, e);
 
-    // Accumulate into the current round's map only if a round is in progress.
-    // Events during warmup (currentRoundIdx === -1) are excluded per spec.
-    if (this.currentRoundIdx >= 0) {
-      const roundMap = this.perRound[this.currentRoundIdx]!;
-      this.accumulate(roundMap, k, e.attacker, e.victim, e);
-    }
+    // Accumulate into the open round's map, if a round is in progress.
+    const roundMap = this.rounds.openBucket;
+    if (roundMap !== undefined) this.accumulate(roundMap, k, e.attacker, e.victim, e);
   }
 
   /**

@@ -34,6 +34,7 @@ interface FakeParser {
   emitRoundStart(): void;
   emitPurchase(e: ItemPurchaseEvent): void;
   emitRoundEnd(): void;
+  emitBeginNewMatch(): void;
 }
 
 function makeFakeParser(initialPlayers: Player[] = []): FakeParser {
@@ -58,6 +59,7 @@ function makeFakeParser(initialPlayers: Player[] = []): FakeParser {
     emitRoundStart: () => emitter.emit("round_start", {}),
     emitPurchase: (e) => emitter.emit("item_purchase", e),
     emitRoundEnd: () => emitter.emit("round_end", {}),
+    emitBeginNewMatch: () => emitter.emit("begin_new_match", {}),
   };
 }
 
@@ -247,5 +249,28 @@ describe("EconomyTracker", () => {
     fake.emitRoundStart();
 
     expect(tracker.getEconomy(0, 1)?.equipmentValue).toBe(0);
+  });
+
+  it("indexes rounds like DemoResult.rounds when the demo starts at begin_new_match", () => {
+    // Round 1 opens with begin_new_match (no round_start); round 2 with
+    // round_start. Counting round_starts used to file round 2 as index 0.
+    const tracker = new EconomyTracker();
+    const fake = makeFakeParser();
+    tracker.attach(fake.asParser);
+    const p1 = makePlayer(1, 800);
+
+    fake.setPlayers([p1]);
+    fake.emitBeginNewMatch();
+    fake.emitPurchase(makePurchase(p1, "weapon_glock"));
+    fake.emitRoundEnd();
+    fake.setPlayers([makePlayer(1, 3400)]);
+    fake.emitRoundStart();
+    fake.emitPurchase(makePurchase(p1, "weapon_ak47"));
+    fake.emitRoundEnd();
+
+    expect(tracker.getEconomy(0, 1)!.startMoney).toBe(800);
+    expect(tracker.getEconomy(0, 1)!.purchases.map((e) => e.item)).toEqual(["weapon_glock"]);
+    expect(tracker.getEconomy(1, 1)!.startMoney).toBe(3400);
+    expect(tracker.getEconomy(1, 1)!.purchases.map((e) => e.item)).toEqual(["weapon_ak47"]);
   });
 });
