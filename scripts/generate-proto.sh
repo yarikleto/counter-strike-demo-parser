@@ -63,4 +63,10 @@ protoc \
   --ts_proto_opt="${TS_PROTO_OPTS}" \
   "${PROTO_FILES[@]}"
 
+# protobufjs ships no package.json "exports" map, so Node's ESM resolver
+# needs the explicit file extension on subpath imports. ts-proto emits the
+# bare "protobufjs/minimal" specifier; rewrite it so dist/index.js loads.
+find "${OUT_DIR}" -type f -name '*.ts' -exec \
+  perl -pi -e 's|from "protobufjs/minimal";|from "protobufjs/minimal.js";|' {} +
+
 echo "Generated TypeScript at ${OUT_DIR}"
